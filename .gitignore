@@ -1,4 +1,4 @@
-source_code\__pycache__
+source_code/__pycache__
 samples\*
 # Ignore build artifacts
 build_system/build/
