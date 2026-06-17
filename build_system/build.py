@@ -47,7 +47,7 @@ DOC_USER_DIR = PROJECT_ROOT / "documentation" / "user_guides"
 APP_NAME = "KaraokeStudioPro"
 VERSION = "2.0"  # Update this manually or read from file
 SPEC_FILE = PROJECT_ROOT / "build_system" / "KaraokeStudioPro.spec"
-MAIN_SCRIPT = SOURCE_DIR / "karaoke_app.py"
+MAIN_SCRIPT = SOURCE_DIR / "main.py"
 
 # ============================================================================
 # HELPER FUNCTIONS

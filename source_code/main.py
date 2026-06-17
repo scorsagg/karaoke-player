@@ -1,13 +1,181 @@
+from pathlib import Path
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
+    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
+    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
+    QListWidget, QGridLayout, QSplashScreen, QDialog
+)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
+from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
+import numpy as np
+import sounddevice as sd
+from collections import deque
+
+# Refactored components
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .workers.process_thread import ProcessThread
+from .dialogs.settings_dialog import SettingsDialog
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService
+
 # Refactored entry file
 # Import extracted components
-from video_frame import VideoFrame
-from audio_meter import AudioLevelMeter
-from audio_analyzer import AudioAnalyzerThread
-from settings_dialog import SettingsDialog
-from process_thread import ProcessThread
+from .widgets.video_frame import VideoFrame
+from .widgets.audio_meter import AudioLevelMeter
+from .workers.audio_analyzer import AudioAnalyzerThread
+from .dialogs.settings_dialog import SettingsDialog
+from .workers.process_thread import ProcessThread
 
-import sys, os, vlc, subprocess, re, time, json
-from pathlib import Path
+import sys, os, subprocess, re, time, json
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog, 
     QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea, 
@@ -20,7 +188,6 @@ import numpy as np
 import sounddevice as sd
 from collections import deque
 
-
 class KaraokeApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -30,20 +197,20 @@ class KaraokeApp(QWidget):
         self.is_video_fullscreen = False
         self.download_splash = None
         self.export_splash = None
-        
+
         self.init_settings_manager()
-        
+
         self.setWindowTitle("Karaoke Studio Pro v2.0")
         self.resize(1150, 850)
         self.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: 'Segoe UI';")
 
         vlc_args = ["--aout=directx"] if sys.platform == "win32" else []
-        self.instance = vlc.Instance(vlc_args)
+        self.instance = .Instance(vlc_args)
         self.player = self.instance.media_player_new()
 
         self.setup_ui()
         self.nav_list.setCurrentRow(0)
-        
+
         self.timer = QTimer()
         self.timer.setInterval(200)
         self.timer.timeout.connect(self.update_ui)
@@ -54,22 +221,22 @@ class KaraokeApp(QWidget):
         self.hide_controls_timer = QTimer()
         self.hide_controls_timer.setInterval(2500)  # Auto-hide after 2.5 seconds
         self.hide_controls_timer.timeout.connect(self.hide_fullscreen_controls)
-        
+
         self.fullscreen_timer = None
         self.fullscreen_mouse_timer = None
-        
+
         self.setAcceptDrops(True)
         self.video_frame.setAcceptDrops(True)
-        
+
         # Monitor mouse events across the video framework structure
         self.video_frame.installEventFilter(self)
         self.playback_widget.installEventFilter(self)
-        
+
         # Initialize and start audio analyzer thread
         self.audio_analyzer = AudioAnalyzerThread()
         self.audio_analyzer.level_updated.connect(self.on_audio_level_updated)
         self.audio_analyzer.start()
-        
+
         # Auto-reduce tracking
         self.auto_reduce_active = False
 
@@ -78,7 +245,7 @@ class KaraokeApp(QWidget):
         config_dir = app_dir / "config"
         config_dir.mkdir(exist_ok=True)
         self.settings_file = config_dir / "settings.json"
-        
+
         self.settings = {
             "base_directory": str(app_dir),
             "download_directory": str(app_dir),
@@ -111,7 +278,7 @@ class KaraokeApp(QWidget):
         self.sidebar.setStyleSheet("background-color: #252526; border-right: 1px solid #333;")
         side_layout = QVBoxLayout(self.sidebar)
         side_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         logo = QLabel("KARAOKE STUDIO PRO")
         logo.setFont(QFont("Segoe UI", 12, QFont.Bold))
         logo.setContentsMargins(15, 20, 10, 20)
@@ -138,7 +305,7 @@ class KaraokeApp(QWidget):
         self.extra_tools_container.setVisible(False)
         extra_tools_container_layout = QVBoxLayout(self.extra_tools_container)
         extra_tools_container_layout.setContentsMargins(0, 5, 0, 0)
-        
+
         self.widen_video_btn = QPushButton("📐 Widen Video")
         self.widen_video_btn.setStyleSheet("background-color: #2d2d2d; color: #aaa; padding: 8px 15px; border: none; text-align: left; margin-left: 15px; margin-right: 10px;")
         self.widen_video_btn.clicked.connect(lambda: self.handle_navigation_change(2))
@@ -158,17 +325,17 @@ class KaraokeApp(QWidget):
         self.history_container.setVisible(False)
         history_container_layout = QVBoxLayout(self.history_container)
         history_container_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         hist_header = QHBoxLayout()
         history_label = QLabel("RECENT FILES")
         history_label.setFont(QFont("Segoe UI", 8, QFont.Bold))
         history_label.setStyleSheet("color: #666; margin-left: 15px;")
-        
+
         self.clear_hist_btn = QPushButton("Clear")
         self.clear_hist_btn.setFixedSize(45, 18)
         self.clear_hist_btn.setStyleSheet("font-size: 9px; background-color: #333; color: #888; border-radius: 2px;")
         self.clear_hist_btn.clicked.connect(self.clear_history)
-        
+
         hist_header.addWidget(history_label)
         hist_header.addStretch()
         hist_header.addWidget(self.clear_hist_btn)
@@ -184,15 +351,15 @@ class KaraokeApp(QWidget):
         self.history_list.itemDoubleClicked.connect(lambda item: self.load_video(item.toolTip()))
         history_container_layout.addWidget(self.history_list)
         side_layout.addWidget(self.history_container)
-        
+
         self.load_history_from_disk()
         side_layout.addStretch(1)
-        
+
         self.settings_btn = QPushButton("⚙️ Settings")
         self.settings_btn.setStyleSheet("background-color: #37373d; color: #ccc; padding: 10px; border: 1px solid #444; border-radius: 3px;")
         self.settings_btn.clicked.connect(self.open_settings)
         side_layout.addWidget(self.settings_btn)
-        
+
         self.status_label = QLabel("Status: Ready")
         self.status_label.setStyleSheet("color: #ffffff; padding: 5px 10px; font-size: 12px; font-weight: bold; border-top: 1px solid #333;")
         self.status_label.setWordWrap(True)
@@ -213,7 +380,7 @@ class KaraokeApp(QWidget):
         self.playback_widget.setLayout(self.create_playback_bar())
         self.playback_widget.setFixedHeight(95)
         self.content_container.addWidget(self.playback_widget)
-        
+
         self.content_container.addWidget(self.stack)
         self.content_container.addStretch()
         self.main_h_layout.addLayout(self.content_container)
@@ -239,7 +406,7 @@ class KaraokeApp(QWidget):
         self.seek_slider.sliderReleased.connect(self.on_slider_released)
         self.duration_label = QLabel("00:00")
         seek_row.addWidget(self.time_label); seek_row.addWidget(self.seek_slider); seek_row.addWidget(self.duration_label)
-        
+
         ctrl_row = QHBoxLayout()
         self.back_btn = QPushButton("⏪ -10s"); self.back_btn.clicked.connect(lambda: self.jump_time(-10000))
         self.play_btn = QPushButton("▶ Play"); self.play_btn.clicked.connect(self.player.play)
@@ -250,7 +417,7 @@ class KaraokeApp(QWidget):
         self.vol_slider = QSlider(Qt.Horizontal); self.vol_slider.setRange(0, 100); self.vol_slider.setValue(80); self.vol_slider.setFixedWidth(120)
         self.vol_slider.valueChanged.connect(self.set_volume)
         self.vol_label = QLabel("80%"); self.vol_label.setFixedWidth(40)
-        
+
         # Add audio level meter
         self.audio_level_meter = AudioLevelMeter()
         self.audio_level_meter.set_level(-80.0)  # Initialize to silent
@@ -259,16 +426,16 @@ class KaraokeApp(QWidget):
 
         for w in [self.back_btn, self.play_btn, self.pause_btn, self.fwd_btn]: ctrl_row.addWidget(w)
         ctrl_row.addStretch()
-        
+
         # Add audio level meter to control row
         ctrl_row.addWidget(self.audio_level_label)
         ctrl_row.addWidget(self.audio_level_meter)
         ctrl_row.addSpacing(10)
-        
+
         self.fullscreen_btn = QPushButton("🖥 Full Video"); self.fullscreen_btn.setFixedWidth(95)
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
         ctrl_row.addWidget(self.fullscreen_btn)
-        
+
         for w in [self.mute_btn, self.vol_slider, self.vol_label]: ctrl_row.addWidget(w)
         container.addLayout(seek_row)
         container.addSpacing(5)
@@ -279,7 +446,7 @@ class KaraokeApp(QWidget):
         page = QWidget(); layout = QVBoxLayout(page)
         layout.setContentsMargins(10, 5, 10, 5)
         grid = QGridLayout()
-        
+
         self.load_btn = QPushButton("📂 Open File..."); self.load_btn.setFixedSize(110, 30)
         self.load_btn.clicked.connect(lambda: self.load_video())
         grid.addWidget(self.load_btn, 1, 0)
@@ -309,11 +476,11 @@ class KaraokeApp(QWidget):
         self.pitch_input = QDoubleSpinBox(); self.pitch_input.setRange(-12.0, 12.0); self.pitch_input.setValue(0.0); self.pitch_input.setSuffix(" semitones"); self.pitch_input.setSingleStep(0.5) 
         self.pitch_plus = QPushButton("+"); self.pitch_plus.setFixedWidth(30)
         self.pitch_reset = QPushButton("↺"); self.pitch_reset.setFixedWidth(40)
-        
+
         self.pitch_minus.clicked.connect(lambda: self.pitch_input.setValue(self.pitch_input.value() - 1.0))
         self.pitch_plus.clicked.connect(lambda: self.pitch_input.setValue(self.pitch_input.value() + 1.0))
         self.pitch_reset.clicked.connect(lambda: self.pitch_input.setValue(0.0))
-        
+
         for w in [self.pitch_minus, self.pitch_input, self.pitch_plus, self.pitch_reset]: p_row.addWidget(w)
         p_row.addStretch()
 
@@ -322,12 +489,12 @@ class KaraokeApp(QWidget):
         self.speed_input = QDoubleSpinBox(); self.speed_input.setRange(0.5, 2.0); self.speed_input.setValue(1.0); self.speed_input.setSuffix("x Timeline"); self.speed_input.setSingleStep(0.05) 
         self.speed_plus = QPushButton("+"); self.speed_plus.setFixedWidth(30)
         self.speed_reset = QPushButton("↺"); self.speed_reset.setFixedWidth(40)
-        
+
         self.speed_minus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() - 0.01, 2)))
         self.speed_plus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() + 0.01, 2)))
         self.speed_reset.clicked.connect(lambda: self.speed_input.setValue(1.0))
         self.speed_input.valueChanged.connect(lambda v: self.player.set_rate(v))
-        
+
         for w in [self.speed_minus, self.speed_input, self.speed_plus, self.speed_reset]: s_row.addWidget(w)
         s_row.addStretch()
 
@@ -339,11 +506,11 @@ class KaraokeApp(QWidget):
     def create_extra_page(self):
         page = QWidget(); layout = QVBoxLayout(page)
         layout.setContentsMargins(10, 5, 10, 5)
-        
+
         title = QLabel("<b>📐 ASPECT-RATIO LAYOUT PAD ENGINE</b>")
         title.setFont(QFont("Segoe UI", 11, QFont.Bold))
         layout.addWidget(title)
-        
+
         grid = QGridLayout()
         widen_file_btn = QPushButton("📂 Open Widen File..."); widen_file_btn.setFixedSize(140, 30)
         widen_file_btn.clicked.connect(self.browse_widen_video)
@@ -363,17 +530,17 @@ class KaraokeApp(QWidget):
         widen_dl_btn.clicked.connect(lambda: self.download_video(from_widen_tab=True))
         grid.addWidget(widen_dl_btn, 1, 3)
         layout.addLayout(grid)
-        
+
         self.widen_file_status_label = QLabel("Queued File for Widening: None (Will fallback to currently loaded player asset if blank)")
         self.widen_file_status_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 5px 0px;")
         layout.addWidget(self.widen_file_status_label)
         layout.addSpacing(10)
-        
+
         self.widen_exec_btn = QPushButton("Scale Active Video to Wide 16:9 Canvas")
         self.widen_exec_btn.setStyleSheet("background-color: #e67e22; height: 45px; font-weight: bold; font-size: 13px; color: white; border-radius: 4px;")
         self.widen_exec_btn.clicked.connect(self.widen_active_video_canvas)
         layout.addWidget(self.widen_exec_btn)
-        
+
         layout.addStretch()
         return page
 
@@ -398,21 +565,21 @@ class KaraokeApp(QWidget):
     def toggle_mute(self):
         m = not self.player.audio_get_mute(); self.player.audio_set_mute(m)
         self.mute_btn.setText("🔇" if m else "🔊")
-    
+
     def on_audio_level_updated(self, db_level):
         if not hasattr(self, 'audio_level_meter'): return
-        
+
         self.audio_level_meter.set_level(db_level)
-        
+
         # Convert dB to 0-100 scale (Assuming -80 to 0)
         level_percent = ((db_level + 80.0) / 80.0) * 100.0
-        
+
         # Auto-reduction logic
         if level_percent > 50:
             # Increment a counter instead of triggering immediately
             if not hasattr(self, 'high_db_counter'): self.high_db_counter = 0
             self.high_db_counter += 1
-            
+
             # If it stays loud for ~10 cycles (~1 second), reduce volume
             if self.high_db_counter >= 20:
                 current_vol = self.vol_slider.value()
@@ -426,7 +593,7 @@ class KaraokeApp(QWidget):
             self.high_db_counter = 0
 
     def jump_time(self, ms):
-        if self.player.get_state() in [vlc.State.Playing, vlc.State.Paused]:
+        if self.player.get_state() in [.State.Playing, .State.Paused]:
             current = self.player.get_time()
             duration = self.player.get_length()
             if duration <= 0: return
@@ -488,7 +655,7 @@ class KaraokeApp(QWidget):
             )
             if not f: return
             file_path = f
-        
+
         if splash_screen is None:
             loading_path = get_resource_path("Loading.png")
             pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
@@ -497,44 +664,44 @@ class KaraokeApp(QWidget):
             loader.show()
         else:
             loader = splash_screen
-            
+
         QApplication.processEvents()
         self._pending_video_path = file_path
         self.add_to_history(file_path)
-        
+
         # Stop audio monitoring when loading
         self.audio_analyzer.set_playing(False)
-        
+
         try:
             self.player.stop()
-            
+
             loader.set_progress(40, "Mapping Core Encoders...")
             self.video_path = self._pending_video_path
             media = self.instance.media_new(os.path.abspath(self.video_path))
             self.player.set_media(media)
-            
+
             win_id = int(self.video_frame.winId())
             if sys.platform == "win32": self.player.set_hwnd(win_id)
             else: self.player.set_xwindow(win_id)
-            
+
             loader.set_progress(70, "Synchronizing Canvas Matrix Pipeline...")
-            
+
             self.player.play()
             self.time_label.setText("00:00")
-            
+
             retries = 0
             while self.player.audio_get_track() == -1 and retries < 20:
                 time.sleep(0.05)
                 QApplication.processEvents()
                 retries += 1
-                
+
             self.player.audio_set_volume(self.vol_slider.value())
-            
+
             # Start audio monitoring after playback begins
             self.audio_analyzer.set_playing(True)
-            
+
             self.finish_loading(loader)
-            
+
         except Exception as e:
             print(f"Engine Fault: {e}")
             loader.close()
@@ -543,7 +710,7 @@ class KaraokeApp(QWidget):
         self.pitch_input.setValue(0.0)
         self.speed_input.setValue(1.0)
         if self.video_path: self.filename_label.setText(f"Playing: {os.path.basename(self.video_path)}")
-        
+
         loader.set_progress(100, "Ready")
         loader.finish(self)
 
@@ -553,21 +720,21 @@ class KaraokeApp(QWidget):
         if not url.startswith("http"):
             QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
             return
-        
+
         self.status_label.setText("Status: Deploying Downloader Task Pipes...")
         loading_path = get_resource_path("Loading.png")
         pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
         if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-        
+
         task_key = "widen_download" if from_widen_tab else "downloader"
         self.download_splash = ModernSplashScreen(pix, show_cancel_button=True)
         self.download_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task(task_key))
         self.download_splash.show()
         QApplication.processEvents()
-        
+
         out_pattern = os.path.join(self.settings["download_directory"], "%(title)s.%(ext)s").replace("\\", "/")
         cmd = [self.settings["ytdlp_path"], "-f", "bv[vcodec^=avc1]+ba[acodec^=mp4a]/b", "-o", out_pattern, "--force-overwrites", "--no-warnings", url]
-        
+
         self.launch_async_task(cmd, None, task_key)
 
     def get_video_duration_via_ffprobe(self, target_path):
@@ -586,33 +753,33 @@ class KaraokeApp(QWidget):
 
     def export_video(self):
         if not self.video_path: return
-        
+
         loading_path = get_resource_path("Loading.png")
         pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
         if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-        
+
         self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
         self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("exporter"))
         self.export_splash.show()
-        
+
         s, p = self.speed_input.value(), self.pitch_input.value()
         pf = 2**(p/12)
         tempo_val = s / pf
-        
+
         atempo_list = []
         curr_t = tempo_val
         while curr_t > 2.0: atempo_list.append("atempo=2.0"); curr_t /= 2.0
         while curr_t < 0.5: atempo_list.append("atempo=0.5"); curr_t /= 0.5
         atempo_list.append(f"atempo={round(curr_t, 4)}")
-        
+
         out = os.path.join(self.settings["download_directory"], f"karaoke_export_{int(time.time())}.mp4")
         abs_in = os.path.abspath(self.video_path).replace("\\", "/")
         abs_out = os.path.abspath(out).replace("\\", "/")
-        
+
         cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-filter_complex", 
                f"[0:v]setpts=PTS/{s}[v];[0:a]asetrate=44100*{pf},aresample=44100,{','.join(atempo_list)}[a]", 
                "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", abs_out]
-        
+
         duration = self.get_video_duration_via_ffprobe(abs_in) / s
         self.launch_async_task(cmd, abs_out, "exporter", override_duration=duration)
 
@@ -621,44 +788,44 @@ class KaraokeApp(QWidget):
         if not target_input or not os.path.exists(target_input):
             QMessageBox.warning(self, "Missing Asset Input", "Load a file path or complete a download segment beforehand.")
             return
-            
+
         loading_path = get_resource_path("Loading.png")
         pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
         if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-        
+
         self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
         self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("widen_task"))
         self.export_splash.show()
-        
+
         base_name = os.path.splitext(os.path.basename(target_input))[0]
         out = os.path.join(self.settings["download_directory"], f"{base_name}-wide.mp4")
-        
+
         abs_in = os.path.abspath(target_input).replace("\\", "/")
         abs_out = os.path.abspath(out).replace("\\", "/")
-        
+
         filter_str = "crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080"
         cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-vf", filter_str, "-c:a", "copy", abs_out]
-               
+
         duration = self.get_video_duration_via_ffprobe(abs_in)
         self.launch_async_task(cmd, abs_out, "widen_task", override_duration=duration)
 
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
         self.kill_allocated_task(task_key)
-        
+
         duration = override_duration
         if duration == 0 and task_key in ["downloader", "widen_download"] and self.player.get_length() > 0:
             duration = self.player.get_length() / 1000.0
-            
+
         thread = ProcessThread(cmd, duration)
         self.active_tasks[task_key] = thread
-        
+
         if task_key in ["downloader", "widen_download"]:
             thread.status_update.connect(lambda text: self.download_splash.set_progress(self.download_splash.pbar.value(), text))
             thread.progress.connect(lambda v: self.download_splash.set_progress(v, self.download_splash.showMessageLabel.text()))
         else:
             thread.status_update.connect(lambda text: self.export_splash.set_progress(self.export_splash.pbar.value(), text))
             thread.progress.connect(lambda v: self.export_splash.set_progress(v, self.export_splash.showMessageLabel.text()))
-            
+
         thread.finished.connect(lambda success: self.handle_task_completion(task_key, out_path, success))
         thread.start()
 
@@ -682,25 +849,25 @@ class KaraokeApp(QWidget):
 
     def handle_task_completion(self, task_key, out_path, success):
         self.active_tasks.pop(task_key, None)
-        
+
         if task_key in ["downloader", "widen_download"] and self.download_splash:
             self.download_splash.close(); self.download_splash = None
         elif self.export_splash:
             self.export_splash.close(); self.export_splash = None
-            
+
         self.status_label.setText("Status: Ready")
-        
+
         if not success:
             QMessageBox.warning(self, "Processing Break", "Execution pipeline stopped or configuration error checked.")
             return
-            
+
         if task_key in ["downloader", "widen_download"]:
             try:
                 targets = [f for f in os.listdir(self.settings["download_directory"]) if f.endswith('.mp4')]
                 if targets:
                     latest = max(targets, key=lambda x: os.path.getmtime(os.path.join(self.settings["download_directory"], x)))
                     full_p = os.path.normpath(os.path.join(self.settings["download_directory"], latest))
-                    
+
                     if task_key == "widen_download":
                         self.widen_url_input.clear()
                         self.widen_tab_video_path = full_p
@@ -719,7 +886,7 @@ class KaraokeApp(QWidget):
     def update_ui(self):
         try:
             state = self.player.get_state()
-            if state in [vlc.State.Playing, vlc.State.Paused]:
+            if state in [.State.Playing, .State.Paused]:
                 dur = self.player.get_length()
                 if dur > 0 and not self.is_user_sliding:
                     pos = self.player.get_position()
@@ -741,7 +908,7 @@ class KaraokeApp(QWidget):
     def on_slider_pressed(self): self.is_user_sliding = True
     def on_slider_released(self):
         self.is_user_sliding = False
-        if self.player.get_state() not in [vlc.State.NothingSpecial, vlc.State.Stopped]:
+        if self.player.get_state() not in [.State.NothingSpecial, .State.Stopped]:
             self.player.set_position(self.seek_slider.value() / 1000.0)
 
     def toggle_video_fullscreen(self):
@@ -749,16 +916,16 @@ class KaraokeApp(QWidget):
         if not self.is_video_fullscreen:
             # 1. Cache the fact that we were maximized
             self._was_maximized_before_fullscreen = self.isMaximized()
-            
+
             # 2. Hide side layout components
             self.sidebar.hide()
             self.stack.hide()
             self.filename_label.hide()
-            
+
             # 3. Enter TRUE OS-level Fullscreen (Hides Taskbar and Title bar completely)
             self.showFullScreen()
             self.is_video_fullscreen = True
-            
+
             # 4. Enforce 100% Width and clean styles on the control bar container
             self.playback_widget.setStyleSheet("""
                 QWidget {
@@ -798,27 +965,27 @@ class KaraokeApp(QWidget):
                     border-radius: 7px;
                 }
             """)
-            
+
             # Set the height to be generous enough to easily fit buttons and labels without truncation
             self.playback_widget.setFixedHeight(110)
-            
+
             # Stretch inner layout margins to give breathing room against monitor edges
             if self.playback_widget.layout():
                 self.playback_widget.layout().setContentsMargins(50, 15, 50, 15)
                 self.playback_widget.layout().setSpacing(10)
                 self.playback_widget.layout().activate()
-                
+
             # Lock standard button widths
             self.back_btn.setMinimumWidth(75)
             self.play_btn.setMinimumWidth(75)
             self.pause_btn.setMinimumWidth(75)
             self.fwd_btn.setMinimumWidth(75)
             self.fullscreen_btn.setMinimumWidth(115)
-            
+
             self.fullscreen_btn.setText("⬜ Exit Full")
             self.fullscreen_btn.setToolTip("Exit fullscreen (or press Esc)")
             self.controls_visible = False
-            
+
             # Trigger auto-hide hover countdowns
             self.show_fullscreen_controls()
             if self.fullscreen_timer is None:
@@ -826,35 +993,35 @@ class KaraokeApp(QWidget):
                 self.fullscreen_timer.setSingleShot(True)
                 self.fullscreen_timer.timeout.connect(self.hide_fullscreen_controls)
             self.fullscreen_timer.start(3000)
-            
+
             self.setMouseTracking(True)
             if hasattr(self, 'fullscreen_mouse_timer') and self.fullscreen_mouse_timer is not None:
                 self.fullscreen_mouse_timer.start()
-                
+
         else:
             # --- TEARDOWN FULLSCREEN STATE ---
             if hasattr(self, 'fullscreen_mouse_timer') and self.fullscreen_mouse_timer is not None:
                 self.fullscreen_mouse_timer.stop()
             if self.fullscreen_timer:
                 self.fullscreen_timer.stop()
-            
+
             # Restore exact previous window state cleanly
             if getattr(self, '_was_maximized_before_fullscreen', True):
                 self.showMaximized()
             else:
                 self.showNormal()
-                
+
             self.is_video_fullscreen = False
-            
+
             # 1. Revert component stylesheets to layout defaults
             self.playback_widget.setStyleSheet("")
             self.playback_widget.setFixedHeight(100)
-            
+
             if self.playback_widget.layout():
                 self.playback_widget.layout().setContentsMargins(15, 10, 15, 10)
                 self.playback_widget.layout().setSpacing(8)
                 self.playback_widget.layout().activate()
-            
+
             # 2. Re-verify the layout tree mapping position below the video player canvas
             target_layout = None
             for i in range(self.main_h_layout.count()):
@@ -862,21 +1029,21 @@ class KaraokeApp(QWidget):
                 if isinstance(layout_item, QVBoxLayout):
                     target_layout = layout_item
                     break
-                    
+
             if target_layout is not None:
                 target_layout.removeWidget(self.playback_widget)
                 target_layout.insertWidget(2, self.playback_widget)
-            
+
             # 3. Bring standard UI panels back into frame view
             self.sidebar.show()
             self.stack.show()
             self.filename_label.show()
-            
+
             self.fullscreen_btn.setText("🖥 Full Video")
             self.fullscreen_btn.setToolTip("Maximize video area, hide controls")
             self.controls_visible = True
             self.setMouseTracking(False)
-            
+
             # 4. Refresh layout painting pipelines
             self.playback_widget.show()
             self.update()
@@ -894,7 +1061,7 @@ class KaraokeApp(QWidget):
                 self.playback_widget.show()
                 self.playback_widget.raise_()
                 self.controls_visible = True
-            
+
             if self.fullscreen_timer:
                 self.fullscreen_timer.stop()
                 self.fullscreen_timer.start(3000)
@@ -908,18 +1075,18 @@ class KaraokeApp(QWidget):
                 screen_geo = QApplication.primaryScreen().geometry()
                 cursor_pos = QCursor.pos()
                 trigger_zone_y = screen_geo.height() - 140
-                
+
                 if cursor_pos.y() >= trigger_zone_y or self.playback_widget.underMouse():
                     self.show_fullscreen_controls()
                 else:
                     # If moving away from the control layer, reset/tick down the timer aggressively
                     if not self.hide_controls_timer.isActive() and not self.playback_widget.underMouse():
                         self.hide_controls_timer.start()
-                        
+
             # If mouse exits the full app window layout context frame entirely
             elif event.type() == QEvent.Leave and watched == self.playback_widget:
                 self.hide_controls_timer.start()
-                
+
         return super().eventFilter(watched, event)
 
     def keyPressEvent(self, event):
@@ -945,18 +1112,18 @@ class KaraokeApp(QWidget):
             if hasattr(self, 'audio_analyzer'):
                 self.audio_analyzer.stop()
         except Exception: pass
-        
+
         # Stop auto-reduce timer
         try:
             if hasattr(self, 'auto_reduce_timer'):
                 self.auto_reduce_timer.stop()
         except Exception: pass
-        
+
         # Stop periodic UI updates first
         try:
             self.timer.stop()
         except Exception: pass
-        
+
         try:
             if self.fullscreen_timer: self.fullscreen_timer.stop()
             if self.fullscreen_mouse_timer: self.fullscreen_mouse_timer.stop()
@@ -968,7 +1135,7 @@ class KaraokeApp(QWidget):
                 self.playback_widget.setParent(None)
                 self.playback_widget.close()
         except Exception: pass
-        
+
         self.stop_all_tasks()
 
         try: self.player.stop()
@@ -979,7 +1146,7 @@ class KaraokeApp(QWidget):
         except Exception: pass
 
         event.accept()
-        
+
 def get_resource_path(filename):
     base_dir = sys._MEIPASS if hasattr(sys, '_MEIPASS') else os.path.dirname(__file__)
     possible_paths = [
@@ -1001,12 +1168,12 @@ class ModernSplashScreen(QSplashScreen):
             QProgressBar::chunk { background-color: #2ecc71; width: 8px; }
         """)
         self.pbar.setRange(0, 100)
-        
+
         self.showMessageLabel = QLabel(self)
         self.showMessageLabel.setGeometry(50, self.size().height() - 70, self.size().width() - 100, 20)
         self.showMessageLabel.setStyleSheet("color: white; font-size: 11px;")
         self.showMessageLabel.setAlignment(Qt.AlignCenter)
-        
+
         if show_cancel_button:
             self.cancel_btn = QPushButton("✖ STOP", self)
             self.cancel_btn.setGeometry(self.size().width() - 75, 10, 65, 26)
@@ -1024,12 +1191,12 @@ if __name__ == "__main__":
         pix = QPixmap(splash_path).scaled(700, 350, Qt.KeepAspectRatio, Qt.SmoothTransformation)
     else:
         pix = QPixmap(700, 350); pix.fill(QColor("#1e1e1e"))
-        
+
     splash = ModernSplashScreen(pix)
     splash.show()
     splash.set_progress(20, "Initializing UI Components...")
     time.sleep(0.2)
-    
+
     try:
         window = KaraokeApp()
         splash.set_progress(70, "Synchronizing Core Audio Engine Drivers...")
@@ -1040,3 +1207,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Fatal Initialization Failure: {e}")
         sys.exit(1)
+from .services.player_service import PlayerService
+from .services.player_service import PlayerService
+from .services.download_service import DownloadService

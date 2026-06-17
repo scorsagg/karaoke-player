@@ -9,7 +9,7 @@ Build with: python build.py (from BUILD_SYSTEM folder)
 block_cipher = None
 
 a = Analysis(
-    ['../source_code/karaoke_app.py'],  # Point to source_code folder
+    ['../source_code/main.py'],  # Point to source_code folder
     pathex=[],
     
     # Binaries to include (FFmpeg and yt-dlp from resources folder)
@@ -29,15 +29,16 @@ a = Analysis(
     
     # Hidden imports (packages not automatically detected)
     hiddenimports=[
-        'vlc',
         'PySide6',
-    ],
-    
-    # Hooks for special handling (optional)
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    
+        'source_code.dialogs.settings_dialog',
+        'source_code.services.download_service',
+        'source_code.services.player_service',
+        'source_code.widgets.audio_meter',
+        'source_code.widgets.video_frame',
+        'source_code.workers.audio_analyzer',
+        'source_code.workers.process_thread',
+        'vlc',
+    ],    
     # Modules to exclude (reduces bundle size)
     excludes=[
         'tkinter',
