@@ -1,1 +1,8 @@
+# Build dependencies
 pyinstaller>=6.0.0
+
+# Runtime dependencies (must also be installed for bundling)
+PySide6>=6.0.0
+python-vlc>=3.0.0
+sounddevice>=0.4.5
+numpy>=1.21.0

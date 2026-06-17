@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QGroupBox, QComboBox
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QGroupBox, QComboBox, QFrame, QFileDialog, QWidget, QListWidget, QStackedWidget
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 import json
 import os
 

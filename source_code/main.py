@@ -1,24 +1,13 @@
+import sys
+import os
+import subprocess
+import time
+import json
+import vlc  # Added to fix the line 208 syntax error
 from pathlib import Path
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
 
-# Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
+# Add parent directory to path so we can import source_code as a module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
@@ -33,160 +22,13 @@ import sounddevice as sd
 from collections import deque
 
 # Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
-
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
-
-# Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
-
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
-
-# Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
-
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
-
-# Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
-
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
-
-# Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
-
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
-
-# Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
-
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
-
-# Refactored components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .workers.process_thread import ProcessThread
-from .dialogs.settings_dialog import SettingsDialog
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService
-
-# Refactored entry file
-# Import extracted components
-from .widgets.video_frame import VideoFrame
-from .widgets.audio_meter import AudioLevelMeter
-from .workers.audio_analyzer import AudioAnalyzerThread
-from .dialogs.settings_dialog import SettingsDialog
-from .workers.process_thread import ProcessThread
-
-import sys, os, subprocess, re, time, json
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog, 
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea, 
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget, 
-    QListWidget, QGridLayout, QSplashScreen, QDialog
-)
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
+from source_code.widgets.video_frame import VideoFrame
+from source_code.widgets.audio_meter import AudioLevelMeter
+from source_code.workers.audio_analyzer import AudioAnalyzerThread
+from source_code.workers.process_thread import ProcessThread
+from source_code.dialogs.settings_dialog import SettingsDialog
+from source_code.services.player_service import PlayerService
+from source_code.services.download_service import DownloadService
 
 class KaraokeApp(QWidget):
     def __init__(self):
@@ -204,8 +46,9 @@ class KaraokeApp(QWidget):
         self.resize(1150, 850)
         self.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: 'Segoe UI';")
 
+        # Fixed syntax error here: Removed the leading dot
         vlc_args = ["--aout=directx"] if sys.platform == "win32" else []
-        self.instance = .Instance(vlc_args)
+        self.instance = vlc.Instance(vlc_args) 
         self.player = self.instance.media_player_new()
 
         self.setup_ui()
@@ -486,12 +329,12 @@ class KaraokeApp(QWidget):
 
         s_row = QHBoxLayout(); s_row.addWidget(QLabel("Playback Velocity Frequency:"))
         self.speed_minus = QPushButton("-"); self.speed_minus.setFixedWidth(30)
-        self.speed_input = QDoubleSpinBox(); self.speed_input.setRange(0.5, 2.0); self.speed_input.setValue(1.0); self.speed_input.setSuffix("x Timeline"); self.speed_input.setSingleStep(0.05) 
+        self.speed_input = QDoubleSpinBox(); self.speed_input.setRange(0.5, 2.0); self.speed_input.setValue(1.0); self.speed_input.setSuffix("x Timeline"); self.speed_input.setSingleStep(0.01) 
         self.speed_plus = QPushButton("+"); self.speed_plus.setFixedWidth(30)
         self.speed_reset = QPushButton("↺"); self.speed_reset.setFixedWidth(40)
 
-        self.speed_minus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() - 0.01, 2)))
-        self.speed_plus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() + 0.01, 2)))
+        self.speed_minus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() - 0.05, 2)))
+        self.speed_plus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() + 0.05, 2)))
         self.speed_reset.clicked.connect(lambda: self.speed_input.setValue(1.0))
         self.speed_input.valueChanged.connect(lambda v: self.player.set_rate(v))
 
@@ -593,7 +436,7 @@ class KaraokeApp(QWidget):
             self.high_db_counter = 0
 
     def jump_time(self, ms):
-        if self.player.get_state() in [.State.Playing, .State.Paused]:
+        if self.player.get_state() in [vlc.State.Playing, vlc.State.Paused]:
             current = self.player.get_time()
             duration = self.player.get_length()
             if duration <= 0: return
@@ -886,7 +729,7 @@ class KaraokeApp(QWidget):
     def update_ui(self):
         try:
             state = self.player.get_state()
-            if state in [.State.Playing, .State.Paused]:
+            if state in [vlc.State.Playing, vlc.State.Paused]:
                 dur = self.player.get_length()
                 if dur > 0 and not self.is_user_sliding:
                     pos = self.player.get_position()
@@ -908,7 +751,7 @@ class KaraokeApp(QWidget):
     def on_slider_pressed(self): self.is_user_sliding = True
     def on_slider_released(self):
         self.is_user_sliding = False
-        if self.player.get_state() not in [.State.NothingSpecial, .State.Stopped]:
+        if self.player.get_state() not in [vlc.State.NothingSpecial, vlc.State.Stopped]:
             self.player.set_position(self.seek_slider.value() / 1000.0)
 
     def toggle_video_fullscreen(self):
@@ -1107,26 +950,33 @@ class KaraokeApp(QWidget):
                     return
 
     def closeEvent(self, event):
-        # Stop audio analyzer thread
+        # Stop audio analyzer thread FIRST - this is blocking
         try:
-            if hasattr(self, 'audio_analyzer'):
+            if hasattr(self, 'audio_analyzer') and self.audio_analyzer is not None:
+                self.audio_analyzer.set_playing(False)
                 self.audio_analyzer.stop()
+                # Ensure thread is fully stopped
+                self.audio_analyzer.wait(1000)
+        except Exception as e:
+            print(f"Error stopping audio analyzer: {e}")
+            pass
+
+        # Stop periodic UI updates
+        try:
+            self.timer.stop()
+        except Exception: pass
+
+        # Stop fullscreen timers
+        try:
+            if self.fullscreen_timer: self.fullscreen_timer.stop()
+            if hasattr(self, 'fullscreen_mouse_timer') and self.fullscreen_mouse_timer: 
+                self.fullscreen_mouse_timer.stop()
         except Exception: pass
 
         # Stop auto-reduce timer
         try:
             if hasattr(self, 'auto_reduce_timer'):
                 self.auto_reduce_timer.stop()
-        except Exception: pass
-
-        # Stop periodic UI updates first
-        try:
-            self.timer.stop()
-        except Exception: pass
-
-        try:
-            if self.fullscreen_timer: self.fullscreen_timer.stop()
-            if self.fullscreen_mouse_timer: self.fullscreen_mouse_timer.stop()
         except Exception: pass
 
         # Clean up floating overlay references to prevent dangling handles
@@ -1136,13 +986,18 @@ class KaraokeApp(QWidget):
                 self.playback_widget.close()
         except Exception: pass
 
+        # Stop all background tasks
         self.stop_all_tasks()
 
-        try: self.player.stop()
+        # Clean up VLC player and instance
+        try: 
+            self.player.stop()
         except Exception: pass
-        try: self.player.release()
+        try: 
+            self.player.release()
         except Exception: pass
-        try: self.instance.release()
+        try: 
+            self.instance.release()
         except Exception: pass
 
         event.accept()
@@ -1207,6 +1062,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Fatal Initialization Failure: {e}")
         sys.exit(1)
-from .services.player_service import PlayerService
-from .services.player_service import PlayerService
-from .services.download_service import DownloadService

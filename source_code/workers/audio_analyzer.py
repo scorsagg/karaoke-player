@@ -58,4 +58,10 @@ class AudioAnalyzerThread(QThread):
     def stop(self):
         """Stop the audio analyzer"""
         self.running = False
-        self.wait(500)
+        self.is_playing = False
+        # Wait longer for the stream to close
+        self.wait(2000)
+        # Force terminate if still running
+        if self.isRunning():
+            self.terminate()
+            self.wait(500)

@@ -1,6 +1,5 @@
 from PySide6.QtWidgets import QFrame
-from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QEvent
+from PySide6.QtCore import Qt, QPoint, QEvent
 
 
 class VideoFrame(QFrame):

@@ -3,14 +3,20 @@
 PyInstaller Spec File for Karaoke Studio Pro v2.0
 
 This spec file defines how to bundle the Karaoke application into a standalone executable.
-Build with: python build.py (from BUILD_SYSTEM folder)
+Build with: python build_system/build.py (from project root)
+OR: cd build_system && python build.py
+
+All required tools are bundled:
+- ffmpeg.exe, yt-dlp.exe 
+- VLC libraries (libvlc.dll, libvlccore.dll, plugins/)
+Team members need ZERO external dependencies!
 """
 
 block_cipher = None
 
 a = Analysis(
     ['../source_code/main.py'],  # Point to source_code folder
-    pathex=[],
+    pathex=['..'],  # Add project root to path so imports work
     
     # Binaries to include (FFmpeg and yt-dlp from resources folder)
     binaries=[
@@ -19,6 +25,7 @@ a = Analysis(
     ],
     
     # Data files and directories (from resources folder)
+    # All tools bundled so team members need NO external installations
     datas=[
         ('../resources/libvlc.dll', '.'),
         ('../resources/libvlccore.dll', '.'),
@@ -30,6 +37,9 @@ a = Analysis(
     # Hidden imports (packages not automatically detected)
     hiddenimports=[
         'PySide6',
+        'PySide6.QtCore',
+        'PySide6.QtGui',
+        'PySide6.QtWidgets',
         'source_code.dialogs.settings_dialog',
         'source_code.services.download_service',
         'source_code.services.player_service',
@@ -44,13 +54,11 @@ a = Analysis(
         'tkinter',
         'matplotlib',
         'scipy',
-        'numpy',
         'pandas',
         'test',
         'tests',
         'pytest',
     ],
-    
     noarchive=False,
     optimize=2,  # Optimization level: 2 = production (removes docstrings)
 )

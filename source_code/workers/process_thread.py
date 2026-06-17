@@ -1,5 +1,7 @@
 from PySide6.QtCore import QThread, Signal
 import subprocess
+import re
+import sys
 
 
 class ProcessThread(QThread):

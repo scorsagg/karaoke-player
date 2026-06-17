@@ -41,7 +41,6 @@ REQUIRED_DATA = {
 # Paths to resources
 RESOURCES_DIR = PROJECT_ROOT / "resources"
 SOURCE_DIR = PROJECT_ROOT / "source_code"
-DOC_USER_DIR = PROJECT_ROOT / "documentation" / "user_guides"
 
 # App metadata
 APP_NAME = "KaraokeStudioPro"
@@ -84,25 +83,35 @@ def validate_prerequisites():
     if not SPEC_FILE.exists():
         missing.append(f"Spec file: {SPEC_FILE}")
     
-    # Check required binaries
-    for binary, desc in REQUIRED_BINARIES.items():
-        binary_path = RESOURCES_DIR / binary
-        if not binary_path.exists():
-            missing.append(f"{desc}: {binary_path}")
+    # Check for image resources (CRITICAL)
+    image_files = ["splash.png", "Loading.png"]
+    for img in image_files:
+        img_path = RESOURCES_DIR / img
+        if not img_path.exists():
+            missing.append(f"Image resource: {img_path}")
     
-    # Check required data files
-    for data, desc in REQUIRED_DATA.items():
-        data_path = RESOURCES_DIR / data
-        if not data_path.exists():
-            missing.append(f"{desc}: {data_path}")
+    # Check for bundled tools (ALL REQUIRED NOW)
+    bundled_tools = {
+        "ffmpeg.exe": "FFmpeg executable",
+        "yt-dlp.exe": "yt-dlp executable",
+        "libvlc.dll": "VLC library",
+        "libvlccore.dll": "VLC core library",
+        "plugins": "VLC plugins directory",
+    }
+    
+    for tool, desc in bundled_tools.items():
+        tool_path = RESOURCES_DIR / tool
+        if not tool_path.exists():
+            missing.append(f"{desc} (REQUIRED FOR BUNDLING): {tool_path}")
     
     if missing:
-        log("[ERROR] Missing required files/directories:", "ERROR")
+        log("[ERROR] Missing required files:", "ERROR")
         for item in missing:
             print(f"   - {item}")
+        log("All these files are needed to bundle a complete standalone executable.", "ERROR")
         return False
     
-    log("[OK] All prerequisites validated", "SUCCESS")
+    log("[OK] All prerequisites validated - Ready for standalone build!", "SUCCESS")
     return True
 
 def clean_old_builds():
@@ -217,24 +226,18 @@ def copy_user_documentation():
         log("[WARNING] App directory not found, skipping documentation copy", "WARNING")
         return
     
-    doc_files = [
-        "README.md",
-        "QUICK_START.txt",
-        "INSTALLATION.txt"
-    ]
+    # Only copy INSTALLATION.txt from documentation folder
+    doc_file = "INSTALLATION.txt"
+    src = PROJECT_ROOT / "documentation" / doc_file
+    dst = app_dir / doc_file
     
-    copied = 0
-    for doc_file in doc_files:
-        src = DOC_USER_DIR / doc_file
-        dst = app_dir / doc_file
-        if src.exists():
-            shutil.copy2(src, dst)
-            copied += 1
-            log(f"   [OK] Copied {doc_file}", "INFO")
-        else:
-            log(f"   [WARNING] Not found: {doc_file}", "WARNING")
-    
-    log(f"[OK] Documentation copied ({copied} files)", "SUCCESS")
+    if src.exists():
+        shutil.copy2(src, dst)
+        log(f"   [OK] Copied {doc_file}", "INFO")
+        log(f"[OK] Documentation copied (1 file)", "SUCCESS")
+    else:
+        log(f"   [WARNING] Not found: {doc_file} at {src}", "WARNING")
+        log(f"[OK] Documentation copied (0 files)", "SUCCESS")
 
 def copy_image_resources():
     """Copy image resources (splash and loading images) to dist folder."""
@@ -327,9 +330,11 @@ def print_summary():
     
     print("="*70)
     log("Next steps:", "INFO")
-    print("  1. Test the built executable: dist/KaraokeStudioPro/KaraokeStudioPro.exe")
-    print("  2. Distribute the .zip file from dist/")
-    print("  3. Users extract and run: KaraokeStudioPro/KaraokeStudioPro.exe")
+    print("  1. TEST: dist/KaraokeStudioPro/KaraokeStudioPro.exe")
+    print("  2. DISTRIBUTE: dist/ folder contains standalone executable")
+    print("  3. NO INSTALLATION NEEDED: Team members just run the .exe")
+    print("     - All tools (FFmpeg, yt-dlp, VLC) are bundled")
+    print("     - Zero external dependencies required!")
     print("="*70 + "\n")
 
 def main():

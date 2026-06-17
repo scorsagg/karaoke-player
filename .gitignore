@@ -1,5 +1,23 @@
-source_code/__pycache__
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# Samples
 samples\*
-# Ignore build artifacts
+
+# Build artifacts
 build_system/build/
 build_system/dist/
+
+# IDE and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

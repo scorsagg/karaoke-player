@@ -1,0 +1,155 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║               KARAOKE STUDIO PRO - INSTALLATION GUIDE                       ║
+║                                                                            ║
+║  Quick Setup: No installation required!                                   ║
+║  Just extract and run KaraokeStudioPro.exe                                 ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ SYSTEM REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Windows 7 SP1 or later (or Windows 10/11 recommended)
+✓ 500 MB free disk space
+✓ No external software dependencies required!
+  (All required tools are bundled in this package)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ INSTALLATION STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. EXTRACT THE ZIP FILE
+   ├─ Locate the downloaded ZIP file: KaraokeStudioPro_v2.0_*.zip
+   ├─ Right-click and select "Extract All..."
+   └─ Choose extraction folder (e.g., C:\KaraokeStudioPro\)
+      (You can place it anywhere on your system)
+
+2. LOCATE THE EXECUTABLE
+   ├─ After extraction, navigate to the folder
+   ├─ Look for: KaraokeStudioPro.exe (Windows application)
+   └─ This is the main application file
+
+3. RUN THE APPLICATION
+   ├─ Double-click KaraokeStudioPro.exe
+   ├─ Application will launch (may take 5-10 seconds on first run)
+   └─ Karaoke Studio Pro is ready to use!
+
+4. CREATE A SHORTCUT (Optional)
+   ├─ Right-click KaraokeStudioPro.exe
+   ├─ Select "Create shortcut"
+   ├─ Move shortcut to Desktop or Start Menu
+   └─ For quick access in future
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GETTING STARTED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LOADING MEDIA
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Option 1: Load Local Video File                                            │
+│   ✓ Click "Open File" button                                               │
+│   ✓ Select a video file (MP4, MKV, AVI, WebM, etc.)                       │
+│   ✓ Click "Open"                                                           │
+│   ✓ Video displays and ready to play                                       │
+│                                                                            │
+│ Option 2: Download from YouTube                                            │
+│   ✓ Paste YouTube URL in input field                                       │
+│   ✓ Click "Download & Play"                                                │
+│   ✓ App downloads video to configured directory                            │
+│   ✓ Video plays automatically after download                               │
+└────────────────────────────────────────────────────────────────────────────┘
+
+PLAYBACK CONTROLS
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Play / Pause          - Click play button or press SPACEBAR                │
+│ Seek / Skip            - Click on timeline or use arrow keys               │
+│ Speed Control         - Use +/- buttons to adjust (0.5x to 2.0x)          │
+│ Volume Control        - Move volume slider left/right                      │
+│ Audio Level Monitor   - Real-time level display (right side)               │
+│ Full Screen           - Double-click video to toggle                       │
+└────────────────────────────────────────────────────────────────────────────┘
+
+FEATURES
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 🎬  Multi-Format Playback  - MP4, MKV, AVI, WebM and more                 │
+│ 📥  YouTube Downloads       - Fetch karaoke tracks directly               │
+│ 🔊  Real-Time Audio Levels  - Live audio level visualization              │
+│ 🎚️  Playback Control        - Play, pause, seek, speed adjustment         │
+│ 📊  Audio Analysis          - Decibel level monitoring (-80 to 0 dB)      │
+│ 💾  Settings                - Save preferences and history                │
+└────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ CONFIGURATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Click "Settings" button to configure:
+├─ FFmpeg Path          - Location of FFmpeg executable (usually auto-detected)
+├─ yt-dlp Path          - Location of yt-dlp (usually auto-detected)
+├─ Download Directory   - Where to save downloaded videos
+└─ Video Output         - Display settings and output options
+
+Most settings are auto-configured. Only change if needed!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ Application Won't Start
+   ✓ Ensure you have Windows 7 SP1 or later
+   ✓ Try running as Administrator (right-click → Run as administrator)
+   ✓ Check that all files extracted correctly
+   ✓ Restart your computer and try again
+
+❌ No Audio Output
+   ✓ Check your system volume settings
+   ✓ Verify audio device is connected and enabled
+   ✓ Try a different video file to test
+   ✓ Check audio levels indicator on right side
+
+❌ YouTube Download Not Working
+   ✓ Check your internet connection
+   ✓ Verify YouTube URL is correct and video is available
+   ✓ Try a different video
+   ✓ Ensure download directory has enough disk space
+
+❌ Video Playback Issues
+   ✓ Check file format is supported (MP4, MKV, AVI, WebM)
+   ✓ Try a different video file
+   ✓ Ensure video file is not corrupted
+   ✓ Check that file isn't in use by another application
+
+❌ Application Hangs or Freezes
+   ✓ Wait 10-20 seconds (may be loading)
+   ✓ If still frozen, close with Task Manager (Ctrl+Shift+Esc)
+   ✓ Restart the application
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BUNDLED COMPONENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This package includes all necessary components:
+
+✓ FFmpeg               - Video encoding/transcoding engine
+✓ yt-dlp              - YouTube content downloader
+✓ VLC Libraries       - Media playback engine (libvlc.dll + plugins)
+✓ PySide6             - Qt6 GUI framework
+✓ Python Libraries    - numpy, sounddevice, and more
+
+No additional installations needed!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ SUPPORT & UPDATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For issues or questions:
+├─ Check README.md for project overview
+├─ Review documentation/ folder for technical details
+└─ Report issues to the development team
+
+To get the latest version:
+└─ Contact your administrator for updated package
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ENJOY YOUR KARAOKE! 🎤🎉
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
