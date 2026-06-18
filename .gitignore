@@ -12,6 +12,7 @@ samples\*
 # Resources - large binary files
 resources/*.exe
 resources/*.dll
+resources/plugins/
 
 # Build artifacts
 build_system/build/
