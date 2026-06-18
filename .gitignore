@@ -12,6 +12,9 @@ samples/*
 #local project files
 project_files/*
 
+# Local user data and state (not tracked)
+config/history.json
+
 # Resources - large binary files
 resources/*.exe
 resources/*.dll
