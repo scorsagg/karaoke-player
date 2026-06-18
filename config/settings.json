@@ -1,4 +1,9 @@
 {
   "base_directory": "D:/Entertainment/youtube-downloads/Srikanth",
-  "download_directory": "D:/Entertainment/youtube-downloads/Srikanth/Downloads"
+  "download_directory": "D:/Entertainment/youtube-downloads/Srikanth/Downloads",
+  "ffmpeg_path": "ffmpeg",
+  "ffprobe_path": "ffprobe",
+  "ytdlp_path": "yt-dlp",
+  "measurement_mode": "dB Output (dBFS)",
+  "auto_reduce_threshold": 50
 }

@@ -29,6 +29,8 @@ from source_code.workers.process_thread import ProcessThread
 from source_code.dialogs.settings_dialog import SettingsDialog
 from source_code.services.player_service import PlayerService
 from source_code.services.download_service import DownloadService
+from source_code.services.audio_service import AudioService
+from source_code.ui.main_layout import create_main_layout
 
 class KaraokeApp(QWidget):
     def __init__(self):
@@ -62,11 +64,12 @@ class KaraokeApp(QWidget):
 
         # Fullscreen Hover Controls Logic Setup
         self.hide_controls_timer = QTimer()
-        self.hide_controls_timer.setInterval(2500)  # Auto-hide after 2.5 seconds
+        self.hide_controls_timer.setSingleShot(True)
+        self.hide_controls_timer.setInterval(3000)  # Auto-hide after 3 seconds of no mouse movement
         self.hide_controls_timer.timeout.connect(self.hide_fullscreen_controls)
 
         self.fullscreen_timer = None
-        self.fullscreen_mouse_timer = None
+        self.last_mouse_pos = QCursor.pos()
 
         self.setAcceptDrops(True)
         self.video_frame.setAcceptDrops(True)
@@ -79,6 +82,9 @@ class KaraokeApp(QWidget):
         self.audio_analyzer = AudioAnalyzerThread()
         self.audio_analyzer.level_updated.connect(self.on_audio_level_updated)
         self.audio_analyzer.start()
+
+        # Initialize audio service for managing audio analyzer and meter
+        self.audio_service = AudioService(self.audio_analyzer, self.audio_level_meter)
 
         # Auto-reduce tracking
         self.auto_reduce_active = False
@@ -94,7 +100,9 @@ class KaraokeApp(QWidget):
             "download_directory": str(app_dir),
             "ffmpeg_path": "ffmpeg",
             "ffprobe_path": "ffprobe",
-            "ytdlp_path": "yt-dlp"
+            "ytdlp_path": "yt-dlp",
+            "measurement_mode": "dB Output (dBFS)",
+            "auto_reduce_threshold": 80
         }
         if self.settings_file.exists():
             try:
@@ -107,126 +115,104 @@ class KaraokeApp(QWidget):
         except: pass
 
     def setup_ui(self):
-        self.main_h_layout = QHBoxLayout(self)
-        self.main_h_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_h_layout.setSpacing(0)
-
-        self.stack = QStackedWidget()
-        self.stack.addWidget(self.create_download_page())   
-        self.stack.addWidget(self.create_pitch_page())      
-        self.stack.addWidget(self.create_extra_page())      
-
-        self.sidebar = QFrame()
-        self.sidebar.setFixedWidth(200)
-        self.sidebar.setStyleSheet("background-color: #252526; border-right: 1px solid #333;")
-        side_layout = QVBoxLayout(self.sidebar)
-        side_layout.setContentsMargins(0, 0, 0, 0)
-
-        logo = QLabel("KARAOKE STUDIO PRO")
-        logo.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        logo.setContentsMargins(15, 20, 10, 20)
-        side_layout.addWidget(logo)
-
-        self.nav_list = QListWidget()
-        self.nav_list.setFixedHeight(110)
-        self.nav_list.setStyleSheet("""
-            QListWidget { border: none; background: transparent; outline: 0; color: #ccc; }
-            QListWidget::item { height: 50px; padding-left: 15px; }
-            QListWidget::item:selected { background-color: #37373d; color: white; border-left: 4px solid #2ecc71; }
-        """)
-        self.nav_list.addItems(["📥 Downloader", "🎬 Pitch & Speed"])
+        """Set up the entire UI using modularized UI components"""
+        layout_result = create_main_layout(self.settings)
+        self.main_h_layout = layout_result["main_layout"]
+        self.setLayout(self.main_h_layout)
+        
+        components = layout_result["components"]
+        
+        # Extract sidebar components
+        sidebar_components = components["sidebar_components"]
+        self.sidebar = sidebar_components["sidebar"]
+        self.nav_list = sidebar_components["nav_list"]
+        self.extra_tools_toggle_btn = sidebar_components["extra_tools_toggle_btn"]
+        self.extra_tools_container = sidebar_components["extra_tools_container"]
+        self.widen_video_btn = sidebar_components["widen_video_btn"]
+        self.history_toggle_btn = sidebar_components["history_toggle_btn"]
+        self.history_container = sidebar_components["history_container"]
+        self.clear_hist_btn = sidebar_components["clear_hist_btn"]
+        self.history_list = sidebar_components["history_list"]
+        self.settings_btn = sidebar_components["settings_btn"]
+        self.status_label = sidebar_components["status_label"]
+        
+        # Extract video frame and labels
+        self.video_frame = components["video_frame"]
+        self.filename_label = components["filename_label"]
+        
+        # Extract playback bar components
+        playback_components = components["playback_components"]
+        self.playback_widget = playback_components["playback_widget"]
+        self.time_label = playback_components["time_label"]
+        self.seek_slider = playback_components["seek_slider"]
+        self.duration_label = playback_components["duration_label"]
+        self.back_btn = playback_components["back_btn"]
+        self.play_btn = playback_components["play_btn"]
+        self.pause_btn = playback_components["pause_btn"]
+        self.fwd_btn = playback_components["fwd_btn"]
+        self.mute_btn = playback_components["mute_btn"]
+        self.vol_slider = playback_components["vol_slider"]
+        self.vol_label = playback_components["vol_label"]
+        self.audio_level_meter = playback_components["audio_level_meter"]
+        self.audio_level_label = playback_components["audio_level_label"]
+        self.fullscreen_btn = playback_components["fullscreen_btn"]
+        
+        # Extract page components
+        download_page_components = components["download_page_components"]
+        self.load_btn = download_page_components["load_btn"]
+        self.url_input = download_page_components["url_input"]
+        dl_btn_download = download_page_components["dl_btn"]
+        
+        pitch_page_components = components["pitch_page_components"]
+        self.pitch_minus = pitch_page_components["pitch_minus"]
+        self.pitch_input = pitch_page_components["pitch_input"]
+        self.pitch_plus = pitch_page_components["pitch_plus"]
+        self.pitch_reset = pitch_page_components["pitch_reset"]
+        self.speed_minus = pitch_page_components["speed_minus"]
+        self.speed_input = pitch_page_components["speed_input"]
+        self.speed_plus = pitch_page_components["speed_plus"]
+        self.speed_reset = pitch_page_components["speed_reset"]
+        self.export_btn = pitch_page_components["export_btn"]
+        
+        extra_page_components = components["extra_page_components"]
+        widen_file_btn = extra_page_components["widen_file_btn"]
+        self.widen_url_input = extra_page_components["widen_url_input"]
+        widen_dl_btn = extra_page_components["widen_dl_btn"]
+        self.widen_file_status_label = extra_page_components["widen_file_status_label"]
+        self.widen_exec_btn = extra_page_components["widen_exec_btn"]
+        
+        self.stack = components["stack"]
+        
+        # Connect signals for button events
         self.nav_list.currentRowChanged.connect(self.handle_navigation_change)
-        side_layout.addWidget(self.nav_list)
-
-        self.extra_tools_toggle_btn = QPushButton("▶ 🛠 Extra Tools")
-        self.extra_tools_toggle_btn.setStyleSheet("background-color: #37373d; color: #ccc; padding: 10px; border: 1px solid #444; border-radius: 3px; text-align: left;")
         self.extra_tools_toggle_btn.clicked.connect(self.toggle_extra_tools)
-        self.extra_tools_is_expanded = False
-        side_layout.addWidget(self.extra_tools_toggle_btn)
-
-        self.extra_tools_container = QFrame()
-        self.extra_tools_container.setVisible(False)
-        extra_tools_container_layout = QVBoxLayout(self.extra_tools_container)
-        extra_tools_container_layout.setContentsMargins(0, 5, 0, 0)
-
-        self.widen_video_btn = QPushButton("📐 Widen Video")
-        self.widen_video_btn.setStyleSheet("background-color: #2d2d2d; color: #aaa; padding: 8px 15px; border: none; text-align: left; margin-left: 15px; margin-right: 10px;")
-        self.widen_video_btn.clicked.connect(lambda: self.handle_navigation_change(2))
-        extra_tools_container_layout.addWidget(self.widen_video_btn)
-        side_layout.addWidget(self.extra_tools_container)
-
-        line = QFrame(); line.setFrameShape(QFrame.HLine); line.setStyleSheet("color: #333; margin: 5px 15px;")
-        side_layout.addWidget(line)
-
-        self.history_toggle_btn = QPushButton("▶ History")
-        self.history_toggle_btn.setStyleSheet("background-color: #37373d; color: #ccc; padding: 10px; border: 1px solid #444; border-radius: 3px; text-align: left;")
         self.history_toggle_btn.clicked.connect(self.toggle_history)
-        self.history_is_expanded = False
-        side_layout.addWidget(self.history_toggle_btn)
-
-        self.history_container = QFrame()
-        self.history_container.setVisible(False)
-        history_container_layout = QVBoxLayout(self.history_container)
-        history_container_layout.setContentsMargins(0, 0, 0, 0)
-
-        hist_header = QHBoxLayout()
-        history_label = QLabel("RECENT FILES")
-        history_label.setFont(QFont("Segoe UI", 8, QFont.Bold))
-        history_label.setStyleSheet("color: #666; margin-left: 15px;")
-
-        self.clear_hist_btn = QPushButton("Clear")
-        self.clear_hist_btn.setFixedSize(45, 18)
-        self.clear_hist_btn.setStyleSheet("font-size: 9px; background-color: #333; color: #888; border-radius: 2px;")
         self.clear_hist_btn.clicked.connect(self.clear_history)
-
-        hist_header.addWidget(history_label)
-        hist_header.addStretch()
-        hist_header.addWidget(self.clear_hist_btn)
-        hist_header.addSpacing(10)
-        history_container_layout.addLayout(hist_header)
-
-        self.history_list = QListWidget()
-        self.history_list.setStyleSheet("""
-            QListWidget { border: none; background: transparent; outline: 0; color: #aaa; font-size: 10px; }
-            QListWidget::item { height: 30px; padding-left: 15px; border-bottom: 1px solid #2d2d2d; }
-            QListWidget::item:hover { background-color: #37373d; color: white; }
-        """)
-        self.history_list.itemDoubleClicked.connect(lambda item: self.load_video(item.toolTip()))
-        history_container_layout.addWidget(self.history_list)
-        side_layout.addWidget(self.history_container)
-
-        self.load_history_from_disk()
-        side_layout.addStretch(1)
-
-        self.settings_btn = QPushButton("⚙️ Settings")
-        self.settings_btn.setStyleSheet("background-color: #37373d; color: #ccc; padding: 10px; border: 1px solid #444; border-radius: 3px;")
         self.settings_btn.clicked.connect(self.open_settings)
-        side_layout.addWidget(self.settings_btn)
-
-        self.status_label = QLabel("Status: Ready")
-        self.status_label.setStyleSheet("color: #ffffff; padding: 5px 10px; font-size: 12px; font-weight: bold; border-top: 1px solid #333;")
-        self.status_label.setWordWrap(True)
-        side_layout.addWidget(self.status_label)
-        self.main_h_layout.addWidget(self.sidebar)
-
-        self.content_container = QVBoxLayout()
-        self.video_frame = VideoFrame()
-        self.video_frame.setStyleSheet("background-color: #000;")
-        self.video_frame.setMinimumHeight(420)
-        self.content_container.addWidget(self.video_frame, 10)
-
-        self.filename_label = QLabel("No file loaded")
-        self.filename_label.setStyleSheet("color: #ccc; padding: 5px 15px; font-size: 12px; background-color: #1e1e1e;")
-        self.content_container.addWidget(self.filename_label)
-
-        self.playback_widget = QWidget()
-        self.playback_widget.setLayout(self.create_playback_bar())
-        self.playback_widget.setFixedHeight(95)
-        self.content_container.addWidget(self.playback_widget)
-
-        self.content_container.addWidget(self.stack)
-        self.content_container.addStretch()
-        self.main_h_layout.addLayout(self.content_container)
+        self.load_btn.clicked.connect(lambda: self.load_video())
+        dl_btn_download.clicked.connect(lambda: self.download_video(from_widen_tab=False))
+        self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
+        self.play_btn.clicked.connect(self.player.play)
+        self.pause_btn.clicked.connect(self.player.pause)
+        self.back_btn.clicked.connect(lambda: self.jump_time(-10000))
+        self.fwd_btn.clicked.connect(lambda: self.jump_time(10000))
+        self.mute_btn.clicked.connect(self.toggle_mute)
+        self.vol_slider.valueChanged.connect(self.set_volume)
+        self.seek_slider.sliderPressed.connect(self.on_slider_pressed)
+        self.seek_slider.sliderReleased.connect(self.on_slider_released)
+        self.speed_input.valueChanged.connect(lambda v: self.player.set_rate(v))
+        self.export_btn.clicked.connect(self.export_video)
+        widen_file_btn.clicked.connect(self.browse_widen_video)
+        widen_dl_btn.clicked.connect(lambda: self.download_video(from_widen_tab=True))
+        self.widen_exec_btn.clicked.connect(self.widen_active_video_canvas)
+        self.history_list.itemDoubleClicked.connect(lambda item: self.load_video(item.toolTip()))
+        
+        # Initialize state flags
+        self.extra_tools_is_expanded = False
+        self.history_is_expanded = False
+        
+        # Load history from disk
+        self.load_history_from_disk()
 
     def handle_navigation_change(self, idx):
         if idx == 2:
@@ -240,153 +226,6 @@ class KaraokeApp(QWidget):
             self.nav_list.blockSignals(False)
         self.stack.setCurrentIndex(idx)
 
-    def create_playback_bar(self):
-        container = QVBoxLayout(); container.setContentsMargins(15, 5, 15, 5)
-        seek_row = QHBoxLayout()
-        self.time_label = QLabel("00:00")
-        self.seek_slider = QSlider(Qt.Horizontal); self.seek_slider.setRange(0, 1000)
-        self.seek_slider.sliderPressed.connect(self.on_slider_pressed)
-        self.seek_slider.sliderReleased.connect(self.on_slider_released)
-        self.duration_label = QLabel("00:00")
-        seek_row.addWidget(self.time_label); seek_row.addWidget(self.seek_slider); seek_row.addWidget(self.duration_label)
-
-        ctrl_row = QHBoxLayout()
-        self.back_btn = QPushButton("⏪ -10s"); self.back_btn.clicked.connect(lambda: self.jump_time(-10000))
-        self.play_btn = QPushButton("▶ Play"); self.play_btn.clicked.connect(self.player.play)
-        self.pause_btn = QPushButton("⏸ Pause"); self.pause_btn.clicked.connect(self.player.pause)
-        self.fwd_btn = QPushButton("+10s ⏩"); self.fwd_btn.clicked.connect(lambda: self.jump_time(10000))
-
-        self.mute_btn = QPushButton("🔊"); self.mute_btn.setFixedWidth(35); self.mute_btn.clicked.connect(self.toggle_mute)
-        self.vol_slider = QSlider(Qt.Horizontal); self.vol_slider.setRange(0, 100); self.vol_slider.setValue(80); self.vol_slider.setFixedWidth(120)
-        self.vol_slider.valueChanged.connect(self.set_volume)
-        self.vol_label = QLabel("80%"); self.vol_label.setFixedWidth(40)
-
-        # Add audio level meter
-        self.audio_level_meter = AudioLevelMeter()
-        self.audio_level_meter.set_level(-80.0)  # Initialize to silent
-        self.audio_level_label = QLabel("Audio:")
-        self.audio_level_label.setStyleSheet("color: #ccc; font-size: 10px;")
-
-        for w in [self.back_btn, self.play_btn, self.pause_btn, self.fwd_btn]: ctrl_row.addWidget(w)
-        ctrl_row.addStretch()
-
-        # Add audio level meter to control row
-        ctrl_row.addWidget(self.audio_level_label)
-        ctrl_row.addWidget(self.audio_level_meter)
-        ctrl_row.addSpacing(10)
-
-        self.fullscreen_btn = QPushButton("🖥 Full Video"); self.fullscreen_btn.setFixedWidth(95)
-        self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
-        ctrl_row.addWidget(self.fullscreen_btn)
-
-        for w in [self.mute_btn, self.vol_slider, self.vol_label]: ctrl_row.addWidget(w)
-        container.addLayout(seek_row)
-        container.addSpacing(5)
-        container.addLayout(ctrl_row)
-        return container
-
-    def create_download_page(self):
-        page = QWidget(); layout = QVBoxLayout(page)
-        layout.setContentsMargins(10, 5, 10, 5)
-        grid = QGridLayout()
-
-        self.load_btn = QPushButton("📂 Open File..."); self.load_btn.setFixedSize(110, 30)
-        self.load_btn.clicked.connect(lambda: self.load_video())
-        grid.addWidget(self.load_btn, 1, 0)
-
-        sep = QFrame(); sep.setFrameShape(QFrame.VLine); sep.setStyleSheet("color: #3a3a3a;")
-        grid.addWidget(sep, 1, 1)
-
-        grid.addWidget(QLabel("<b>YouTube / Stream Target URL:</b>"), 0, 2)
-        self.url_input = QLineEdit(); self.url_input.setPlaceholderText("Paste network audio/video stream links here...")
-        self.url_input.setStyleSheet("background-color: #333; border: 1px solid #555; padding: 5px; color: white;")
-        self.url_input.setFixedSize(700, 30)
-        grid.addWidget(self.url_input, 1, 2)
-
-        dl_btn = QPushButton("Download and Load"); dl_btn.setFixedSize(140, 30)
-        dl_btn.setStyleSheet("background-color: #2ecc71; font-weight: bold; color: white;")
-        dl_btn.clicked.connect(lambda: self.download_video(from_widen_tab=False))
-        grid.addWidget(dl_btn, 1, 3)
-
-        layout.addLayout(grid)       
-        layout.addStretch()
-        return page
-
-    def create_pitch_page(self):
-        page = QWidget(); layout = QVBoxLayout(page)
-        p_row = QHBoxLayout(); p_row.addWidget(QLabel("Pitch Shifter Matrix Shift:"))
-        self.pitch_minus = QPushButton("-"); self.pitch_minus.setFixedWidth(30)
-        self.pitch_input = QDoubleSpinBox(); self.pitch_input.setRange(-12.0, 12.0); self.pitch_input.setValue(0.0); self.pitch_input.setSuffix(" semitones"); self.pitch_input.setSingleStep(0.5) 
-        self.pitch_plus = QPushButton("+"); self.pitch_plus.setFixedWidth(30)
-        self.pitch_reset = QPushButton("↺"); self.pitch_reset.setFixedWidth(40)
-
-        self.pitch_minus.clicked.connect(lambda: self.pitch_input.setValue(self.pitch_input.value() - 1.0))
-        self.pitch_plus.clicked.connect(lambda: self.pitch_input.setValue(self.pitch_input.value() + 1.0))
-        self.pitch_reset.clicked.connect(lambda: self.pitch_input.setValue(0.0))
-
-        for w in [self.pitch_minus, self.pitch_input, self.pitch_plus, self.pitch_reset]: p_row.addWidget(w)
-        p_row.addStretch()
-
-        s_row = QHBoxLayout(); s_row.addWidget(QLabel("Playback Velocity Frequency:"))
-        self.speed_minus = QPushButton("-"); self.speed_minus.setFixedWidth(30)
-        self.speed_input = QDoubleSpinBox(); self.speed_input.setRange(0.5, 2.0); self.speed_input.setValue(1.0); self.speed_input.setSuffix("x Timeline"); self.speed_input.setSingleStep(0.01) 
-        self.speed_plus = QPushButton("+"); self.speed_plus.setFixedWidth(30)
-        self.speed_reset = QPushButton("↺"); self.speed_reset.setFixedWidth(40)
-
-        self.speed_minus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() - 0.05, 2)))
-        self.speed_plus.clicked.connect(lambda: self.speed_input.setValue(round(self.speed_input.value() + 0.05, 2)))
-        self.speed_reset.clicked.connect(lambda: self.speed_input.setValue(1.0))
-        self.speed_input.valueChanged.connect(lambda v: self.player.set_rate(v))
-
-        for w in [self.speed_minus, self.speed_input, self.speed_plus, self.speed_reset]: s_row.addWidget(w)
-        s_row.addStretch()
-
-        self.export_btn = QPushButton("Export Unified Master Render File"); self.export_btn.setStyleSheet("background-color: #0e639c; height: 45px; font-weight: bold; color: white;")
-        self.export_btn.clicked.connect(self.export_video)
-        layout.addLayout(p_row); layout.addLayout(s_row); layout.addWidget(self.export_btn); layout.addStretch()
-        return page
-
-    def create_extra_page(self):
-        page = QWidget(); layout = QVBoxLayout(page)
-        layout.setContentsMargins(10, 5, 10, 5)
-
-        title = QLabel("<b>📐 ASPECT-RATIO LAYOUT PAD ENGINE</b>")
-        title.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        layout.addWidget(title)
-
-        grid = QGridLayout()
-        widen_file_btn = QPushButton("📂 Open Widen File..."); widen_file_btn.setFixedSize(140, 30)
-        widen_file_btn.clicked.connect(self.browse_widen_video)
-        grid.addWidget(widen_file_btn, 1, 0)
-
-        sep = QFrame(); sep.setFrameShape(QFrame.VLine); sep.setStyleSheet("color: #3a3a3a;")
-        grid.addWidget(sep, 1, 1)
-
-        grid.addWidget(QLabel("<b>YouTube / Stream Link:</b>"), 0, 2)
-        self.widen_url_input = QLineEdit(); self.widen_url_input.setPlaceholderText("Paste target URL link here to download directly to Widen context...")
-        self.widen_url_input.setStyleSheet("background-color: #333; border: 1px solid #555; padding: 5px; color: white;")
-        self.widen_url_input.setFixedSize(540, 30)
-        grid.addWidget(self.widen_url_input, 1, 2)
-
-        widen_dl_btn = QPushButton("Download & Queue"); widen_dl_btn.setFixedSize(140, 30)
-        widen_dl_btn.setStyleSheet("background-color: #2ecc71; font-weight: bold; color: white;")
-        widen_dl_btn.clicked.connect(lambda: self.download_video(from_widen_tab=True))
-        grid.addWidget(widen_dl_btn, 1, 3)
-        layout.addLayout(grid)
-
-        self.widen_file_status_label = QLabel("Queued File for Widening: None (Will fallback to currently loaded player asset if blank)")
-        self.widen_file_status_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 5px 0px;")
-        layout.addWidget(self.widen_file_status_label)
-        layout.addSpacing(10)
-
-        self.widen_exec_btn = QPushButton("Scale Active Video to Wide 16:9 Canvas")
-        self.widen_exec_btn.setStyleSheet("background-color: #e67e22; height: 45px; font-weight: bold; font-size: 13px; color: white; border-radius: 4px;")
-        self.widen_exec_btn.clicked.connect(self.widen_active_video_canvas)
-        layout.addWidget(self.widen_exec_btn)
-
-        layout.addStretch()
-        return page
-
     def browse_widen_video(self):
         f, _ = QFileDialog.getOpenFileName(
             self, "Select Widen Target Video", self.settings["base_directory"],
@@ -398,8 +237,18 @@ class KaraokeApp(QWidget):
             self.load_video(self.widen_tab_video_path)
 
     def open_settings(self):
-        dialog = SettingsDialog(self, self)
-        dialog.exec()
+        # Pause audio analyzer while settings dialog is open to prevent conflicts
+        was_playing = self.audio_service.pause_analyzer()
+        
+        try:
+            dialog = SettingsDialog(self, self)
+            dialog.exec()
+            # Update audio meter display mode if settings were changed
+            self.audio_service.set_display_mode(self.settings.get("measurement_mode", "dB Output (dBFS)"))
+        finally:
+            # Resume audio analyzer if it was playing
+            if was_playing:
+                self.audio_service.resume_analyzer()
 
     def set_volume(self, value):
         self.player.audio_set_volume(value); self.vol_label.setText(f"{value}%")
@@ -417,20 +266,24 @@ class KaraokeApp(QWidget):
         # Convert dB to 0-100 scale (Assuming -80 to 0)
         level_percent = ((db_level + 80.0) / 80.0) * 100.0
 
-        # Auto-reduction logic
-        if level_percent > 50:
+        # Get configurable auto-reduce threshold (default 90%)
+        threshold = self.settings.get("auto_reduce_threshold", 90)
+        
+        # Auto-reduction logic with configurable threshold
+        if level_percent > threshold:
             # Increment a counter instead of triggering immediately
             if not hasattr(self, 'high_db_counter'): self.high_db_counter = 0
             self.high_db_counter += 1
 
-            # If it stays loud for ~10 cycles (~1 second), reduce volume
+            # If it stays loud for ~2 seconds (20 cycles at 100ms each), reduce volume
             if self.high_db_counter >= 20:
                 current_vol = self.vol_slider.value()
                 if current_vol > 20:
                     new_volume = max(20, current_vol - 5)
                     self.vol_slider.setValue(new_volume)
-                    self.status_label.setText(f"Auto-reduced volume to {new_volume}% (Peak detected)")
-                    self.high_db_counter = 0 # Reset after action
+                    spl = 60 + (level_percent * 0.5)  # Approximate SPL
+                    self.status_label.setText(f"Auto-reduced volume to {new_volume}% (Level: {level_percent:.0f}%, ~{spl:.0f} SPL)")
+                    self.high_db_counter = 0  # Reset after action
         else:
             # Reset counter if volume drops below threshold
             self.high_db_counter = 0
@@ -728,6 +581,15 @@ class KaraokeApp(QWidget):
 
     def update_ui(self):
         try:
+            # Handle fullscreen hover controls - detect mouse movement anywhere on screen
+            if self.is_video_fullscreen:
+                current_mouse_pos = QCursor.pos()
+                
+                # If mouse has moved, show controls and restart the hide timer
+                if current_mouse_pos != self.last_mouse_pos:
+                    self.show_fullscreen_controls()
+                    self.last_mouse_pos = current_mouse_pos
+            
             state = self.player.get_state()
             if state in [vlc.State.Playing, vlc.State.Paused]:
                 dur = self.player.get_length()
@@ -823,7 +685,6 @@ class KaraokeApp(QWidget):
             self.play_btn.setMinimumWidth(75)
             self.pause_btn.setMinimumWidth(75)
             self.fwd_btn.setMinimumWidth(75)
-            self.fullscreen_btn.setMinimumWidth(115)
 
             self.fullscreen_btn.setText("⬜ Exit Full")
             self.fullscreen_btn.setToolTip("Exit fullscreen (or press Esc)")
@@ -831,30 +692,30 @@ class KaraokeApp(QWidget):
 
             # Trigger auto-hide hover countdowns
             self.show_fullscreen_controls()
-            if self.fullscreen_timer is None:
-                self.fullscreen_timer = QTimer()
-                self.fullscreen_timer.setSingleShot(True)
-                self.fullscreen_timer.timeout.connect(self.hide_fullscreen_controls)
-            self.fullscreen_timer.start(3000)
 
             self.setMouseTracking(True)
-            if hasattr(self, 'fullscreen_mouse_timer') and self.fullscreen_mouse_timer is not None:
-                self.fullscreen_mouse_timer.start()
+            self.last_mouse_pos = QCursor.pos()
 
         else:
             # --- TEARDOWN FULLSCREEN STATE ---
-            if hasattr(self, 'fullscreen_mouse_timer') and self.fullscreen_mouse_timer is not None:
-                self.fullscreen_mouse_timer.stop()
-            if self.fullscreen_timer:
-                self.fullscreen_timer.stop()
-
-            # Restore exact previous window state cleanly
-            if getattr(self, '_was_maximized_before_fullscreen', True):
-                self.showMaximized()
-            else:
-                self.showNormal()
+            if self.hide_controls_timer:
+                self.hide_controls_timer.stop()
 
             self.is_video_fullscreen = False
+            self.last_mouse_pos = QCursor.pos()  # Reset mouse position tracking
+
+            # Restore exact previous window state cleanly
+            # Always show normal first to reset window decorations properly
+            self.showNormal()
+            
+            # Then restore to maximized state if that's what we were before
+            if getattr(self, '_was_maximized_before_fullscreen', False):
+                # Use a timer to defer the maximize call, allowing window manager to fully process normal state
+                QTimer.singleShot(50, self.showMaximized)
+            
+            # Force window to update its decorations and bring to front
+            self.raise_()
+            self.activateWindow()
 
             # 1. Revert component stylesheets to layout defaults
             self.playback_widget.setStyleSheet("")
@@ -905,15 +766,16 @@ class KaraokeApp(QWidget):
                 self.playback_widget.raise_()
                 self.controls_visible = True
 
-            if self.fullscreen_timer:
-                self.fullscreen_timer.stop()
-                self.fullscreen_timer.start(3000)
+            # Stop any pending hide timer and restart it
+            if self.hide_controls_timer.isActive():
+                self.hide_controls_timer.stop()
+            self.hide_controls_timer.start(3000)
 
     def eventFilter(self, watched, event):
         """Monitors global application events to catch hover tracking values on top of native video engines."""
         if self.is_video_fullscreen:
             # Catch mouse movements anywhere over the video frame or the controller window bar itself
-            if event.type() in [QEvent.MouseMove, QEvent.HoverMove]:
+            if event.type() == QEvent.MouseMove:
                 # If mouse is in the bottom 15% region of the viewport screen, surface the controls panel layout
                 screen_geo = QApplication.primaryScreen().geometry()
                 cursor_pos = QCursor.pos()
@@ -922,13 +784,15 @@ class KaraokeApp(QWidget):
                 if cursor_pos.y() >= trigger_zone_y or self.playback_widget.underMouse():
                     self.show_fullscreen_controls()
                 else:
-                    # If moving away from the control layer, reset/tick down the timer aggressively
-                    if not self.hide_controls_timer.isActive() and not self.playback_widget.underMouse():
-                        self.hide_controls_timer.start()
+                    # If moving away from the control layer, start hide timer if not already running
+                    if not self.playback_widget.underMouse():
+                        if not self.hide_controls_timer.isActive():
+                            self.hide_controls_timer.start(3000)
 
             # If mouse exits the full app window layout context frame entirely
             elif event.type() == QEvent.Leave and watched == self.playback_widget:
-                self.hide_controls_timer.start()
+                if not self.hide_controls_timer.isActive():
+                    self.hide_controls_timer.start(3000)
 
         return super().eventFilter(watched, event)
 
@@ -950,13 +814,18 @@ class KaraokeApp(QWidget):
                     return
 
     def closeEvent(self, event):
-        # Stop audio analyzer thread FIRST - this is blocking
+        # Exit fullscreen mode first if active
         try:
-            if hasattr(self, 'audio_analyzer') and self.audio_analyzer is not None:
-                self.audio_analyzer.set_playing(False)
-                self.audio_analyzer.stop()
-                # Ensure thread is fully stopped
-                self.audio_analyzer.wait(1000)
+            if self.is_video_fullscreen:
+                self.toggle_video_fullscreen()
+        except Exception as e:
+            print(f"Error exiting fullscreen: {e}")
+            pass
+
+        # Stop audio analyzer thread FIRST - this is blocking (use audio service)
+        try:
+            if hasattr(self, 'audio_service') and self.audio_service:
+                self.audio_service.cleanup()
         except Exception as e:
             print(f"Error stopping audio analyzer: {e}")
             pass
@@ -966,11 +835,9 @@ class KaraokeApp(QWidget):
             self.timer.stop()
         except Exception: pass
 
-        # Stop fullscreen timers
+        # Stop fullscreen timer
         try:
-            if self.fullscreen_timer: self.fullscreen_timer.stop()
-            if hasattr(self, 'fullscreen_mouse_timer') and self.fullscreen_mouse_timer: 
-                self.fullscreen_mouse_timer.stop()
+            if self.hide_controls_timer: self.hide_controls_timer.stop()
         except Exception: pass
 
         # Stop auto-reduce timer

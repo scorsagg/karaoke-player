@@ -55,6 +55,10 @@ class SettingsDialog(QDialog):
                 {"key": "ffmpeg_path", "label": "FFmpeg Core Binary Path:", "type": "file", "desc": "Target path targeting local executable 'ffmpeg'."},
                 {"key": "ffprobe_path", "label": "FFprobe Context Parser Path:", "type": "file", "desc": "Target location targeting local executable 'ffprobe'."},
                 {"key": "ytdlp_path", "label": "YT-DLP Extract Target Path:", "type": "file", "desc": "Target location pointing to your engine binary 'yt-dlp'."}
+            ],
+            "🔊 Audio Settings": [
+                {"key": "measurement_mode", "label": "Audio Measurement Display:", "type": "select", "options": ["dB Output (dBFS)", "SPL Estimate (Room)"], "desc": "dB Output (dBFS) = signal from player. SPL Estimate = approximate room sound pressure from speaker."},
+                {"key": "auto_reduce_threshold", "label": "Auto-Reduce Volume Threshold (%):", "type": "number", "desc": "Audio level percentage (0-100%) above which volume auto-reduces. Default 80% ≈ 84 SPL. Max 100% = 90 SPL. Lower % = more sensitive."}
             ]
         }
         
@@ -102,17 +106,33 @@ class SettingsDialog(QDialog):
                 row_layout.addWidget(label)
                 
                 input_row = QHBoxLayout()
-                edit_field = QLineEdit(str(self.temp_states.get(prop["key"], "")))
-                edit_field.setStyleSheet("background-color: #2d2d2d; border: 1px solid #444; padding: 6px; color: #90ee90; border-radius: 3px;")
-                self.display_fields[prop["key"]] = edit_field
                 
-                browse_btn = QPushButton("📁 Browse...")
-                browse_btn.setFixedSize(90, 28)
-                browse_btn.setStyleSheet("background-color: #3a3a3a; color: white;")
-                browse_btn.clicked.connect(lambda checked=False, k=prop["key"], t=prop["type"]: self.handle_browse(k, t))
+                # Handle different field types
+                if prop["type"] == "select":
+                    # Dropdown for select options
+                    combo_box = QComboBox()
+                    combo_box.setStyleSheet("background-color: #2d2d2d; border: 1px solid #444; padding: 6px; color: #90ee90; border-radius: 3px;")
+                    for option in prop.get("options", []):
+                        combo_box.addItem(option)
+                    current_val = self.temp_states.get(prop["key"], prop.get("options", [""])[0])
+                    combo_box.setCurrentText(str(current_val))
+                    self.display_fields[prop["key"]] = combo_box
+                    input_row.addWidget(combo_box)
+                else:
+                    # Text field for file, directory, number types
+                    edit_field = QLineEdit(str(self.temp_states.get(prop["key"], "")))
+                    edit_field.setStyleSheet("background-color: #2d2d2d; border: 1px solid #444; padding: 6px; color: #90ee90; border-radius: 3px;")
+                    self.display_fields[prop["key"]] = edit_field
+                    input_row.addWidget(edit_field)
+                    
+                    # Only show browse button for file/directory types
+                    if prop["type"] in ["file", "directory"]:
+                        browse_btn = QPushButton("📁 Browse...")
+                        browse_btn.setFixedSize(90, 28)
+                        browse_btn.setStyleSheet("background-color: #3a3a3a; color: white;")
+                        browse_btn.clicked.connect(lambda checked=False, k=prop["key"], t=prop["type"]: self.handle_browse(k, t))
+                        input_row.addWidget(browse_btn)
                 
-                input_row.addWidget(edit_field)
-                input_row.addWidget(browse_btn)
                 row_layout.addLayout(input_row)
                 
                 desc_lbl = QLabel(f"<i>{prop['desc']}</i>")
@@ -138,7 +158,24 @@ class SettingsDialog(QDialog):
 
     def accept_changes(self):
         for key in self.display_fields.keys():
-            self.temp_states[key] = self.display_fields[key].text().strip()
+            field = self.display_fields[key]
+            # Get value based on field type
+            if isinstance(field, QComboBox):
+                value = field.currentText()
+            else:
+                value = field.text().strip()
+            
+            # Convert numeric fields to appropriate type
+            if key == "auto_reduce_threshold":
+                try:
+                    value = int(value)
+                    # Clamp between 0 and 100
+                    value = max(0, min(100, value))
+                except ValueError:
+                    value = 80  # Default if invalid
+            
+            self.temp_states[key] = value
+        
         self.manager.settings.update(self.temp_states)
         self.manager.save_settings()
         self.accept()
