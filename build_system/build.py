@@ -44,7 +44,7 @@ SOURCE_DIR = PROJECT_ROOT / "source_code"
 
 # App metadata
 APP_NAME = "KaraokeStudioPro"
-VERSION = "2.0"  # Update this manually or read from file
+VERSION = "3"  # Update this manually or read from file
 SPEC_FILE = PROJECT_ROOT / "build_system" / "KaraokeStudioPro.spec"
 MAIN_SCRIPT = SOURCE_DIR / "main.py"
 
@@ -221,19 +221,18 @@ def copy_user_documentation():
     """Copy user documentation to dist folder."""
     log("Copying user documentation...", "INFO")
     
-    app_dir = DIST_DIR / APP_NAME
-    if not app_dir.exists():
-        log("[WARNING] App directory not found, skipping documentation copy", "WARNING")
+    if not DIST_DIR.exists():
+        log("[WARNING] Dist directory not found, skipping documentation copy", "WARNING")
         return
     
-    # Only copy INSTALLATION.txt from documentation folder
+    # Only copy INSTALLATION.txt from documentation folder to dist root
     doc_file = "INSTALLATION.txt"
     src = PROJECT_ROOT / "documentation" / doc_file
-    dst = app_dir / doc_file
+    dst = DIST_DIR / doc_file
     
     if src.exists():
         shutil.copy2(src, dst)
-        log(f"   [OK] Copied {doc_file}", "INFO")
+        log(f"   [OK] Copied {doc_file} to dist/", "INFO")
         log(f"[OK] Documentation copied (1 file)", "SUCCESS")
     else:
         log(f"   [WARNING] Not found: {doc_file} at {src}", "WARNING")

@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller Spec File for Karaoke Studio Pro v2.0
+PyInstaller Spec File for Karaoke Studio Pro v3
 
 This spec file defines how to bundle the Karaoke application into a standalone executable.
 Build with: python build_system/build.py (from project root)
@@ -60,7 +60,7 @@ a = Analysis(
         'pytest',
     ],
     noarchive=False,
-    optimize=2,  # Optimization level: 2 = production (removes docstrings)
+    optimize=1,  # Optimization level: 1 = keep docstrings (numpy needs them)
 )
 
 # Create Python archive
