@@ -7,7 +7,10 @@ __pycache__/
 .eggs/
 
 # Samples
-samples\*
+samples/*
+
+#local project files
+project_files/*
 
 # Resources - large binary files
 resources/*.exe
