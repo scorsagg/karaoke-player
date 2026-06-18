@@ -46,6 +46,11 @@ KaraokeStudioPro.exe
 
 For team distribution, create a self-contained .exe:
 
+**⚠️ Important:** Before building, ensure you have the required external tools in the `resources/` folder:
+- `ffmpeg.exe`, `yt-dlp.exe`, `libvlc.dll`, `libvlccore.dll`, `plugins/`
+
+See [BUILD_GUIDE.md](build_system/BUILD_GUIDE.md#acquiring-resource-files) for instructions on acquiring these files.
+
 **1. Install build dependencies:**
 ```bash
 cd d:\Srikanth\Academics\Python\karaoke-player
@@ -79,11 +84,13 @@ karaoke-player/
 │   ├── build.py          # Build orchestrator
 │   ├── KaraokeStudioPro.spec  # PyInstaller config
 │   └── BUILD_GUIDE.md    # Detailed build instructions
-├── resources/            # External tools and assets
-│   ├── ffmpeg.exe        # FFmpeg binary (bundled)
-│   ├── yt-dlp.exe        # YouTube downloader (bundled)
-│   ├── libvlc.dll        # VLC library (bundled)
-│   └── plugins/          # VLC plugins (bundled)
+├── resources/            # External tools and assets (git-ignored binaries)
+│   ├── ffmpeg.exe        # FFmpeg binary (download required)
+│   ├── yt-dlp.exe        # YouTube downloader (download required)
+│   ├── libvlc.dll        # VLC library (download required)
+│   ├── plugins/          # VLC plugins (download required)
+│   ├── splash.png        # Included
+│   └── Loading.png       # Included
 ├── config/               # User settings
 │   ├── settings.json     # Application preferences
 │   └── history.json      # Recent files

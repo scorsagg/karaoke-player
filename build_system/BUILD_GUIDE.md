@@ -13,15 +13,45 @@ This guide explains how to build a **complete standalone executable** of Karaoke
    ```
 
 3. **All bundled tools present** in `resources/` folder:
-   - ✅ `ffmpeg.exe` - Video processing
-   - ✅ `yt-dlp.exe` - YouTube/stream downloading
-   - ✅ `libvlc.dll` - VLC video library
-   - ✅ `libvlccore.dll` - VLC core library
-   - ✅ `plugins/` - VLC plugins directory
+   - ⚠️ `ffmpeg.exe` - Video processing
+   - ⚠️ `yt-dlp.exe` - YouTube/stream downloading
+   - ⚠️ `libvlc.dll` - VLC video library
+   - ⚠️ `libvlccore.dll` - VLC core library
+   - ⚠️ `plugins/` - VLC plugins directory
    - ✅ `splash.png` - Splash screen image
    - ✅ `Loading.png` - Loading screen image
 
-**Current Status:** ✅ All tools are already present in the `resources/` folder!
+### ⚠️ Important: Acquiring Resource Files
+
+The EXE and DLL files are **NOT included in the repository** because they are large binaries and belong in a shared resource location. Here's how to set them up:
+
+#### Option 1: From Shared Storage (Recommended for Teams)
+Contact your team lead to get the `resources/` folder with all files already included.
+
+#### Option 2: Manual Setup (Individual Setup)
+1. **Download FFmpeg**
+   - Go to: https://ffmpeg.org/download.html
+   - Download Windows build (static)
+   - Extract and copy `ffmpeg.exe` to `resources/`
+
+2. **Download yt-dlp**
+   - Go to: https://github.com/yt-dlp/yt-dlp/releases
+   - Download `yt-dlp.exe` 
+   - Copy to `resources/`
+
+3. **Download VLC Libraries**
+   - Go to: https://www.videolan.org/vlc/download-windows.html
+   - Download Windows installer
+   - Extract VLC and copy:
+     - `libvlc.dll` → `resources/`
+     - `libvlccore.dll` → `resources/`
+     - `plugins/` folder → `resources/plugins/`
+
+**Verify setup:**
+```powershell
+ls resources/
+# Should show: ffmpeg.exe, yt-dlp.exe, libvlc.dll, libvlccore.dll, plugins/, splash.png, Loading.png
+```
 
 ## Building the Executable
 
@@ -106,7 +136,9 @@ build_system/
 ## Troubleshooting
 
 ### Build Fails: "Missing required files"
-**Solution:** Ensure all files exist in `resources/` folder:
+**Cause:** The EXE and DLL files are not in the `resources/` folder (they're git-ignored).
+
+**Solution:** Follow the **Acquiring Resource Files** section above to download and place them in `resources/`:
 ```powershell
 ls resources/
 ```
