@@ -1,7 +1,7 @@
-# Karaoke Studio Pro - Build Guide
+# Karaoke Studio Pro v3 - Build Guide
 
 ## Overview
-This guide explains how to build a **complete standalone executable** of Karaoke Studio Pro that includes all required tools (FFmpeg, yt-dlp, VLC libraries) so team members need **zero external dependencies**.
+This guide explains how to build a **complete standalone executable** of Karaoke Studio Pro v3 that includes all required tools (FFmpeg, yt-dlp, VLC libraries) so team members need **zero external dependencies**.
 
 ## Prerequisites
 

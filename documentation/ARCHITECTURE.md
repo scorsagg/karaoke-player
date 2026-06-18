@@ -1,14 +1,14 @@
-# 🎤 Karaoke Studio Pro - Architecture
+# 🎤 Karaoke Studio Pro v3 - Architecture
 
 ## Overview
 
-Karaoke Studio Pro is a feature-rich cross-platform karaoke application built with Python, PySide6 (Qt6), and VLC. It provides video playback, YouTube downloads, real-time audio level monitoring, and playback controls for karaoke enthusiasts.
+Karaoke Studio Pro v3 is a feature-rich cross-platform karaoke application built with Python, PySide6 (Qt6), and VLC. It provides video playback, YouTube downloads, real-time audio level monitoring with configurable room calibration, and playback controls for karaoke enthusiasts.
 
 **Technology Stack:**
 - **GUI Framework**: PySide6 (Qt6 bindings for Python)
 - **Media Engine**: python-vlc (VLC bindings for playback)
 - **Audio Capture**: sounddevice (real-time audio stream analysis)
-- **Audio Processing**: numpy (RMS calculation, buffer management)
+- **Audio Processing**: numpy (RMS calculation, SPL conversion, buffer management)
 - **YouTube Downloads**: yt-dlp (media downloader)
 - **Video Encoding**: FFmpeg (transcoding and processing)
 - **Build System**: PyInstaller (creates standalone executables)

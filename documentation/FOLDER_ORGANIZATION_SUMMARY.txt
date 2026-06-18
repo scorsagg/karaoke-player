@@ -1,4 +1,4 @@
-✅ KARAOKE STUDIO PRO - FOLDER ORGANIZATION (UPDATED)
+✅ KARAOKE STUDIO PRO v3 - FOLDER ORGANIZATION (UPDATED)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -7,9 +7,9 @@
 ├─ 📱 SOURCE_CODE/                 (Refactored Python package)
 │  ├─ __init__.py                 (Package initialization)
 │  ├─ main.py                     (Main application - EXECUTABLE)
-│  ├─ karaoke_app.py              (Legacy version - deprecated)
-│  ├─ v2-karaoke_app - Copy.py    (Archive)
-│  ├─ v2-VLC_version.py           (Archive)
+│  ├─ karaoke_app.py              (⚠️ DEPRECATED - Use main.py instead)
+│  ├─ v2-karaoke_app - Copy.py    (Archive - can be deleted)
+│  ├─ v2-VLC_version.py           (Archive - can be deleted)
 │  │
 │  ├─ 📁 dialogs/
 │  │  ├─ __init__.py
@@ -21,14 +21,21 @@
 │  ├─ 📁 services/
 │  │  ├─ __init__.py
 │  │  ├─ player_service.py        (VLC player abstraction)
-│  │  └─ download_service.py      (YouTube/stream downloads)
+│  │  ├─ download_service.py      (YouTube/stream downloads)
+│  │  └─ audio_service.py         (Audio analyzer management & coordination)
 │  │
-│  ├─ 📁 ui/
-│  │  └─ __init__.py
+│  ├─ 📁 ui/ (NEW - Modularized UI Components)
+│  │  ├─ __init__.py              (UI package exports)
+│  │  ├─ main_layout.py           (Orchestrator combining all UI)
+│  │  ├─ sidebar.py               (Navigation & settings sidebar)
+│  │  ├─ playback_bar.py          (Play/pause/seek/volume/audio meter)
+│  │  ├─ download_page.py         (File loading & URL streaming)
+│  │  ├─ pitch_page.py            (Pitch shift & speed controls)
+│  │  └─ extra_page.py            (Aspect ratio widening tool)
 │  │
 │  ├─ 📁 widgets/
 │  │  ├─ __init__.py
-│  │  ├─ audio_meter.py           (Audio level visualizer)
+│  │  ├─ audio_meter.py           (Audio level visualizer - SPL/dBFS modes)
 │  │  └─ video_frame.py           (Video display frame)
 │  │
 │  └─ 📁 workers/
@@ -37,17 +44,18 @@
 │     └─ process_thread.py        (Command execution thread)
 │
 ├─ 🛠️ BUILD_SYSTEM/
-│  ├─ build.py                    (Smart build orchestrator - COMPLETE)
+│  ├─ build.py                    (Smart build orchestrator v3)
 │  ├─ KaraokeStudioPro.spec       (PyInstaller config - ALL TOOLS BUNDLED)
-│  ├─ BUILD_GUIDE.md              (NEW - Build documentation for team)
-│  ├─ requirements-build.txt      (Build dependencies - UPDATED)
+│  ├─ BUILD_GUIDE.md              (Build documentation for team)
+│  ├─ requirements-build.txt      (Build dependencies)
 │  ├─ build/                      (PyInstaller temp artifacts - auto-generated)
 │  └─ dist/                       (Output: KaraokeStudioPro.exe + dependencies)
 │
 ├─ 📚 DOCUMENTATION/
-│  ├─ ARCHITECTURE.md             (System design & components - UPDATED)
-│  ├─ requirements.txt            (Runtime dependencies - MOVED HERE)
-│  └─ FOLDER_ORGANIZATION_SUMMARY.txt (This file - MOVED HERE)
+│  ├─ ARCHITECTURE.md             (System design & components)
+│  ├─ INSTALLATION.txt            (User setup guide included in dist/)
+│  ├─ requirements.txt            (Runtime dependencies)
+│  └─ FOLDER_ORGANIZATION_SUMMARY.txt (This file)
 │
 ├─ 🔧 RESOURCES/
 │  ├─ ffmpeg.exe                  ✅ Bundled in build
@@ -67,12 +75,13 @@
 │  └─ (Test video files for testing)
 │
 ├─ 📋 CONFIG/
-│  ├─ settings.json               (App settings)
-│  └─ history.json                (Recent files list)
+│  └─ settings.json               (App settings - persistent storage)
+│  └─ history.json                (Local only - NOT tracked in git)
 │
 ├─ 🏗️ ROOT LEVEL FILES (STREAMLINED)
 │  ├─ README.md                   (Project overview)
 │  ├─ KaraokePlayer.code-workspace (VS Code workspace)
+│  ├─ .gitignore                  (Excludes binaries, history.json, cache)
 │  └─ build_system/requirements-build.txt  (For build)
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -83,51 +92,59 @@ Development (Direct):
    cd D:\Srikanth\Academics\Python\karaoke-player
    python .\source_code\main.py
 
-Build Standalone Executable:
+Build Standalone Executable (v3):
    cd D:\Srikanth\Academics\Python\karaoke-player
    pip install -r build_system\requirements-build.txt
    python build_system\build.py
 
    Output: build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe
+           INSTALLATION.txt (included in distribution)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-✨ RECENT FIXES & IMPROVEMENTS (Session 2026-06-17):
+✨ RECENT FIXES & IMPROVEMENTS (Session 2026-06-18 - v3 Release):
 
-✅ Import Issues Fixed:
-   • Converted relative imports to absolute imports in main.py
-   • Added sys.path.insert(0) for proper module discovery
-   • Created __init__.py for source_code package
-   • Fixed QEvent import from PySide6.QtCore (not QtGui)
-   • Added missing QPen import in audio_meter.py
+✅ Audio Features (v3):
+   • SPL (Sound Pressure Level) display: ~60-90 dB SPL with room calibration
+   • Measurement modes: Switch between dB Output (dBFS) and SPL Estimate (Room)
+   • Configurable auto-reduce threshold: Adjustable 0-100% for room-specific calibration
+   • Auto-volume reduction: Reduces volume by 5% when sustained above threshold for 2 seconds
 
-✅ Code Quality:
-   • Fixed VLC state enum references (.State → vlc.State)
-   • Added missing imports (re, sys) in process_thread.py
-   • Fixed missing imports in settings_dialog.py
-   • Added missing imports in audio_meter.py
+✅ Code Architecture:
+   • Extracted all UI building into modular components (ui/ folder)
+   • Created AudioService for audio analyzer management
+   • Refactored main.py from 1100+ lines → cleaner orchestrator
+   • Improved separation of concerns (services, workers, UI, widgets, dialogs)
 
-✅ Feature Fixes:
-   • Fixed speed control: minus/plus buttons now skip 0.05x
-   • Fixed speed control: arrow keys now skip 0.01x (were reversed)
+✅ UI/UX Refactoring:
+   • Moved playback bar creation to ui/playback_bar.py
+   • Moved sidebar creation to ui/sidebar.py
+   • Moved page creation (download, pitch, extra) to individual modules
+   • Created ui/main_layout.py as orchestrator
+   • main.py now only handles event connections and app logic
 
-✅ Performance & Stability:
-   • Fixed app hang on close after playing multiple songs
-   • Improved audio analyzer thread cleanup
-   • Better thread synchronization in closeEvent
-   • Increased timeouts for proper resource cleanup
+✅ Settings & Configuration:
+   • Added "🔊 Audio Settings" section to settings dialog
+   • Settings now include: measurement_mode, auto_reduce_threshold
+   • Integrated number-type field support in settings dialog
+   • Added QComboBox dropdown selector for measurement modes
 
-✅ Build System Enhancements:
-   • Updated build.py to validate all bundled tools
-   • Updated KaraokeStudioPro.spec to include ALL tools
-   • Created BUILD_GUIDE.md for team distribution
-   • All external tools (FFmpeg, yt-dlp, VLC) now BUNDLED
-   • Team members get ZERO-dependency standalone executable
+✅ File Management:
+   • Added config/history.json to .gitignore (local user data only)
+   • history.json no longer tracked in version control
+   • Ensures clean collaborative development
 
-✅ Documentation Updates:
-   • Updated ARCHITECTURE.md with comprehensive component details
-   • Moved requirements.txt to documentation/ folder
-   • Moved FOLDER_ORGANIZATION_SUMMARY.txt to documentation/ folder
+✅ Stability:
+   • Pauses audio analyzer during settings dialog to prevent conflicts
+   • Properly resumes analyzer after settings close
+   • Improved audio service cleanup on application exit
+   • No more UI hangs when switching audio modes
+
+✅ Build System (v3):
+   • Version bumped to 3 in build.py and spec file
+   • INSTALLATION.txt copied to dist/ root for user visibility
+   • Validates all prerequisites before building
+   • Optimization level adjusted for NumPy compatibility
 
 ═══════════════════════════════════════════════════════════════════════════════
 

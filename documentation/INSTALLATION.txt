@@ -1,5 +1,5 @@
 ╔════════════════════════════════════════════════════════════════════════════╗
-║               KARAOKE STUDIO PRO - INSTALLATION GUIDE                       ║
+║          KARAOKE STUDIO PRO v3 - INSTALLATION GUIDE                        ║
 ║                                                                            ║
 ║  Quick Setup: No installation required!                                   ║
 ║  Just extract and run KaraokeStudioPro.exe                                 ║
@@ -19,23 +19,23 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. EXTRACT THE ZIP FILE
-   ├─ Locate the downloaded ZIP file: KaraokeStudioPro_v2.0_*.zip
+   ├─ Locate the downloaded ZIP file: KaraokeStudioPro_v3_*.zip
    ├─ Right-click and select "Extract All..."
    └─ Choose extraction folder (e.g., C:\KaraokeStudioPro\)
       (You can place it anywhere on your system)
 
 2. LOCATE THE EXECUTABLE
    ├─ After extraction, navigate to the folder
-   ├─ Look for: KaraokeStudioPro.exe (Windows application)
+   ├─ Look for: KaraokeStudioProV3.exe (Windows application)
    └─ This is the main application file
 
 3. RUN THE APPLICATION
-   ├─ Double-click KaraokeStudioPro.exe
+   ├─ Double-click KaraokeStudioProV3.exe
    ├─ Application will launch (may take 5-10 seconds on first run)
    └─ Karaoke Studio Pro is ready to use!
 
 4. CREATE A SHORTCUT (Optional)
-   ├─ Right-click KaraokeStudioPro.exe
+   ├─ Right-click KaraokeStudioProV3.exe
    ├─ Select "Create shortcut"
    ├─ Move shortcut to Desktop or Start Menu
    └─ For quick access in future
@@ -65,7 +65,7 @@ PLAYBACK CONTROLS
 │ Seek / Skip            - Click on timeline or use arrow keys               │
 │ Speed Control         - Use +/- buttons to adjust (0.5x to 2.0x)          │
 │ Volume Control        - Move volume slider left/right                      │
-│ Audio Level Monitor   - Real-time level display (right side)               │
+│ Audio Level Monitor   - Real-time SPL/dBFS visualization (right side)      │
 │ Full Screen           - Double-click video to toggle                       │
 └────────────────────────────────────────────────────────────────────────────┘
 
@@ -73,9 +73,10 @@ FEATURES
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ 🎬  Multi-Format Playback  - MP4, MKV, AVI, WebM and more                 │
 │ 📥  YouTube Downloads       - Fetch karaoke tracks directly               │
-│ 🔊  Real-Time Audio Levels  - Live audio level visualization              │
+│ 🔊  Smart Audio Analysis    - SPL room calibration + dBFS modes            │
+│ 📊  Audio Level Monitoring  - Real-time visualization (~60-90 dB SPL)     │
+│ ⚙️  Configurable Threshold   - Auto-reduce at custom level for rooms       │
 │ 🎚️  Playback Control        - Play, pause, seek, speed adjustment         │
-│ 📊  Audio Analysis          - Decibel level monitoring (-80 to 0 dB)      │
 │ 💾  Settings                - Save preferences and history                │
 └────────────────────────────────────────────────────────────────────────────┘
 
@@ -87,9 +88,36 @@ Click "Settings" button to configure:
 ├─ FFmpeg Path          - Location of FFmpeg executable (usually auto-detected)
 ├─ yt-dlp Path          - Location of yt-dlp (usually auto-detected)
 ├─ Download Directory   - Where to save downloaded videos
-└─ Video Output         - Display settings and output options
+├─ Measurement Mode    - Switch between dB Output (dBFS) or SPL Estimate
+└─ Auto-Reduce Threshold - Set volume reduction trigger (0-100%, default 80%)
 
-Most settings are auto-configured. Only change if needed!
+Most settings are auto-configured. Customize audio settings for your room!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ AUDIO CALIBRATION (v3 NEW FEATURE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Karaoke Studio Pro v3 includes room-specific audio calibration:
+
+MEASUREMENT MODES:
+├─ dB Output (dBFS)      - Raw digital signal level (-80 to 0 dB)
+│                          [Technical mode for debugging]
+│
+└─ SPL Estimate (Room)   - Room sound pressure (~60-90 dB SPL)
+                          [Calibrated for typical karaoke rooms]
+
+HOW TO CALIBRATE:
+1. Open "Settings" → "🔊 Audio Settings"
+2. Select measurement mode that works for your room
+3. Set "Auto-Reduce Threshold" based on your preferred volume:
+   ├─ Lower value (0-50%)   = More sensitive, reduces volume sooner
+   ├─ Default (80%)         = Recommended starting point
+   └─ Higher value (90-100%) = Less sensitive, allows louder levels
+
+4. Test with actual karaoke sessions and fine-tune as needed
+5. When threshold is reached, app automatically reduces volume by 5%
+
+NOTE: Auto-reduce prevents excessive audio spikes and hearing damage!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  TROUBLESHOOTING
@@ -97,7 +125,7 @@ Most settings are auto-configured. Only change if needed!
 
 ❌ Application Won't Start
    ✓ Ensure you have Windows 7 SP1 or later
-   ✓ Try running as Administrator (right-click → Run as administrator)
+   ✓ Try running as Administrator: right-click KaraokeStudioProV3.exe → "Run as administrator"
    ✓ Check that all files extracted correctly
    ✓ Restart your computer and try again
 

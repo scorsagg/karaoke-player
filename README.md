@@ -1,4 +1,4 @@
-# 🎤 Karaoke Studio Pro
+# 🎤 Karaoke Studio Pro v3
 
 A feature-rich cross-platform karaoke application built with Python, PySide6, and VLC. Perfect for karaoke enthusiasts and groups!
 
@@ -6,9 +6,10 @@ A feature-rich cross-platform karaoke application built with Python, PySide6, an
 
 - **🎬 Multi-Format Playback**: Play MP4, MKV, AVI, WebM and more with VLC backend
 - **📥 YouTube Downloads**: Fetch karaoke tracks directly from YouTube URLs
-- **🔊 Real-Time Audio Levels**: Live audio level meter with visual feedback
+- **🔊 Real-Time Audio Levels**: Live audio level meter with SPL and dBFS display options
 - **🎚️ Playback Control**: Play, pause, seek, and speed adjustment (0.5x - 2.0x)
-- **📊 Audio Analysis**: Background audio level monitoring with decibel display
+- **📊 Audio Analysis**: Background audio level monitoring with configurable auto-volume reduction
+- **🎛️ Audio Calibration**: Switchable measurement modes (dB Output vs SPL Estimate) for room calibration
 - **💾 Settings**: Persistent storage of app preferences and recent files
 - **🖥️ Cross-Platform**: Works on Windows, macOS, and Linux
 - **📦 Standalone Distribution**: Build as a single .exe with all dependencies bundled (zero external setup needed)
