@@ -168,6 +168,92 @@ download.download_video(url, callback)  # Download with progress
 
 ---
 
+#### AudioService (services/audio_service.py)
+
+**Purpose:** Coordinate audio analyzer thread state management and meter display modes
+
+**Responsibilities:**
+- Manage audio analyzer pause/resume state
+- Set audio meter display modes (dB vs SPL)
+- Provide clean shutdown for audio subsystem
+- Prevent signal conflicts during settings operations
+
+**Public Interface:**
+```python
+audio_service = AudioService(analyzer, meter)
+audio_service.pause_analyzer()           # Pause audio capture
+audio_service.resume_analyzer()          # Resume audio capture
+audio_service.set_display_mode(mode)     # Change meter display
+audio_service.cleanup()                  # Cleanup on shutdown
+```
+
+**Key Methods:**
+- `pause_analyzer()` - Pauses analysis, returns previous state
+- `resume_analyzer()` - Resumes analysis if previously playing
+- `set_display_mode(mode)` - Sets meter display to 'dB Output (dBFS)' or 'SPL Estimate (Room)'
+- `cleanup()` - Safely stops analyzer thread on app exit
+
+---
+
+#### FileLoadingService (services/file_loading_service.py) - FINAL FIX ✅
+
+**Purpose:** Thread-safe file loading with intelligent resource cleanup (no VLC deadlock)
+
+**Problem Solved:** App hung when loading second file - VLC's `stop()` hangs with active decoder threads. Solution: pause + release media reference, let VLC auto-cleanup
+
+**Responsibilities:**
+- Check if file is currently active (playing or paused)
+- If YES: Pause player, wait 1.0s, stop audio analyzer, release media reference (NO stop() call)
+- If NO: Just pause audio analyzer
+- Prevent overlapping file load operations
+- Safely coordinate audio analyzer with file transitions
+- Resume audio analyzer after successful loads
+
+**5 File Loading Entry Points (all use this service internally via `load_video()`):**
+1. Download page "Open File..." button → `load_video()`
+2. Widen page "Open Widen File..." button → `browse_widen_video()` → `load_video()`
+3. History list double-click → `load_video(file_path)`
+4. Download & Queue button → `_on_download_finished()` → `load_video(full_p)`
+5. Convert to 16:9 button → `handle_task_completion()` → `load_video(out_path)`
+
+**Public Interface:**
+```python
+file_loader = FileLoadingService(audio_service, player_service)
+was_playing = file_loader.prepare_for_loading()  # Prepare (pause audio, release media)
+# ... perform file load operation ...
+file_loader.finish_loading(resume_audio=was_playing)  # Cleanup (resume audio)
+```
+
+**Key Methods:**
+- `prepare_for_loading()` - Smart cleanup: check if active → pause → stop audio → release media. Returns previous play state
+- `finish_loading(resume_audio)` - Resumes audio analyzer if specified
+- `is_currently_loading()` - Check if load is in progress
+
+**How It Works (Final Solution):**
+```
+if is_active():
+    if is_playing():
+        pause() + wait 1.0s        ← Stop decoder threads
+    stop_audio_analyzer()          ← Close sounddevice InputStream
+    release_media_reference()      ← NO STOP() CALL - causes hang!
+    wait 0.5s
+else:
+    just pause_audio_analyzer()
+
+→ New file loads
+→ VLC auto-cleans old media
+→ No hang! ✅
+```
+
+**Why This Avoids Deadlock:**
+- VLC decoder threads stay alive even after pause
+- Calling `player.stop()` tries to wait for threads → DEADLOCK
+- Solution: Don't wait for stop, just release reference
+- VLC auto-cleans when new media is set
+
+---
+
+
 ### Widgets
 
 #### VideoFrame (widgets/video_frame.py)

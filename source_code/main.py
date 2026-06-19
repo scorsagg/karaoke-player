@@ -3,7 +3,6 @@ import os
 import subprocess
 import time
 import json
-import vlc  # Added to fix the line 208 syntax error
 from pathlib import Path
 
 # Add parent directory to path so we can import source_code as a module
@@ -11,25 +10,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
-    QLabel, QLineEdit, QHBoxLayout, QFrame, QScrollArea,
-    QMessageBox, QDoubleSpinBox, QProgressBar, QSlider, QStackedWidget,
-    QListWidget, QGridLayout, QSplashScreen, QDialog
+    QLabel, QMessageBox, QProgressBar, QSplashScreen
 )
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect, QEvent, QPoint
-from PySide6.QtGui import QFont, QPixmap, QColor, QCursor, QPainter, QPen
-import numpy as np
-import sounddevice as sd
-from collections import deque
+from PySide6.QtCore import Qt, QTimer, QEvent
+from PySide6.QtGui import QPixmap, QColor, QCursor
 
-# Refactored components
-from source_code.widgets.video_frame import VideoFrame
-from source_code.widgets.audio_meter import AudioLevelMeter
 from source_code.workers.audio_analyzer import AudioAnalyzerThread
 from source_code.workers.process_thread import ProcessThread
 from source_code.dialogs.settings_dialog import SettingsDialog
 from source_code.services.player_service import PlayerService
 from source_code.services.download_service import DownloadService
 from source_code.services.audio_service import AudioService
+from source_code.services.file_loading_service import FileLoadingService
 from source_code.ui.main_layout import create_main_layout
 
 class KaraokeApp(QWidget):
@@ -48,10 +40,7 @@ class KaraokeApp(QWidget):
         self.resize(1150, 850)
         self.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: 'Segoe UI';")
 
-        # Fixed syntax error here: Removed the leading dot
-        vlc_args = ["--aout=directx"] if sys.platform == "win32" else []
-        self.instance = vlc.Instance(vlc_args) 
-        self.player = self.instance.media_player_new()
+        self.player = PlayerService(parent=self)
 
         self.setup_ui()
         self.nav_list.setCurrentRow(0)
@@ -85,6 +74,16 @@ class KaraokeApp(QWidget):
 
         # Initialize audio service for managing audio analyzer and meter
         self.audio_service = AudioService(self.audio_analyzer, self.audio_level_meter)
+
+        # Initialize file loading service for thread-safe file operations
+        self.file_loading_service = FileLoadingService(self.audio_service, self.player)
+
+        # Initialize download service
+        self._download_from_widen = False
+        self.download_service = DownloadService(self.settings, ProcessThread)
+        self.download_service.download_progress.connect(self._on_download_progress)
+        self.download_service.download_finished.connect(self._on_download_finished)
+        self.download_service.download_error.connect(self._on_download_error)
 
         # Auto-reduce tracking
         self.auto_reduce_active = False
@@ -185,6 +184,7 @@ class KaraokeApp(QWidget):
         
         # Connect signals for button events
         self.nav_list.currentRowChanged.connect(self.handle_navigation_change)
+        self.widen_video_btn.clicked.connect(lambda: self.handle_navigation_change(2))
         self.extra_tools_toggle_btn.clicked.connect(self.toggle_extra_tools)
         self.history_toggle_btn.clicked.connect(self.toggle_history)
         self.clear_hist_btn.clicked.connect(self.clear_history)
@@ -251,11 +251,11 @@ class KaraokeApp(QWidget):
                 self.audio_service.resume_analyzer()
 
     def set_volume(self, value):
-        self.player.audio_set_volume(value); self.vol_label.setText(f"{value}%")
+        self.player.set_volume(value); self.vol_label.setText(f"{value}%")
         self.mute_btn.setText("🔊" if value > 0 else "🔇")
 
     def toggle_mute(self):
-        m = not self.player.audio_get_mute(); self.player.audio_set_mute(m)
+        m = not self.player.get_mute(); self.player.set_mute(m)
         self.mute_btn.setText("🔇" if m else "🔊")
 
     def on_audio_level_updated(self, db_level):
@@ -289,7 +289,7 @@ class KaraokeApp(QWidget):
             self.high_db_counter = 0
 
     def jump_time(self, ms):
-        if self.player.get_state() in [vlc.State.Playing, vlc.State.Paused]:
+        if self.player.is_active():
             current = self.player.get_time()
             duration = self.player.get_length()
             if duration <= 0: return
@@ -344,13 +344,25 @@ class KaraokeApp(QWidget):
         self.extra_tools_toggle_btn.setText(f"{'▼' if self.extra_tools_is_expanded else '▶'} 🛠 Extra Tools")
 
     def load_video(self, file_path=None, splash_screen=None):
+        print(f"\n\n{'='*80}")
+        print(f"[main.load_video] 🎬 ENTRY (file_path={file_path})")
+        
         if not file_path:
+            print(f"[main.load_video] 📂 No file path provided, opening dialog...")
             f, _ = QFileDialog.getOpenFileName(
                 self, "Open Audio/Video Track Resource", self.settings["base_directory"],
                 "Media Feeds (*.mp4 *.avi *.mkv *.mov *.mp3 *.wav *.aac *.m4a *.webm);;All System Inputs (*.*)"
             )
-            if not f: return
+            if not f: 
+                print(f"[main.load_video] ❌ Dialog cancelled")
+                return
             file_path = f
+            print(f"[main.load_video] ✓ File selected: {file_path}")
+
+        # Prepare for loading using file loading service
+        print(f"[main.load_video] Calling file_loading_service.prepare_for_loading()...")
+        was_playing = self.file_loading_service.prepare_for_loading()
+        print(f"[main.load_video] ✓ prepare_for_loading returned (was_playing={was_playing})")
 
         if splash_screen is None:
             loading_path = get_resource_path("Loading.png")
@@ -365,42 +377,64 @@ class KaraokeApp(QWidget):
         self._pending_video_path = file_path
         self.add_to_history(file_path)
 
-        # Stop audio monitoring when loading
-        self.audio_analyzer.set_playing(False)
-
         try:
-            self.player.stop()
-
+            # Core loading logic
+            print(f"[main.load_video] 🎯 Starting core loading logic...")
             loader.set_progress(40, "Mapping Core Encoders...")
             self.video_path = self._pending_video_path
-            media = self.instance.media_new(os.path.abspath(self.video_path))
-            self.player.set_media(media)
+            print(f"[main.load_video] 📝 Setting video_path: {self.video_path}")
+            
+            print(f"[main.load_video] 🎬 Calling player.set_media({os.path.abspath(self.video_path)})...")
+            self.player.set_media(os.path.abspath(self.video_path))
+            print(f"[main.load_video] ✓ player.set_media() complete")
 
-            win_id = int(self.video_frame.winId())
-            if sys.platform == "win32": self.player.set_hwnd(win_id)
-            else: self.player.set_xwindow(win_id)
+            print(f"[main.load_video] 🖥️  Calling player.set_video_widget()...")
+            self.player.set_video_widget(int(self.video_frame.winId()))
+            print(f"[main.load_video] ✓ Video widget set")
 
             loader.set_progress(70, "Synchronizing Canvas Matrix Pipeline...")
 
+            time.sleep(0.1)  # Small delay before playing to ensure media is properly loaded
+            print(f"[main.load_video] ⏱️  Waited 0.1s before playback...")
+            
+            print(f"[main.load_video] ▶️  Calling player.play()...")
             self.player.play()
+            print(f"[main.load_video] ✓ player.play() called")
+            
             self.time_label.setText("00:00")
 
+            print(f"[main.load_video] 🔊 Waiting for audio track (retries up to 20)...")
             retries = 0
-            while self.player.audio_get_track() == -1 and retries < 20:
+            while self.player.get_audio_track() == -1 and retries < 20:
                 time.sleep(0.05)
                 QApplication.processEvents()
                 retries += 1
+            print(f"[main.load_video] ✓ Audio track detected after {retries} retries")
 
-            self.player.audio_set_volume(self.vol_slider.value())
+            print(f"[main.load_video] 🔉 Setting volume to {self.vol_slider.value()}...")
+            self.player.set_volume(self.vol_slider.value())
+            print(f"[main.load_video] ✓ Volume set")
 
             # Start audio monitoring after playback begins
-            self.audio_analyzer.set_playing(True)
+            print(f"[main.load_video] 🎙️  Starting audio analyzer (via audio_service)...")
+            self.audio_service.start_audio_monitoring()
+            print(f"[main.load_video] ✓ Audio analyzer started")
 
+            print(f"[main.load_video] 📊 Calling finish_loading(loader)...")
             self.finish_loading(loader)
+            print(f"[main.load_video] ✓ finish_loading() complete")
 
         except Exception as e:
-            print(f"Engine Fault: {e}")
+            print(f"[main.load_video] ❌ Engine Fault: {e}")
+            import traceback
+            traceback.print_exc()
             loader.close()
+        finally:
+            # Ensure file loading service is notified of completion
+            print(f"[main.load_video] 🔚 Calling file_loading_service.finish_loading(resume_audio={was_playing})...")
+            self.file_loading_service.finish_loading(resume_audio=was_playing)
+            print(f"[main.load_video] ✓ file_loading_service.finish_loading() complete")
+            print(f"{'='*80}\n")
 
     def finish_loading(self, loader):
         self.pitch_input.setValue(0.0)
@@ -417,21 +451,113 @@ class KaraokeApp(QWidget):
             QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
             return
 
+        self._download_from_widen = from_widen_tab
         self.status_label.setText("Status: Deploying Downloader Task Pipes...")
         loading_path = get_resource_path("Loading.png")
         pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
         if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
 
-        task_key = "widen_download" if from_widen_tab else "downloader"
         self.download_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.download_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task(task_key))
+        self.download_splash.cancel_btn.clicked.connect(self.download_service.stop_download)
         self.download_splash.show()
         QApplication.processEvents()
 
-        out_pattern = os.path.join(self.settings["download_directory"], "%(title)s.%(ext)s").replace("\\", "/")
-        cmd = [self.settings["ytdlp_path"], "-f", "bv[vcodec^=avc1]+ba[acodec^=mp4a]/b", "-o", out_pattern, "--force-overwrites", "--no-warnings", url]
+        self.download_service.download_video(url, self.settings["download_directory"])
 
-        self.launch_async_task(cmd, None, task_key)
+    def _on_download_progress(self, percent, message):
+        if self.download_splash:
+            self.download_splash.set_progress(percent, message)
+
+    def _on_download_finished(self, filename):
+        if self.download_splash:
+            self.download_splash.close()
+            self.download_splash = None
+        self.status_label.setText("Status: Ready")
+        try:
+            targets = [f for f in os.listdir(self.settings["download_directory"]) if f.endswith('.mp4')]
+            if targets:
+                latest = max(targets, key=lambda x: os.path.getmtime(os.path.join(self.settings["download_directory"], x)))
+                full_p = os.path.normpath(os.path.join(self.settings["download_directory"], latest))
+                
+                # Wait for file to be completely written and stable (not locked)
+                if self._wait_for_file_ready(full_p):
+                    if self._download_from_widen:
+                        self.widen_url_input.clear()
+                        self.widen_tab_video_path = full_p
+                        self.widen_file_status_label.setText(f"Queued File for Widening: {os.path.basename(full_p)}")
+                        self.load_video(full_p)
+                    else:
+                        self.url_input.clear()
+                        self.load_video(full_p)
+                else:
+                    QMessageBox.warning(self, "File Access Error", "Downloaded file is locked or inaccessible. Please try again.")
+        except Exception as e:
+            QMessageBox.critical(self, "File Capture Error", f"Failed capturing downloaded file: {e}")
+
+    def _wait_for_file_ready(self, file_path, max_wait=15, stability_threshold=1.0):
+        """
+        Wait for a downloaded file to be completely written and stable.
+        
+        Args:
+            file_path: Path to the file
+            max_wait: Maximum seconds to wait
+            stability_threshold: Seconds file size must remain stable
+        
+        Returns:
+            True if file is ready, False if timeout/error
+        """
+        import os
+        
+        start_time = time.time()
+        last_size = -1
+        stable_start = None
+        
+        while time.time() - start_time < max_wait:
+            try:
+                # Check if file exists and is accessible
+                if not os.path.exists(file_path):
+                    time.sleep(0.1)
+                    continue
+                
+                # Get current file size
+                current_size = os.path.getsize(file_path)
+                
+                # Try to open file (check if locked)
+                try:
+                    with open(file_path, 'rb') as f:
+                        f.read(1)  # Read one byte to ensure file is accessible
+                except (IOError, OSError):
+                    # File is locked, wait more
+                    last_size = -1
+                    stable_start = None
+                    time.sleep(0.5)
+                    continue
+                
+                # Check if file size has stabilized
+                if current_size == last_size:
+                    if stable_start is None:
+                        stable_start = time.time()
+                    elif time.time() - stable_start >= stability_threshold:
+                        return True  # File is stable!
+                else:
+                    # Size changed, reset stability timer
+                    last_size = current_size
+                    stable_start = None
+                    time.sleep(0.5)
+                    
+            except Exception as e:
+                print(f"File readiness check error: {e}")
+                time.sleep(0.5)
+        
+        return False
+
+    def _on_download_error(self, message):
+        if self.download_splash:
+            self.download_splash.close()
+            self.download_splash = None
+        self.status_label.setText("Status: Ready")
+        if "cancelled" not in message.lower():
+            QMessageBox.warning(self, "Download Error", message)
 
     def get_video_duration_via_ffprobe(self, target_path):
         if not os.path.exists(target_path): return 0
@@ -474,7 +600,7 @@ class KaraokeApp(QWidget):
 
         cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-filter_complex", 
                f"[0:v]setpts=PTS/{s}[v];[0:a]asetrate=44100*{pf},aresample=44100,{','.join(atempo_list)}[a]", 
-               "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", abs_out]
+               "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-b:v", "2000k", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", abs_out]
 
         duration = self.get_video_duration_via_ffprobe(abs_in) / s
         self.launch_async_task(cmd, abs_out, "exporter", override_duration=duration)
@@ -508,29 +634,22 @@ class KaraokeApp(QWidget):
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
         self.kill_allocated_task(task_key)
 
-        duration = override_duration
-        if duration == 0 and task_key in ["downloader", "widen_download"] and self.player.get_length() > 0:
-            duration = self.player.get_length() / 1000.0
-
-        thread = ProcessThread(cmd, duration)
+        thread = ProcessThread(cmd, override_duration)
         self.active_tasks[task_key] = thread
 
-        if task_key in ["downloader", "widen_download"]:
-            thread.status_update.connect(lambda text: self.download_splash.set_progress(self.download_splash.pbar.value(), text))
-            thread.progress.connect(lambda v: self.download_splash.set_progress(v, self.download_splash.showMessageLabel.text()))
-        else:
-            thread.status_update.connect(lambda text: self.export_splash.set_progress(self.export_splash.pbar.value(), text))
-            thread.progress.connect(lambda v: self.export_splash.set_progress(v, self.export_splash.showMessageLabel.text()))
-
+        thread.status_update.connect(lambda text: self.export_splash.set_progress(self.export_splash.pbar.value(), text))
+        thread.progress.connect(lambda v: self.export_splash.set_progress(v, self.export_splash.showMessageLabel.text()))
         thread.finished.connect(lambda success: self.handle_task_completion(task_key, out_path, success))
         thread.start()
 
     def kill_allocated_task(self, task_key):
         if task_key in self.active_tasks:
-            thread = self.active_tasks[task_key]
+            thread = self.active_tasks.pop(task_key)
             thread.stop()
-            thread.wait(1000)
-            self.active_tasks.pop(task_key, None)
+            if self.export_splash:
+                self.export_splash.close()
+                self.export_splash = None
+            self.status_label.setText("Status: Ready")
 
     def stop_all_tasks(self):
         """Stop all active tasks during app shutdown"""
@@ -546,10 +665,9 @@ class KaraokeApp(QWidget):
     def handle_task_completion(self, task_key, out_path, success):
         self.active_tasks.pop(task_key, None)
 
-        if task_key in ["downloader", "widen_download"] and self.download_splash:
-            self.download_splash.close(); self.download_splash = None
-        elif self.export_splash:
-            self.export_splash.close(); self.export_splash = None
+        if self.export_splash:
+            self.export_splash.close()
+            self.export_splash = None
 
         self.status_label.setText("Status: Ready")
 
@@ -557,27 +675,9 @@ class KaraokeApp(QWidget):
             QMessageBox.warning(self, "Processing Break", "Execution pipeline stopped or configuration error checked.")
             return
 
-        if task_key in ["downloader", "widen_download"]:
-            try:
-                targets = [f for f in os.listdir(self.settings["download_directory"]) if f.endswith('.mp4')]
-                if targets:
-                    latest = max(targets, key=lambda x: os.path.getmtime(os.path.join(self.settings["download_directory"], x)))
-                    full_p = os.path.normpath(os.path.join(self.settings["download_directory"], latest))
-
-                    if task_key == "widen_download":
-                        self.widen_url_input.clear()
-                        self.widen_tab_video_path = full_p
-                        self.widen_file_status_label.setText(f"Queued File for Widening: {os.path.basename(full_p)}")
-                        self.load_video(full_p)
-                    else:
-                        self.url_input.clear()
-                        self.load_video(full_p)
-            except Exception as e:
-                QMessageBox.critical(self, "File Capture Error", f"Failed capturing downloaded file: {e}")
-        else:
-            if out_path and os.path.exists(out_path):
-                self.load_video(out_path)
-                QMessageBox.information(self, "Success", f"Output loaded successfully:\n{os.path.basename(out_path)}")
+        if out_path and os.path.exists(out_path):
+            self.load_video(out_path)
+            QMessageBox.information(self, "Success", f"Output loaded successfully:\n{os.path.basename(out_path)}")
 
     def update_ui(self):
         try:
@@ -590,8 +690,7 @@ class KaraokeApp(QWidget):
                     self.show_fullscreen_controls()
                     self.last_mouse_pos = current_mouse_pos
             
-            state = self.player.get_state()
-            if state in [vlc.State.Playing, vlc.State.Paused]:
+            if self.player.is_active():
                 dur = self.player.get_length()
                 if dur > 0 and not self.is_user_sliding:
                     pos = self.player.get_position()
@@ -600,20 +699,20 @@ class KaraokeApp(QWidget):
                     self.time_label.setText(f"{max(0, (ms//1000)//60):02d}:{(ms//1000)%60:02d}")
                     self.duration_label.setText(f"{(dur//1000)//60:02d}:{(dur//1000)%60:02d}")
                     if pos >= 0.99:
-                        self.audio_analyzer.set_playing(False)
+                        self.audio_service.stop_audio_monitoring()
                         self.seek_slider.setValue(0)
                         self.time_label.setText("00:00")
                         QTimer.singleShot(100, self.player.stop)
             else:
                 # Not playing or paused - stop audio monitoring
-                self.audio_analyzer.set_playing(False)
+                self.audio_service.stop_audio_monitoring()
         except Exception as e:
             print(f"UI loop fault: {e}")
 
     def on_slider_pressed(self): self.is_user_sliding = True
     def on_slider_released(self):
         self.is_user_sliding = False
-        if self.player.get_state() not in [vlc.State.NothingSpecial, vlc.State.Stopped]:
+        if self.player.is_active():
             self.player.set_position(self.seek_slider.value() / 1000.0)
 
     def toggle_video_fullscreen(self):
@@ -857,14 +956,9 @@ class KaraokeApp(QWidget):
         self.stop_all_tasks()
 
         # Clean up VLC player and instance
-        try: 
+        try:
             self.player.stop()
-        except Exception: pass
-        try: 
             self.player.release()
-        except Exception: pass
-        try: 
-            self.instance.release()
         except Exception: pass
 
         event.accept()

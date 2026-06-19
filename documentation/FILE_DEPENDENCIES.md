@@ -69,7 +69,37 @@
 - `documentation/ARCHITECTURE.md` → Document new component
 - `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → Add to folder listing
 
-### 8. DEPRECATED/DELETED FILES
+### 8. THREAD-SAFE FILE LOADING (File Loading Operations - FINAL FIX ✅)
+**Current Service:** `source_code/services/file_loading_service.py`
+**Related files:**
+- `source_code/services/file_loading_service.py` → FileLoadingService implementation
+- `source_code/services/audio_service.py` → Coordinates with audio analyzer state
+- `source_code/services/player_service.py` → Player state checks and pause
+- `source_code/main.py` → Initializes FileLoadingService, uses prepare_for_loading()/finish_loading()
+- `build_system/KaraokeStudioPro.spec` → file_loading_service in hiddenimports
+
+**Final Solution (After Debugging):**
+The key fix: **Never call player.stop() when decoder is active** instead:
+1. Call `player.pause()` to stop decoder threads
+2. Wait 1.0s for pause to take effect
+3. Call `audio_analyzer.stop()` to close sounddevice InputStream
+4. Release media reference: `player._media = None` (DON'T call stop()!)
+5. Wait 0.5s for cleanup
+6. Load new file - VLC auto-cleans old media
+
+**Why This Works:**
+- VLC decoder threads stay active even after pause
+- Calling `player.stop()` hangs waiting for threads to exit
+- Solution: pause + release media reference + let VLC auto-cleanup when new media loads
+
+**Entry Points (all use load_video() internally):**
+1. Download page "Open File..." button
+2. Widen page "Open Widen File..." button
+3. History list double-click
+4. Download & Queue button completion
+5. Convert to 16:9 button completion
+
+### 9. DEPRECATED/DELETED FILES
 **Current deprecated files:**
 - karaoke_app.py
 - v2-karaoke_app - Copy.py
@@ -82,7 +112,7 @@
 - Check build_system/KaraokeStudioPro.spec doesn't reference it
 - Check .gitignore if needed
 
-### 9. GITIGNORE & LOCAL FILES
+### 10. GITIGNORE & LOCAL FILES
 **Current:**
 - config/history.json (local user data, not tracked)
 - __pycache__/, *.pyc
@@ -92,7 +122,7 @@
 - Add to .gitignore
 - Document in FOLDER_ORGANIZATION_SUMMARY.txt
 
-### 10. DOCUMENTATION SYNC CHECKLIST
+### 11. DOCUMENTATION SYNC CHECKLIST
 **When updating docs, ensure consistency across:**
 - README.md (project overview, features)
 - ARCHITECTURE.md (technical design, components)

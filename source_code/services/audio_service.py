@@ -1,5 +1,7 @@
 """Audio management service - handles audio analyzer and meter display coordination"""
 
+import time
+
 class AudioService:
     """Service to manage audio analyzer and meter display modes"""
     
@@ -13,17 +15,126 @@ class AudioService:
         self.audio_meter = audio_meter
     
     def pause_analyzer(self):
-        """Pause the audio analyzer - returns True if it was playing"""
+        """Pause the audio analyzer by stopping the thread and closing sounddevice stream"""
+        print(f"[AudioService.pause_analyzer] ⏸️  ENTRY (audio_analyzer={self.audio_analyzer is not None})")
         if self.audio_analyzer and hasattr(self.audio_analyzer, 'is_playing'):
             was_playing = self.audio_analyzer.is_playing
-            self.audio_analyzer.set_playing(False)
+            print(f"[AudioService.pause_analyzer] is_playing={was_playing}")
+            
+            if was_playing:
+                print(f"[AudioService.pause_analyzer] Calling stop() to close sounddevice InputStream...")
+                try:
+                    self.audio_analyzer.stop()
+                    print(f"[AudioService.pause_analyzer] ✓ Audio analyzer stopped and sounddevice stream closed")
+                except Exception as e:
+                    print(f"[AudioService.pause_analyzer] ❌ Error stopping thread: {e}")
+            else:
+                print(f"[AudioService.pause_analyzer] Thread not playing, skipping stop")
+            
+            print(f"[AudioService.pause_analyzer] ✓ EXIT (was_playing={was_playing})")
             return was_playing
+        print(f"[AudioService.pause_analyzer] ℹ️  Audio analyzer not available, returning False")
+        print(f"[AudioService.pause_analyzer] ✓ EXIT (was_playing=False)")
         return False
     
     def resume_analyzer(self):
-        """Resume the audio analyzer"""
+        """Resume the audio analyzer - recreate and restart the thread"""
+        print(f"[AudioService.resume_analyzer] ▶️  ENTRY (audio_analyzer={self.audio_analyzer is not None})")
+        
         if self.audio_analyzer:
+            is_running = self.audio_analyzer.isRunning() if hasattr(self.audio_analyzer, 'isRunning') else False
+            print(f"[AudioService.resume_analyzer] Thread isRunning={is_running}")
+            
+            if not is_running:
+                print(f"[AudioService.resume_analyzer] Thread was stopped, creating new AudioAnalyzerThread...")
+                try:
+                    from source_code.workers.audio_analyzer import AudioAnalyzerThread
+                    
+                    # Create new thread
+                    new_thread = AudioAnalyzerThread()
+                    
+                    # Reconnect the level_updated signal to the meter
+                    if self.audio_meter and hasattr(self.audio_meter, 'update_level'):
+                        print(f"[AudioService.resume_analyzer] Connecting new thread to audio meter...")
+                        new_thread.level_updated.connect(self.audio_meter.update_level)
+                    
+                    # Replace old thread with new one
+                    old_thread = self.audio_analyzer
+                    self.audio_analyzer = new_thread
+                    
+                    # Start the new thread
+                    print(f"[AudioService.resume_analyzer] Starting new thread...")
+                    self.audio_analyzer.start()
+                    print(f"[AudioService.resume_analyzer] ✓ New thread created and started")
+                    
+                    # Mark for playing
+                    self.audio_analyzer.set_playing(True)
+                    print(f"[AudioService.resume_analyzer] ✓ set_playing(True) called")
+                    
+                except Exception as e:
+                    print(f"[AudioService.resume_analyzer] ❌ Error creating new thread: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print(f"[AudioService.resume_analyzer] Thread still running, setting is_playing=True")
+                self.audio_analyzer.set_playing(True)
+                print(f"[AudioService.resume_analyzer] ✓ set_playing(True) called")
+            
+            print(f"[AudioService.resume_analyzer] ✓ EXIT")
+        else:
+            print(f"[AudioService.resume_analyzer] ℹ️  Audio analyzer not available, skipping")
+            print(f"[AudioService.resume_analyzer] ✓ EXIT")
+    
+    def get_audio_analyzer(self):
+        """Get the current audio analyzer thread instance"""
+        return self.audio_analyzer
+    
+    def start_audio_monitoring(self):
+        """Start monitoring audio (resume playing state) using current audio analyzer"""
+        print(f"[AudioService.start_audio_monitoring] 🎙️  ENTRY")
+        if self.audio_analyzer:
+            print(f"[AudioService.start_audio_monitoring] Calling set_playing(True) on current audio analyzer...")
             self.audio_analyzer.set_playing(True)
+            print(f"[AudioService.start_audio_monitoring] ✓ Audio monitoring started")
+        else:
+            print(f"[AudioService.start_audio_monitoring] ❌ Audio analyzer not available")
+        print(f"[AudioService.start_audio_monitoring] ✓ EXIT")
+    
+    def stop_audio_monitoring(self):
+        """Stop monitoring audio (pause playing state) using current audio analyzer"""
+        print(f"[AudioService.stop_audio_monitoring] ⏸️  ENTRY")
+        if self.audio_analyzer:
+            print(f"[AudioService.stop_audio_monitoring] Calling set_playing(False) on current audio analyzer...")
+            self.audio_analyzer.set_playing(False)
+            print(f"[AudioService.stop_audio_monitoring] ✓ Audio monitoring stopped")
+        else:
+            print(f"[AudioService.stop_audio_monitoring] ❌ Audio analyzer not available")
+        print(f"[AudioService.stop_audio_monitoring] ✓ EXIT")
+    
+    def disconnect_audio_signals(self):
+        """Block audio analyzer signals to prevent interference during file loading"""
+        print(f"[AudioService.disconnect_audio_signals] 🔌 ENTRY")
+        if self.audio_analyzer:
+            try:
+                print(f"[AudioService.disconnect_audio_signals] Blocking audio analyzer signals...")
+                self.audio_analyzer.blockSignals(True)
+                print(f"[AudioService.disconnect_audio_signals] ✓ Signals blocked")
+            except Exception as e:
+                print(f"[AudioService.disconnect_audio_signals] ❌ Error: {e}")
+        print(f"[AudioService.disconnect_audio_signals] ✓ EXIT")
+    
+    def reconnect_audio_signals(self):
+        """Unblock audio analyzer signals after file loading"""
+        print(f"[AudioService.reconnect_audio_signals] 🔌 ENTRY")
+        if self.audio_analyzer:
+            try:
+                print(f"[AudioService.reconnect_audio_signals] Unblocking audio analyzer signals...")
+                self.audio_analyzer.blockSignals(False)
+                print(f"[AudioService.reconnect_audio_signals] ✓ Signals unblocked")
+            except Exception as e:
+                print(f"[AudioService.reconnect_audio_signals] ❌ Error: {e}")
+        print(f"[AudioService.reconnect_audio_signals] ✓ EXIT")
+    
     
     def set_display_mode(self, mode):
         """Set the audio meter display mode ('dB Output (dBFS)' or 'SPL Estimate (Room)')"""

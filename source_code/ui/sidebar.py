@@ -1,6 +1,6 @@
 """Sidebar UI component - navigation and settings"""
 
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QPushButton, QListWidget, QLabel
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget, QLabel
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
 
@@ -68,7 +68,6 @@ def create_sidebar(parent):
     history_label.setFont(QFont("Segoe UI", 8, QFont.Bold))
     history_label.setStyleSheet("color: #666; margin-left: 15px;")
 
-    from PySide6.QtWidgets import QHBoxLayout
     clear_hist_btn = QPushButton("Clear")
     clear_hist_btn.setFixedSize(45, 18)
     clear_hist_btn.setStyleSheet("font-size: 9px; background-color: #333; color: #888; border-radius: 2px;")

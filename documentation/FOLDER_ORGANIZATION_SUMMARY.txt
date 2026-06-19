@@ -22,7 +22,8 @@
 │  │  ├─ __init__.py
 │  │  ├─ player_service.py        (VLC player abstraction)
 │  │  ├─ download_service.py      (YouTube/stream downloads)
-│  │  └─ audio_service.py         (Audio analyzer management & coordination)
+│  │  ├─ audio_service.py         (Audio analyzer management & coordination)
+│  │  └─ file_loading_service.py  (Thread-safe file loading with state coordination)
 │  │
 │  ├─ 📁 ui/ (NEW - Modularized UI Components)
 │  │  ├─ __init__.py              (UI package exports)

@@ -48,46 +48,25 @@ class DownloadService(QObject):
         elif d['status'] == 'error':
             self.download_error.emit(f"Download error: {d.get('error')}")
 
-    def download_video(self, url, download_dir, preferred_format='bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'):
+    def download_video(self, url, download_dir, preferred_format='bv[vcodec^=avc1]+ba[acodec^=mp4a]/b'):
         self.download_url = url
-        # Ensure yt-dlp is installed
-        try:
-            subprocess.run(["yt-dlp", "--version"], check=True, capture_output=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            self.download_error.emit("yt-dlp is not installed or not in PATH. Please install it.")
-            return
+        ytdlp_path = self.settings_manager.get("ytdlp_path", "yt-dlp")
 
-        # Use settings_manager for download directory
         target_dir = Path(download_dir)
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        ydl_opts = {
-            'format': preferred_format,
-            'outtmpl': str(target_dir / '%(title)s.%(ext)s'),
-            'noplaylist': True,
-            'progress_hooks': [self._download_progress_hook],
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4', # Ensure final output is mp4
-            }],
-        }
-
-        # yt-dlp can be run as a command-line tool. Let's build the command.
-        # This approach avoids importing youtube_dl directly, which can be problematic
-        # with PySide6 and ensures yt-dlp runs in its own process.
-
         command = [
-            "yt-dlp",
-            "--format", preferred_format,
-            "--output", str(target_dir / '%(title)s.%(ext)s'),
+            ytdlp_path,
+            "-f", preferred_format,
+            "-o", str(target_dir / '%(title)s.%(ext)s'),
             "--no-playlist",
-            "--merge-output-format", "mp4", # Ensure merged output is mp4
+            "--merge-output-format", "mp4",
+            "--force-overwrites",
+            "--no-warnings",
             url
         ]
 
-        # Add a placeholder for duration if we can determine it, otherwise pass 0
-        # For now, we'll assume 0 and update progress based on stdout parsing
-        self.download_thread = self.process_thread_factory(cmd=command, duration=0) # duration is a placeholder here
+        self.download_thread = self.process_thread_factory(cmd=command, duration=0)
         self.download_thread.status_update.connect(self._parse_download_status)
         self.download_thread.finished.connect(self._download_process_finished)
         self.download_thread.start()
@@ -123,12 +102,10 @@ class DownloadService(QObject):
             self.download_error.emit(status_line)
 
     def _download_process_finished(self, success):
-        if success and self.current_download_filename:
-            self.download_finished.emit(self.current_download_filename)
-        elif not success:
-            # Error should have been emitted by _parse_download_status if yt-dlp failed
-            if not self.download_thread.is_killed:
-                self.download_error.emit("Download process failed unexpectedly.")
+        if success:
+            self.download_finished.emit(self.current_download_filename or "")
+        elif not self.download_thread.is_killed:
+            self.download_error.emit("Download process failed unexpectedly.")
 
         self.download_thread = None
         self.download_url = None

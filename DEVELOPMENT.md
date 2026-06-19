@@ -203,6 +203,62 @@ config/
 4. **Use in `main.py`**
    - Access via `self.settings.get("new_setting")`
 
+### Implementing Thread-Safe File Loading
+
+**Important:** All file loading operations must go through the `FileLoadingService` to prevent audio analyzer conflicts and UI hangs.
+
+#### Problem This Solves
+Without proper coordination, switching pages and opening files causes:
+- Audio analyzer signals conflicting with file dialogs
+- UI event loop blocked during file operations
+- App hangs when widen/export operations complete
+
+#### Solution: FileLoadingService Pattern
+
+The `FileLoadingService` coordinates state between file loading and audio monitoring:
+```python
+# In main.py __init__()
+self.file_loading_service = FileLoadingService(self.audio_service, self.player)
+
+# In load_video() method
+def load_video(self, file_path=None):
+    # Prepare: pause audio, process events, stop player
+    was_playing = self.file_loading_service.prepare_for_loading()
+    
+    try:
+        # Your file loading logic here
+        self.player.set_media(file_path)
+        self.player.play()
+        # ... rest of load logic ...
+    finally:
+        # Cleanup: resume audio if it was playing
+        self.file_loading_service.finish_loading(resume_audio=was_playing)
+```
+
+#### Adding a New File Loading Entry Point
+
+**If adding another way to load files:**
+
+1. Ensure all paths call `load_video()` (don't duplicate loading logic)
+2. Example: "Open from Folder" button
+   ```python
+   open_folder_btn.clicked.connect(lambda: self.load_video())
+   ```
+
+3. Test by:
+   - Opening file in download page ✓
+   - Switching to pitch page immediately ✓
+   - Opening another file - should not hang ✓
+   - Switching to widen page and downloading ✓
+   - Switching back and opening file - should not hang ✓
+
+#### Files Affected by File Loading Changes
+- `services/file_loading_service.py` - Core loading logic
+- `services/audio_service.py` - Audio state coordination
+- `main.py` - Usage and initialization
+- Build spec (add to hiddenimports if creating new module)
+- Documentation (ARCHITECTURE.md, FOLDER_ORGANIZATION_SUMMARY.txt, FILE_DEPENDENCIES.md)
+
 ---
 
 ## Testing Checklist
@@ -215,6 +271,10 @@ Before committing or building:
 - [ ] Settings dialog opens/closes without freezing
 - [ ] Settings persist in `config/settings.json`
 - [ ] Audio features work as expected
+- [ ] **File loading:** Open file in download page ✓
+- [ ] **File loading:** Switch pages quickly ✓
+- [ ] **File loading:** Open multiple files in same page ✓
+- [ ] **File loading:** Download and convert to 16:9 without hang ✓
 - [ ] `python build_system/build.py` completes successfully
 - [ ] `build_system/dist/KaraokeStudioProV3/KaraokeStudioProV3.exe` runs
 - [ ] Documentation is consistent and up-to-date

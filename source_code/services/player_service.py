@@ -47,19 +47,75 @@ class PlayerService(QObject):
         self.playback_stopped.emit() # Treat end reached as stopped
 
     def set_media(self, media_path):
+        print(f"[PlayerService.set_media] 🎬 ENTRY (media_path={media_path})")
+        # Release old media if any
+        if self._media is not None:
+            try:
+                self._media = None
+                print(f"[PlayerService.set_media] ✓ Old media released")
+            except:
+                pass
+        
+        # Create and set new media
+        print(f"[PlayerService.set_media] Creating new media...")
         self._media = self._instance.media_new(media_path)
+        print(f"[PlayerService.set_media] ✓ Media object created")
+        
+        print(f"[PlayerService.set_media] Setting media to player...")
         self._player.set_media(self._media)
+        print(f"[PlayerService.set_media] ✓ Media set to player")
+        
+        print(f"[PlayerService.set_media] Emitting media_changed signal...")
         self.media_changed.emit(media_path)
+        print(f"[PlayerService.set_media] ✓ EXIT")
 
     def play(self):
-        if self._player.play() == -1:
-            print("Error playing media.")
+        print(f"[PlayerService.play] ▶️  ENTRY")
+        result = self._player.play()
+        if result == -1:
+            print(f"[PlayerService.play] ❌ Error playing media.")
+        else:
+            print(f"[PlayerService.play] ✓ Play command sent")
+        print(f"[PlayerService.play] ✓ EXIT")
 
     def pause(self):
+        print(f"[PlayerService.pause] ⏸️  ENTRY")
         self._player.pause()
+        print(f"[PlayerService.pause] ⏸️  Pause command sent")
+        print(f"[PlayerService.pause] ✓ EXIT")
+    
+    def clear_media(self):
+        """Clear the current media - stops playback and releases resources"""
+        print(f"[PlayerService.clear_media] 🗑️  ENTRY")
+        try:
+            # Clear the media from the player
+            self._player.set_media(None)
+            print(f"[PlayerService.clear_media] ✓ Player media cleared")
+        except Exception as e:
+            print(f"[PlayerService.clear_media] ℹ️  set_media(None) not fully supported: {e}")
+        
+        # Release our reference
+        if self._media is not None:
+            try:
+                self._media = None
+                print(f"[PlayerService.clear_media] ✓ Media object released")
+            except Exception as e:
+                print(f"[PlayerService.clear_media] ⚠️  Error releasing media: {e}")
+        
+        print(f"[PlayerService.clear_media] ✓ EXIT")
 
     def stop(self):
+        print(f"[PlayerService.stop] 🛑 ENTRY")
         self._player.stop()
+        print(f"[PlayerService.stop] ✓ Player stopped")
+        # Release media to free resources
+        if self._media is not None:
+            try:
+                self._media = None
+                print(f"[PlayerService.stop] ✓ Media released")
+            except:
+                pass
+        print(f"[PlayerService.stop] ✓ EXIT")
 
     def is_playing(self):
         return self._player.is_playing()
@@ -95,3 +151,40 @@ class PlayerService(QObject):
             self._player.set_nsobject(video_widget_id)
         else:
             print("Unsupported platform for VLC video widget.")
+
+    def set_rate(self, rate):
+        self._player.set_rate(rate)
+
+    def get_mute(self):
+        return self._player.audio_get_mute()
+
+    def set_mute(self, mute):
+        self._player.audio_set_mute(mute)
+
+    def get_audio_track(self):
+        return self._player.audio_get_track()
+
+    def is_active(self):
+        """Returns True if player is playing or paused (not stopped/idle)."""
+        state = self._player.get_state()
+        return state in [vlc.State.Playing, vlc.State.Paused]
+
+    def release(self):
+        """Detach VLC event callbacks then release player and instance resources."""
+        try:
+            self._event_manager.event_detach(vlc.EventType.MediaPlayerTimeChanged, self._handle_time_changed)
+            self._event_manager.event_detach(vlc.EventType.MediaPlayerPositionChanged, self._handle_position_changed)
+            self._event_manager.event_detach(vlc.EventType.MediaPlayerPlaying, self._handle_playing)
+            self._event_manager.event_detach(vlc.EventType.MediaPlayerPaused, self._handle_paused)
+            self._event_manager.event_detach(vlc.EventType.MediaPlayerStopped, self._handle_stopped)
+            self._event_manager.event_detach(vlc.EventType.MediaPlayerEndReached, self._handle_end_reached)
+        except Exception:
+            pass
+        try:
+            self._player.release()
+        except Exception:
+            pass
+        try:
+            self._instance.release()
+        except Exception:
+            pass
