@@ -1,7 +1,7 @@
 # Karaoke Application - Feature Implementation Guide
-**Status:** Planning & Documentation  
+**Status:** Features 1-8 Complete ✅ | Remaining features in planning  
 **Date:** 2026-06-20  
-**Priority:** Medium & High Impact Features
+**Priority:** Complete core features, planning advanced features
 
 ---
 
@@ -236,44 +236,40 @@ ffmpeg -i input.mp4 -af "volume=5dB,alimiter=limit=0.95" -c:v copy output.mp4
 ### Feature 6: Audio Trimming/Seeking
 **Priority:** MEDIUM  
 **Difficulty:** Low  
-**Status:** Ready to implement
+**Status:** ✅ COMPLETE
 
-**Purpose:** Remove first N seconds from audio (useful for removing intros, silence, or intro music)
+**Purpose:** Remove first/last N seconds from audio or extract middle range (useful for removing intros, silence, or outro)
 
-**Basic FFmpeg Command:**
+**Implementation:** Fully implemented with UI in Audio Tools page (3 independent trim options)
+- **Trim First X seconds** - Remove opening
+- **Trim Last X seconds** - Remove ending  
+- **Keep Range (A to B)** - Extract middle section
+- Options can be combined (cascading application order)
+- **UI Component:** TimePickerWidget (H/M/S spinners for each option)
+
+**FFmpeg Command Used:**
 ```bash
-ffmpeg -y -ss SECONDS -i input.mp3 -acodec copy output.mp3
+ffmpeg -y -ss START -to END -i input.mp3 -acodec copy output.mp3
 ```
 
-**Real Examples from Project:**
-```bash
-ffmpeg -y -ss 3.5 -i "slowed_Babu Samjho Ishare-karaoke-session.mp3" \
-        -acodec copy "Babu Samjho Ishare-karaoke-session_slowed.mp3"
-```
-
-**More Trimming Examples:**
+**Real-World Examples:**
 ```bash
 # Remove first 10 seconds
 ffmpeg -y -ss 10.0 -i "audio.wav" -acodec copy "audio_trimmed.wav"
 
-# Remove first 3.5 seconds from MP3
-ffmpeg -y -ss 3.5 -i "audio.mp3" -acodec copy "audio_trimmed.mp3"
+# Keep range from 1:30 to 3:45 (remove intro and outro)
+ffmpeg -y -ss 00:01:30 -to 00:03:45 -i "audio.mp3" -acodec copy "audio_trimmed.mp3"
 
-# Remove first 1 minute and 30 seconds (HH:MM:SS format)
-ffmpeg -y -ss 00:01:30 -i "audio.mp3" -acodec copy "audio_trimmed.mp3"
+# Remove first 1 minute 30 seconds, then remove last 45 seconds
+# (calculated by get_trimmed_duration)
+ffmpeg -y -ss 00:01:30 -to END_CALCULATED -i "audio.mp3" -acodec copy "audio_trimmed.mp3"
 ```
 
-**Parameters:**
-- `-ss`: Seek/start position (format: HH:MM:SS or decimal seconds)
-  - `3.5` = 3.5 seconds
-  - `00:01:30` = 1 minute 30 seconds
-- `-y`: Overwrite output file without asking
-- `-acodec copy`: Fast trimming without re-encoding (no quality loss)
-
-**Use Cases:**
-- Remove intro music before singing starts
-- Trim silence from beginning
-- Remove countdown or introduction
+**Time Format in UI:**
+- Display: HH:MM:SS (e.g., 00:01:30 for 1 minute 30 seconds)
+- Input: Separate spinners for hours (0-59), minutes (0-59), seconds (0-59)
+- No typing required - increment buttons for each unit
+- Total seconds calculated as: hours × 3600 + minutes × 60 + seconds
 
 **Processing Speed:** ~1-2 seconds for entire file (extremely fast because no re-encoding)
 
@@ -282,40 +278,62 @@ ffmpeg -y -ss 00:01:30 -i "audio.mp3" -acodec copy "audio_trimmed.mp3"
 ### Feature 7: Audio Format Conversion
 **Priority:** MEDIUM  
 **Difficulty:** Low  
-**Status:** Ready to implement
+**Status:** ✅ COMPLETE
 
-**Purpose:** Convert between MP3, WAV, DAT formats
+**Purpose:** Convert between MP3, WAV, M4A, AAC, MP4, MKV, and other audio/video formats with quality control
 
-**WAV to MP3:**
+**Implementation:** Fully implemented with UI in Audio Tools page
+- Source format auto-detection or manual selection
+- Target format dropdown (9 formats supported)
+- Quality selector for lossy formats (High 320kbps, Medium 192kbps, Low 128kbps)
+- Intelligent FFmpeg command builder (format-specific codec selection)
+
+**FFmpeg Commands Generated:**
 ```bash
-ffmpeg -i input.wav -q:a 0 output.mp3
+# WAV to MP3 (High Quality)
+ffmpeg -i input.wav -acodec libmp3lame -b:a 320k output.mp3
+
+# MP3 to WAV
+ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 output.wav
+
+# DAT to MP3
+ffmpeg -i input.dat -vn -acodec libmp3lame -b:a 192k output.mp3
+
+# MP4 to M4A (extract audio)
+ffmpeg -i input.mp4 -vn -acodec aac -b:a 192k output.m4a
+
+# Video to audio extraction
+ffmpeg -i video.mp4 -vn -acodec libmp3lame -b:a 320k output.mp3
 ```
 
-**MP3 to WAV:**
-```bash
-ffmpeg -i input.mp3 output.wav
-```
+**Quality Preset Mappings:**
+- **High:** 320 kbps (for MP3, best audio quality)
+- **Medium:** 192 kbps (default, good quality with smaller file size)
+- **Low:** 128 kbps (minimum, very compressed)
 
-**DAT to MP3:**
-```bash
-ffmpeg -i input.dat -vn -ar 44100 -ac 2 -b:a 192k output.mp3
-```
-
-**DAT to WAV:**
-```bash
-ffmpeg -i input.dat -vn -ar 44100 -ac 2 output.wav
-```
+**Supported Formats:**
+| Audio | Video |
+|-------|-------|
+| MP3 | MP4 |
+| WAV | MKV |
+| M4A | AVI |
+| AAC | WebM |
+| OGG | |
+| FLAC | |
+| DAT | |
+| OPUS | |
+| WMA | |
 
 **Parameters:**
-- `-vn`: No video stream
+- `-vn`: No video stream (for audio extraction)
 - `-ar 44100`: Sample rate (44.1 kHz = CD quality)
 - `-ac 2`: Audio channels (stereo)
-- `-b:a 192k`: Audio bitrate
-- `-q:a 0`: Highest quality
+- `-b:a {bitrate}`: Audio bitrate
+- `-acodec {codec}`: Audio codec (libmp3lame, aac, libvorbis, etc.)
 
-**Better Approaches:**
-- For lossless preservation: Always use WAV as intermediate format
-- For distribution: MP3 with `-q:a 0` or `-b:a 320k`
+**Processing Speed:** Depends on file size and format - typically 30-60 seconds for 5 minute audio
+
+**Auto-Load:** After conversion, result automatically loads into player
 
 ---
 

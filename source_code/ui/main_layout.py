@@ -6,7 +6,7 @@ from source_code.ui.sidebar import create_sidebar
 from source_code.ui.playback_bar import create_playback_bar
 from source_code.ui.download_page import create_download_page
 from source_code.ui.pitch_page import create_pitch_page
-from source_code.ui.extra_page import create_extra_page
+from source_code.ui.extra_page import create_widen_page, create_audio_tools_page
 from PySide6.QtWidgets import QLabel, QWidget
 from PySide6.QtGui import QFont
 
@@ -64,8 +64,18 @@ def create_main_layout(settings):
     stack.addWidget(pitch_page_components["page"])
     components["pitch_page_components"] = pitch_page_components
     
-    extra_page_components = create_extra_page()
-    stack.addWidget(extra_page_components["page"])
+    # Index 2: Widen Video page
+    widen_page_components = create_widen_page()
+    stack.addWidget(widen_page_components["page"])
+    components["widen_page_components"] = widen_page_components
+    
+    # Index 3: Audio Tools page (with internal tabs for trimming and conversion)
+    audio_tools_page_components = create_audio_tools_page()
+    stack.addWidget(audio_tools_page_components["page"])
+    components["audio_tools_page_components"] = audio_tools_page_components
+    
+    # Combine widen and audio tools into extra_page_components for backward compatibility
+    extra_page_components = {**widen_page_components, **audio_tools_page_components}
     components["extra_page_components"] = extra_page_components
 
     components["stack"] = stack

@@ -11,6 +11,10 @@ A feature-rich cross-platform karaoke application built with Python, PySide6, an
 - **📊 Audio Analysis**: Background audio level monitoring with configurable auto-volume reduction
 - **🎛️ Audio Calibration**: Switchable measurement modes (dB Output vs SPL Estimate) for room calibration
 - **💾 Settings**: Persistent storage of app preferences and recent files
+- **✨ Audio Tools** (NEW v3):
+  - 🎵 **Audio Extraction**: Extract audio from video files (WAV format)
+  - ✂️ **Audio Trimming**: Trim first/last seconds or keep specific range (with H/M/S controls)
+  - 🔄 **Format Conversion**: Convert between MP3, WAV, M4A, AAC, MP4, MKV, and more with quality control
 - **🖥️ Cross-Platform**: Works on Windows, macOS, and Linux
 - **📦 Standalone Distribution**: Build as a single .exe with all dependencies bundled (zero external setup needed)
 

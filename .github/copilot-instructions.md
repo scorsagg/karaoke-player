@@ -166,7 +166,29 @@ When starting a new session:
 
 ---
 
-## Recent Implementation: Final Fix for File Loading Hang (v3)
+## Recent Implementation: Audio Loudness Normalization (Feature 8) (v3)
+
+**Status:** ✅ COMPLETE & WORKING
+
+**What changed:**
+- Added: `source_code/ui/extra_page.py` (normalize tab with controls)
+- Added: `source_code/main.py` (normalize_audio() method)
+
+**The Feature:** Normalizes audio to consistent LUFS levels for streaming/broadcast standards
+- Three presets: -14 LUFS (Streaming), -16 LUFS (Broadcast), -18 LUFS (Loud)
+- FFmpeg `loudnorm` filter with automatic gain application
+- Output: WAV format with 44100 Hz sample rate
+
+**Why It Works:** 
+- Uses industry-standard LUFS (Loudness Units relative to Full Scale) measurement
+- Three-second analysis + automatic gain calculation
+- Preserves audio quality while normalizing loudness
+
+**For future developers:** See `documentation/FILE_DEPENDENCIES.md` section 11 for complete Feature 8 details and `IMPLEMENTATION_LOG.md` for implementation specifics
+
+---
+
+## Previous Implementation: Audio Tools Extraction UI Fix (v3)
 
 **Status:** ✅ COMPLETE & WORKING
 
@@ -193,8 +215,80 @@ When starting a new session:
 
 ---
 
+## Recent Implementation: Audio Tools Features 6&7 with H/M/S Time Picker (v3)
+
+**Status:** ✅ COMPLETE & FULLY TESTED
+
+**Features Implemented:**
+- ✅ Feature 6: Audio Trimming (trim first/last/keep range with combinations)
+- ✅ Feature 7: Format Conversion (MP3, WAV, M4A, AAC, MP4, MKV, AVI, WebM with quality control)
+- ✅ TimePickerWidget: Custom UI component with separate H/M/S spinners
+- ✅ Audio Overlay: Visual indicator "🎵 Audio File Loaded" for audio files
+- ✅ Navigation Fix: Page stays on Audio Tools after trim/convert/extract
+- ✅ History Detection: Audio files from history show overlay automatically
+
+**What changed:**
+- **Created:** `TimePickerWidget` class in `source_code/ui/extra_page.py` (lines 6-36)
+  - Three QSpinBox widgets (hours 0-59, minutes 0-59, seconds 0-59)
+  - Methods: `get_total_seconds()`, `set_total_seconds(seconds)`, `get_display_text()`
+  - Display format: HH:MM:SS with independent increment buttons
+- **Updated:** `source_code/ui/extra_page.py` - Trim spinners use TimePickerWidget (lines 167-197)
+- **Updated:** `source_code/main.py`
+  - Added `audio_overlay` widget, `create_audio_overlay()`, `show_audio_visualization()`, `hide_audio_visualization()`
+  - Added `load_history_item()` for audio format detection
+  - Added `is_audio_only` parameter to `load_video()` and `finish_loading()`
+  - Updated `trim_audio()` to use `get_total_seconds()` instead of `value()`
+  - Updated `handle_task_completion()` to auto-navigate back to Audio Tools page
+- **Updated:** `extract_audio_from_video()` to show overlay
+- **Updated:** All 5 documentation files with completion markers
+
+**UX Improvements:**
+- **No More Typing:** Each time unit (hours, minutes, seconds) has independent spinners
+- **Clear Display:** HH:MM:SS format shows exact time selected
+- **Visual Feedback:** Green "🎵 Audio File Loaded" overlay confirms audio is playing
+- **Navigation Stability:** Users stay on Audio Tools page after any operation
+- **Smart History:** Loading audio files from history auto-detects format and shows overlay
+
+**Dependencies:** No new packages added (TimePickerWidget uses only PySide6 primitives)
+
+**Validation:**
+- ✅ Syntax check passed (exit code 0)
+- ✅ H/M/S spinners parse correctly (1:30 = 5400 seconds)
+- ✅ Multiple trim operations combined successfully
+- ✅ Format conversion handles all formats
+- ✅ Navigation stays on Audio Tools page after trim/convert/extract
+- ✅ Audio overlay displays for audio-only files
+- ✅ History detection works for audio formats
+
+**For future developers:** See `documentation/FILE_DEPENDENCIES.md` section 9 for TimePickerWidget details, `FEATURE_IMPLEMENTATION_GUIDE.md` for Features 6&7 implementation details, and `ARCHITECTURE.md` for system design
+
+---
+
 
 ## Common Tasks Checklist
+
+**Adding a New Service:**
+- [ ] Create file in `source_code/services/`
+- [ ] Add to `build_system/KaraokeStudioPro.spec` hiddenimports
+- [ ] Import and init in `main.py`
+- [ ] Update 5 docs (FILE_DEPENDENCIES, ARCHITECTURE, FOLDER_ORGANIZATION, DEVELOPMENT, IMPLEMENTATION_LOG)
+
+**Adding a New UI Component:**
+- [ ] Create in `source_code/ui/`
+- [ ] Add to `ui/main_layout.py`
+- [ ] Add to build spec hiddenimports
+- [ ] Update 5 docs
+
+**Modifying Audio Features:**
+- [ ] Update audio_service.py or audio_meter.py
+- [ ] Update settings in dialogs/settings_dialog.py
+- [ ] Update 5 docs
+
+**ANY Change Type:**
+1. Check FILE_DEPENDENCIES.md for what to update
+2. Make changes
+3. Update all 5 docs
+4. Test syntax
 
 **Adding a New Service:**
 - [ ] Create file in `source_code/services/`

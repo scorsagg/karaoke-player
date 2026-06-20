@@ -29,7 +29,8 @@ class KaraokeApp(QWidget):
     def __init__(self):
         super().__init__()
         self.video_path = ""
-        self.widen_tab_video_path = ""  
+        self.widen_tab_video_path = ""
+        self.audio_tools_file_path = ""  # For audio tools file loader
         self.active_tasks = {}
         self.is_video_fullscreen = False
         self.download_splash = None
@@ -129,6 +130,7 @@ class KaraokeApp(QWidget):
         self.extra_tools_toggle_btn = sidebar_components["extra_tools_toggle_btn"]
         self.extra_tools_container = sidebar_components["extra_tools_container"]
         self.widen_video_btn = sidebar_components["widen_video_btn"]
+        self.audio_tools_btn = sidebar_components["audio_tools_btn"]
         self.history_toggle_btn = sidebar_components["history_toggle_btn"]
         self.history_container = sidebar_components["history_container"]
         self.clear_hist_btn = sidebar_components["clear_hist_btn"]
@@ -139,6 +141,8 @@ class KaraokeApp(QWidget):
         # Extract video frame and labels
         self.video_frame = components["video_frame"]
         self.filename_label = components["filename_label"]
+        
+        # Create audio visualization overlay for Audio Tools (will be parented to video_frame after)
         
         # Extract playback bar components
         playback_components = components["playback_components"]
@@ -180,12 +184,46 @@ class KaraokeApp(QWidget):
         widen_dl_btn = extra_page_components["widen_dl_btn"]
         self.widen_file_status_label = extra_page_components["widen_file_status_label"]
         self.widen_exec_btn = extra_page_components["widen_exec_btn"]
+        # Audio Tools File Loader controls
+        audio_file_btn = extra_page_components["audio_file_btn"]
+        self.audio_file_status = extra_page_components["audio_file_status"]
+        audio_url_input = extra_page_components["audio_url_input"]
+        audio_dl_btn = extra_page_components["audio_dl_btn"]
+        self.extract_section = extra_page_components["extract_section"]
+        self.extract_no_video_msg = extra_page_components["extract_no_video_msg"]
+        self.extract_cb = extra_page_components["extract_cb"]
+        self.extract_format_combo = extra_page_components["extract_format_combo"]
+        self.extract_btn = extra_page_components["extract_btn"]
+        # Audio Trimming controls (Feature 6)
+        self.trim_first_cb = extra_page_components["trim_first_cb"]
+        self.trim_first_spin = extra_page_components["trim_first_spin"]
+        self.trim_last_cb = extra_page_components["trim_last_cb"]
+        self.trim_last_spin = extra_page_components["trim_last_spin"]
+        self.trim_range_cb = extra_page_components["trim_range_cb"]
+        self.trim_range_start = extra_page_components["trim_range_start"]
+        self.trim_range_end = extra_page_components["trim_range_end"]
+        self.trim_format_combo = extra_page_components["trim_format_combo"]
+        trim_export_btn = extra_page_components["trim_export_btn"]
+        # Audio Conversion controls (Feature 7)
+        self.convert_source_combo = extra_page_components["convert_source_combo"]
+        self.convert_target_combo = extra_page_components["convert_target_combo"]
+        self.convert_quality_combo = extra_page_components["convert_quality_combo"]
+        convert_btn = extra_page_components["convert_btn"]
+        # Audio Normalization controls (Feature 8)
+        self.normalize_cb = extra_page_components["normalize_cb"]
+        self.normalize_lufs_combo = extra_page_components["normalize_lufs_combo"]
+        normalize_btn = extra_page_components["normalize_btn"]
         
         self.stack = components["stack"]
+        
+        # Create audio visualization overlay for Audio Tools (parented to video_frame)
+        self.audio_overlay = self.create_audio_overlay()
+        self.audio_overlay.setParent(self.video_frame)
         
         # Connect signals for button events
         self.nav_list.currentRowChanged.connect(self.handle_navigation_change)
         self.widen_video_btn.clicked.connect(lambda: self.handle_navigation_change(2))
+        self.audio_tools_btn.clicked.connect(lambda: self.handle_navigation_change(3))
         self.extra_tools_toggle_btn.clicked.connect(self.toggle_extra_tools)
         self.history_toggle_btn.clicked.connect(self.toggle_history)
         self.clear_hist_btn.clicked.connect(self.clear_history)
@@ -206,7 +244,13 @@ class KaraokeApp(QWidget):
         widen_file_btn.clicked.connect(self.browse_widen_video)
         widen_dl_btn.clicked.connect(lambda: self.download_video(from_widen_tab=True))
         self.widen_exec_btn.clicked.connect(self.widen_active_video_canvas)
-        self.history_list.itemDoubleClicked.connect(lambda item: self.load_video(item.toolTip()))
+        audio_file_btn.clicked.connect(self.load_audio_tools_file)
+        audio_dl_btn.clicked.connect(lambda: self.download_audio(audio_url_input))
+        self.extract_btn.clicked.connect(self.extract_audio_from_video)
+        trim_export_btn.clicked.connect(self.trim_audio)
+        convert_btn.clicked.connect(self.convert_audio_format)
+        normalize_btn.clicked.connect(self.normalize_audio)
+        self.history_list.itemDoubleClicked.connect(lambda item: self.load_history_item(item.toolTip()))
         
         # Initialize state flags
         self.extra_tools_is_expanded = False
@@ -215,8 +259,8 @@ class KaraokeApp(QWidget):
         # Load history from disk
         self.load_history_from_disk()
 
-    def handle_navigation_change(self, idx):
-        if idx == 2:
+    def handle_navigation_change(self, idx, is_audio_only=None):
+        if idx == 2 or idx == 3:  # Widen or Audio Tools
             self.nav_list.blockSignals(True)
             self.nav_list.clearSelection()
             self.nav_list.setCurrentRow(-1)
@@ -225,6 +269,48 @@ class KaraokeApp(QWidget):
             self.nav_list.blockSignals(True)
             self.nav_list.setCurrentRow(idx)
             self.nav_list.blockSignals(False)
+        
+        # Use provided is_audio_only or fall back to stored flag
+        if is_audio_only is None:
+            is_audio_only = getattr(self, '_current_is_audio_only', False)
+        
+        # Adjust video frame height based on page
+        if idx == 3:  # Audio Tools - reduce video frame height and hide full video button
+            if is_audio_only:
+                # For audio-only, minimize video frame to give more space to tabs
+                self.video_frame.setMinimumHeight(80)
+                self.video_frame.setMaximumHeight(100)
+            else:
+                # For video content, give more space
+                self.video_frame.setMinimumHeight(280)
+                self.video_frame.setMaximumHeight(320)
+            self.fullscreen_btn.setVisible(False)
+            
+            # Update extraction UI and status based on current file type
+            if self.video_path:
+                # Determine if current file is video or audio
+                video_exts = {'.mp4', '.avi', '.mkv', '.mov', '.webm'}
+                is_video = os.path.splitext(self.video_path)[1].lower() in video_exts
+                
+                # Store path for audio tools if not already stored
+                if not hasattr(self, 'audio_tools_file_path') or not self.audio_tools_file_path:
+                    self.audio_tools_file_path = self.video_path
+                
+                # Update status label if not already set
+                if self.audio_file_status.text() == "No file loaded":
+                    filename = os.path.basename(self.video_path)
+                    if is_video:
+                        self.audio_file_status.setText(f"✅ {filename}")
+                    else:
+                        self.audio_file_status.setText(f"✅ {filename} (Audio)")
+                
+                # Update extraction controls visibility
+                self.update_extraction_ui(is_video)
+        else:
+            self.video_frame.setMinimumHeight(420)
+            self.video_frame.setMaximumHeight(16777215)  # Reset to no max height
+            self.fullscreen_btn.setVisible(True)
+        
         self.stack.setCurrentIndex(idx)
 
     def browse_widen_video(self):
@@ -344,7 +430,7 @@ class KaraokeApp(QWidget):
         self.extra_tools_container.setVisible(self.extra_tools_is_expanded)
         self.extra_tools_toggle_btn.setText(f"{'▼' if self.extra_tools_is_expanded else '▶'} 🛠 Extra Tools")
 
-    def load_video(self, file_path=None, splash_screen=None):
+    def load_video(self, file_path=None, splash_screen=None, is_audio_only=False):
         print(f"\n\n{'='*80}")
         print(f"[main.load_video] 🎬 ENTRY (file_path={file_path})")
         
@@ -422,7 +508,7 @@ class KaraokeApp(QWidget):
             print(f"[main.load_video] ✓ Audio analyzer started")
 
             print(f"[main.load_video] 📊 Calling finish_loading(loader)...")
-            self.finish_loading(loader)
+            self.finish_loading(loader, is_audio_only)
             print(f"[main.load_video] ✓ finish_loading() complete")
 
         except Exception as e:
@@ -437,13 +523,122 @@ class KaraokeApp(QWidget):
             print(f"[main.load_video] ✓ file_loading_service.finish_loading() complete")
             print(f"{'='*80}\n")
 
-    def finish_loading(self, loader):
+    def finish_loading(self, loader, is_audio_only=False):
         self.pitch_input.setValue(0.0)
         self.speed_input.setValue(1.0)
         if self.video_path: self.filename_label.setText(f"Playing: {os.path.basename(self.video_path)}")
 
         loader.set_progress(100, "Ready")
         loader.finish(self)
+        
+        # Store audio-only flag for height adjustment in Audio Tools page
+        self._current_is_audio_only = is_audio_only
+        
+        # If we're on Audio Tools page (idx 3), adjust video frame height based on file type
+        current_page = self.stack.currentIndex()
+        if current_page == 3:  # Audio Tools page
+            if is_audio_only:
+                # For audio-only, minimize video frame to give more space to tabs
+                self.video_frame.setMinimumHeight(80)
+                self.video_frame.setMaximumHeight(100)
+            else:
+                # For video content, give more space
+                self.video_frame.setMinimumHeight(280)
+                self.video_frame.setMaximumHeight(320)
+        
+        # Show/hide audio visualization overlay
+        if is_audio_only:
+            # Use a delay to ensure frame is resized and laid out before positioning overlay
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(150, self.show_audio_visualization)
+        else:
+            self.hide_audio_visualization()
+
+    def create_audio_overlay(self):
+        """Create an audio visualization overlay for the video frame area"""
+        overlay = QLabel()
+        overlay.setText("🎵 Audio File Loaded\n(Playing in player)")
+        overlay.setAlignment(Qt.AlignCenter)
+        overlay.setStyleSheet("""
+            QLabel {
+                background-color: rgba(30, 30, 30, 220);
+                color: #2ecc71;
+                font-size: 16px;
+                font-weight: bold;
+                border: 2px solid #2ecc71;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        overlay.hide()  # Hidden by default
+        return overlay
+    
+    def show_audio_visualization(self):
+        """Show audio visualization overlay when audio-only file is loaded"""
+        if not hasattr(self, 'audio_overlay'):
+            return
+        
+        # Get frame dimensions
+        frame_width = self.video_frame.width()
+        frame_height = self.video_frame.height()
+        
+        # If frame dimensions are still 0, retry after more delay
+        if frame_width <= 0 or frame_height <= 0:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(100, self.show_audio_visualization)
+            return
+        
+        # Adjust overlay size and text based on available space
+        is_audio_only = getattr(self, '_current_is_audio_only', False)
+        if is_audio_only and frame_height < 150:
+            # For small audio-only frame, use compact overlay that fits in available space
+            overlay_width = max(60, min(180, frame_width - 10))
+            overlay_height = max(35, min(55, frame_height - 5))
+            self.audio_overlay.setText("🎵 Audio")
+            self.audio_overlay.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(30, 30, 30, 250);
+                    color: #2ecc71;
+                    font-size: 13px;
+                    font-weight: bold;
+                    border: 2px solid #2ecc71;
+                    border-radius: 6px;
+                    padding: 5px;
+                }
+            """)
+        else:
+            # For standard video frame, use larger overlay but still cap to frame size
+            overlay_width = max(100, min(280, frame_width - 20))
+            overlay_height = max(60, min(140, frame_height - 10))
+            self.audio_overlay.setText("🎵 Audio File Loaded\n(Playing)")
+            self.audio_overlay.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(30, 30, 30, 250);
+                    color: #2ecc71;
+                    font-size: 15px;
+                    font-weight: bold;
+                    border: 2px solid #2ecc71;
+                    border-radius: 8px;
+                    padding: 10px;
+                }
+            """)
+        
+        self.audio_overlay.setFixedSize(overlay_width, overlay_height)
+        
+        # Position overlay in center of video frame
+        overlay_x = max(0, (frame_width - overlay_width) // 2)
+        overlay_y = max(0, (frame_height - overlay_height) // 2)
+        self.audio_overlay.move(overlay_x, overlay_y)
+        
+        # Ensure overlay is visible and on top
+        self.audio_overlay.raise_()
+        self.audio_overlay.show()
+    
+    def hide_audio_visualization(self):
+        """Hide audio visualization overlay when video is loaded"""
+        if hasattr(self, 'audio_overlay'):
+            self.audio_overlay.hide()
+            self.audio_overlay.setFixedSize(300, 150)  # Reset to default size when hidden
 
     def download_video(self, from_widen_tab=False):
         input_widget = self.widen_url_input if from_widen_tab else self.url_input
@@ -463,6 +658,26 @@ class KaraokeApp(QWidget):
         self.download_splash.show()
         QApplication.processEvents()
 
+        self.download_service.download_video(url, self.settings["download_directory"])
+
+    def download_audio(self, audio_url_input):
+        """Download audio from URL for audio tools page"""
+        url = audio_url_input.text().strip()
+        if not url.startswith("http"):
+            QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
+            return
+
+        self.status_label.setText("Status: Downloading audio...")
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+
+        self.download_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.download_splash.cancel_btn.clicked.connect(self.download_service.stop_download)
+        self.download_splash.show()
+        QApplication.processEvents()
+
+        self._download_from_audio_tools = True
         self.download_service.download_video(url, self.settings["download_directory"])
 
     def _on_download_progress(self, percent, message):
@@ -487,6 +702,12 @@ class KaraokeApp(QWidget):
                         self.widen_tab_video_path = full_p
                         self.widen_file_status_label.setText(f"Queued File for Widening: {os.path.basename(full_p)}")
                         self.load_video(full_p)
+                    elif getattr(self, '_download_from_audio_tools', False):
+                        # Audio download from Audio Tools page
+                        from source_code.ui.extra_page import audio_url_input
+                        # Clear URL input - need to get reference from components
+                        self.audio_file_status.setText(f"✅ Downloaded: {os.path.basename(full_p)}")
+                        self.load_video(full_p, is_audio_only=True)
                     else:
                         self.url_input.clear()
                         self.load_video(full_p)
@@ -632,6 +853,302 @@ class KaraokeApp(QWidget):
         duration = self.get_video_duration_via_ffprobe(abs_in)
         self.launch_async_task(cmd, abs_out, "widen_task", override_duration=duration)
 
+    def update_extraction_ui(self, is_video):
+        """Update extraction tab UI based on file type (video or audio)"""
+        if is_video:
+            self.extract_section.setVisible(True)
+            self.extract_cb.setVisible(True)
+            self.extract_format_combo.setVisible(True)
+            self.extract_btn.setVisible(True)
+            self.extract_no_video_msg.setVisible(False)
+            self.extract_section.setText("<b>🎬 VIDEO FILE DETECTED - Extract Audio?</b>")
+        else:
+            self.extract_section.setVisible(False)
+            self.extract_cb.setVisible(False)
+            self.extract_format_combo.setVisible(False)
+            self.extract_btn.setVisible(False)
+            self.extract_no_video_msg.setVisible(True)
+
+    def load_audio_tools_file(self):
+        """Load audio or video file for audio tools processing"""
+        f, _ = QFileDialog.getOpenFileName(
+            self, "Open Audio/Video File for Processing", self.settings["base_directory"],
+            "Media Files (*.mp3 *.wav *.aac *.m4a *.mp4 *.avi *.mkv *.mov *.webm *.flac *.ogg);;All Files (*.*)"
+        )
+        if f:
+            f = os.path.normpath(f)
+            self.audio_tools_file_path = f
+            filename = os.path.basename(f)
+            
+            # Check if it's a video file
+            video_exts = {'.mp4', '.avi', '.mkv', '.mov', '.webm'}
+            is_video = os.path.splitext(f)[1].lower() in video_exts
+            
+            # Update status label
+            if is_video:
+                self.audio_file_status.setText(f"✅ {filename}")
+            else:
+                self.audio_file_status.setText(f"✅ {filename} (Audio)")
+            
+            # Update extraction UI
+            self.update_extraction_ui(is_video)
+            
+            # Load file into player - show audio visualization for audio files
+            self.load_video(f, is_audio_only=(not is_video))
+    
+    def load_history_item(self, file_path):
+        """Load file from history, detecting if it's audio and showing visualization"""
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, "File Not Found", f"File no longer exists:\n{file_path}")
+            return
+        
+        # Detect if it's an audio-only file (no video)
+        audio_exts = {'.mp3', '.wav', '.aac', '.m4a', '.flac', '.ogg', '.opus', '.wma'}
+        video_exts = {'.mp4', '.avi', '.mkv', '.mov', '.webm', '.mts', '.m2ts'}
+        
+        file_ext = os.path.splitext(file_path)[1].lower()
+        is_audio = file_ext in audio_exts
+        is_video = file_ext in video_exts
+        
+        # If we're on Audio Tools page, update extraction UI based on file type
+        current_page = self.stack.currentIndex()
+        if current_page == 3:  # Audio Tools page
+            self.audio_tools_file_path = file_path
+            filename = os.path.basename(file_path)
+            
+            # Update status label
+            if is_video:
+                self.audio_file_status.setText(f"✅ {filename}")
+            else:
+                self.audio_file_status.setText(f"✅ {filename} (Audio)")
+            
+            # Update extraction UI
+            self.update_extraction_ui(is_video)
+        
+        # Load with appropriate visualization
+        self.load_video(file_path, is_audio_only=is_audio)
+
+    def extract_audio_from_video(self):
+        """Extract audio from video file and load it with selected format (WAV, MP3, AAC)"""
+        if not hasattr(self, 'audio_tools_file_path') or not self.audio_tools_file_path:
+            QMessageBox.warning(self, "No File", "Load a video file first")
+            return
+        
+        video_path = self.audio_tools_file_path
+        base_name = os.path.splitext(os.path.basename(video_path))[0]
+        
+        # Get selected format from combo
+        selected_format = self.extract_format_combo.currentText().lower()
+        
+        # Determine file extension and FFmpeg codec parameters
+        if selected_format == "mp3":
+            ext = ".mp3"
+            codec_args = ["-acodec", "libmp3lame", "-q:a", "0"]
+        elif selected_format == "aac":
+            ext = ".aac"
+            codec_args = ["-acodec", "aac", "-q:a", "2"]
+        else:  # WAV
+            ext = ".wav"
+            codec_args = []
+        
+        output_path = os.path.join(self.settings["download_directory"], f"{base_name}-extracted{ext}")
+        
+        # Store output path for completion handler
+        self._extract_output_path = output_path
+        
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("extract_task"))
+        self.export_splash.show()
+
+        # Build FFmpeg command
+        abs_in = os.path.abspath(video_path).replace("\\", "/")
+        abs_out = os.path.abspath(output_path).replace("\\", "/")
+        cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in] + codec_args + ["-map", "a", abs_out]
+
+        duration = self.get_video_duration_via_ffprobe(abs_in)
+        self.launch_async_task(cmd, abs_out, "extract_task", override_duration=duration)
+
+    def trim_audio(self):
+        """Export audio with trimming applied (Feature 6)"""
+        if not self.video_path:
+            QMessageBox.warning(self, "No File", "Load a file first")
+            return
+
+        # Get trimming parameters (get_total_seconds() from TimePickerWidget)
+        trim_first = self.trim_first_spin.get_total_seconds() if self.trim_first_cb.isChecked() else None
+        trim_last = self.trim_last_spin.get_total_seconds() if self.trim_last_cb.isChecked() else None
+        trim_range = (self.trim_range_start.get_total_seconds(), self.trim_range_end.get_total_seconds()) if self.trim_range_cb.isChecked() else None
+        target_format = self.trim_format_combo.currentText().lower()
+
+        # Validate that at least one trim option is selected
+        if trim_first is None and trim_last is None and trim_range is None:
+            QMessageBox.warning(self, "No Trim Options", "Select at least one trimming option")
+            return
+
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("trim_task"))
+        self.export_splash.show()
+
+        # Calculate trim points
+        duration = self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/"))
+        start_time = 0
+        end_time = duration
+
+        # Apply trim_first
+        if trim_first is not None:
+            start_time = trim_first
+
+        # Apply trim_last
+        if trim_last is not None:
+            end_time = duration - trim_last
+
+        # Apply trim_range (overrides other trims)
+        if trim_range is not None:
+            start_time = trim_range[0]
+            end_time = trim_range[1]
+
+        # Ensure valid range
+        if start_time >= end_time:
+            QMessageBox.warning(self, "Invalid Range", "Start time must be before end time")
+            if self.export_splash:
+                self.export_splash.close()
+                self.export_splash = None
+            return
+
+        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
+        out = os.path.join(self.settings["download_directory"], f"{base_name}_trimmed.{target_format}")
+
+        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
+        abs_out = os.path.abspath(out).replace("\\", "/")
+
+        # Build FFmpeg command for trimming (audio extraction + trim, fast path with -acodec copy)
+        cmd = [self.settings["ffmpeg_path"], "-y", "-ss", str(start_time), "-to", str(end_time), 
+               "-i", abs_in, "-vn", "-acodec", "copy", abs_out]
+
+        trimmed_duration = end_time - start_time
+        self.launch_async_task(cmd, abs_out, "trim_task", override_duration=trimmed_duration)
+
+    def convert_audio_format(self):
+        """Convert audio/video to different format (Feature 7)"""
+        if not self.video_path:
+            QMessageBox.warning(self, "No File", "Load a file first")
+            return
+
+        source_fmt = self.convert_source_combo.currentText()
+        target_fmt = self.convert_target_combo.currentText().lower()
+        quality_text = self.convert_quality_combo.currentText()
+
+        # Extract bitrate from quality selector
+        bitrate_map = {
+            "High (320kbps)": "320k",
+            "Medium (192kbps)": "192k",
+            "Low (128kbps)": "128k"
+        }
+        bitrate = bitrate_map.get(quality_text, "192k")
+
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("convert_task"))
+        self.export_splash.show()
+
+        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
+        out = os.path.join(self.settings["download_directory"], f"{base_name}_converted.{target_fmt}")
+
+        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
+        abs_out = os.path.abspath(out).replace("\\", "/")
+
+        # Build intelligent FFmpeg command based on target format
+        cmd = self.build_format_conversion_cmd(abs_in, abs_out, target_fmt, bitrate)
+
+        duration = self.get_video_duration_via_ffprobe(abs_in)
+        self.launch_async_task(cmd, abs_out, "convert_task", override_duration=duration)
+
+    def build_format_conversion_cmd(self, input_file, output_file, target_fmt, bitrate):
+        """Build FFmpeg command for format conversion (Feature 7)"""
+        ffmpeg_path = self.settings["ffmpeg_path"]
+
+        # Audio-only formats
+        if target_fmt in ["mp3", "wav", "aac", "m4a"]:
+            # Extract audio only
+            if target_fmt == "mp3":
+                # MP3: use libmp3lame for best quality
+                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "libmp3lame", "-b:a", bitrate, output_file]
+            elif target_fmt == "wav":
+                # WAV: lossless
+                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", output_file]
+            elif target_fmt == "aac":
+                # AAC: using aac encoder
+                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "aac", "-b:a", bitrate, output_file]
+            elif target_fmt == "m4a":
+                # M4A: audio only MP4
+                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "aac", "-b:a", bitrate, output_file]
+
+        # Video formats (keep video, optionally re-encode audio)
+        elif target_fmt in ["mp4", "mkv"]:
+            # For video formats, copy video codec (fast), encode audio if needed
+            if target_fmt == "mp4":
+                return [ffmpeg_path, "-y", "-i", input_file, "-c:v", "libx264", "-preset", "fast", 
+                        "-acodec", "aac", "-b:a", bitrate, output_file]
+            elif target_fmt == "mkv":
+                return [ffmpeg_path, "-y", "-i", input_file, "-c:v", "copy", 
+                        "-acodec", "aac", "-b:a", bitrate, output_file]
+
+        # Default: copy streams (fastest)
+        return [ffmpeg_path, "-y", "-i", input_file, "-c", "copy", output_file]
+
+    def normalize_audio(self):
+        """Normalize audio loudness to consistent LUFS level (Feature 8)"""
+        if not self.video_path:
+            QMessageBox.warning(self, "No File", "Load a file first")
+            return
+
+        if not self.normalize_cb.isChecked():
+            QMessageBox.information(self, "Normalization Disabled", "Check the 'Normalize Loudness' checkbox to proceed")
+            return
+
+        # Get target LUFS from dropdown
+        lufs_text = self.normalize_lufs_combo.currentText()
+        # Extract LUFS value: "-14 LUFS (Streaming)" → -14
+        lufs_value = lufs_text.split()[0]  # Get "-14"
+
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("normalize_task"))
+        self.export_splash.show()
+
+        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
+        out = os.path.join(self.settings["download_directory"], f"{base_name}_normalized.wav")
+
+        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
+        abs_out = os.path.abspath(out).replace("\\", "/")
+
+        # Two-pass loudness normalization using FFmpeg
+        # Pass 1: Analyze with loudnorm filter and capture JSON output
+        ffmpeg_path = self.settings["ffmpeg_path"]
+        
+        # For simplicity, we'll use a single-pass approach with reasonable defaults
+        # loudnorm filter parameters: I (integrated LUFS), LRA (loudness range), tp (true peak)
+        loudnorm_filter = f"loudnorm=I={lufs_value}:LRA=11:tp=-1.5"
+        
+        cmd = [ffmpeg_path, "-y", "-i", abs_in, "-af", loudnorm_filter, "-acodec", "pcm_s16le", "-ar", "44100", abs_out]
+
+        duration = self.get_video_duration_via_ffprobe(abs_in)
+        self.launch_async_task(cmd, abs_out, "normalize_task", override_duration=duration)
+
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
         self.kill_allocated_task(task_key)
 
@@ -677,8 +1194,31 @@ class KaraokeApp(QWidget):
             return
 
         if out_path and os.path.exists(out_path):
-            self.load_video(out_path)
+            # For audio operations, show audio visualization
+            is_audio_task = task_key in ["extract_task", "trim_task", "convert_task"]
+            self.load_video(out_path, is_audio_only=is_audio_task)
+            
+            # For extraction task, update audio_tools_file_path and UI
+            if task_key == "extract_task":
+                self.audio_tools_file_path = out_path
+                extracted_name = os.path.basename(out_path)
+                self.audio_file_status.setText(f"✅ {extracted_name} (Extracted Audio)")
+                self.extract_section.setVisible(False)
+                self.extract_cb.setVisible(False)
+                self.extract_format_combo.setVisible(False)
+                self.extract_btn.setVisible(False)
+            
+            # For trimming and conversion, also update audio_tools_file_path
+            if task_key in ["trim_task", "convert_task"]:
+                self.audio_tools_file_path = out_path
+                output_name = os.path.basename(out_path)
+                self.audio_file_status.setText(f"✅ {output_name} (Processed Audio)")
+            
             QMessageBox.information(self, "Success", f"Output loaded successfully:\n{os.path.basename(out_path)}")
+            
+            # Navigate back to Audio Tools page for audio operations
+            if task_key in ["extract_task", "trim_task", "convert_task"]:
+                QTimer.singleShot(100, lambda: self.handle_navigation_change(3))
 
     def update_ui(self):
         try:

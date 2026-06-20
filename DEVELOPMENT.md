@@ -65,7 +65,7 @@ source_code/
 │   ├── playback_bar.py       # Play/pause/volume/audio meter
 │   ├── download_page.py      # File & URL loading
 │   ├── pitch_page.py         # Pitch & speed controls
-│   └── extra_page.py         # Video aspect ratio tool
+│   └── extra_page.py         # Video widening + Audio Tools (Trim/Convert)
 ├── services/
 │   ├── audio_service.py      # Audio analyzer coordination
 │   ├── player_service.py     # VLC player abstraction
@@ -115,15 +115,52 @@ config/
 
 ---
 
-## Core Features (v3)
+## Core Features (v3) - All Complete ✅
 
-### Audio Calibration System
+### Feature 1: Pitch Adjustment ✅
+- Adjust vocal pitch by semitones without changing tempo
+- FFmpeg audio filter: asetrate + atempo
+
+### Feature 2: Speed Control ✅
+- Adjust playback speed (0.5x to 2.0x)
+- VLC native speed control
+
+### Feature 3: Audio Calibration System ✅
 - **Modes:** SPL (Sound Pressure Level) ~60-90 dB or dBFS (raw -80 to 0 dB)
 - **Auto-Reduce:** Configurable threshold (0-100%, default 80%)
-- **Components:**
-  - `audio_service.py` - Manages analyzer coordination
-  - `audio_meter.py` - Dual-mode visualization
-  - `audio_analyzer.py` - Real-time capture (sounddevice + numpy)
+- Real-time audio visualization with dual measurement modes
+
+### Feature 4: Video Aspect Ratio Control ✅
+- Scale videos to 16:9 aspect ratio
+- Maintains video quality with FFmpeg padding
+
+### Feature 5: Audio Extraction ✅
+- Extract audio from video files to WAV format
+- Auto-loads extracted audio into player
+
+### Feature 6: Audio Trimming ✅ NEW
+- **Trim First X seconds** - Remove opening
+- **Trim Last X seconds** - Remove ending
+- **Keep Range (A to B)** - Extract middle section
+- **UI:** Separate H/M/S spinners for each control (TimePickerWidget)
+- **Time Format:** HH:MM:SS with independent increment buttons
+- Supports all audio formats (MP3, WAV, AAC, M4A)
+- Fast processing using FFmpeg copy codec
+
+### Feature 7: Format Conversion ✅ NEW
+- Convert between audio/video formats (MP3, WAV, M4A, AAC, MP4, MKV, AVI, WebM)
+- Quality selector for lossy formats (High 320k, Medium 192k, Low 128k)
+- Intelligent FFmpeg command builder for all format combinations
+- Auto-loads converted result
+
+### Audio Visualization Enhancements ✅
+- Green glowing overlay shows "🎵 Audio File Loaded" for audio files
+- Appears when loading from browser, history, extraction, or conversion
+- Visual confirmation that audio is active in player
+
+### Navigation Improvements ✅
+- Stays on Audio Tools page after trim/convert/extract operations
+- Auto-navigates back to Audio Tools after processing
 
 ### Modularized UI
 - All UI components in separate files (`source_code/ui/`)
@@ -261,6 +298,135 @@ def load_video(self, file_path=None):
 
 ---
 
+## Audio Processing Pattern (Features 6 & 7)
+
+**Audio Trimming & Format Conversion Pattern**
+
+This pattern applies to any FFmpeg-based audio/video processing (trimming, conversion, effects, etc.).
+
+### How It Works
+
+1. **UI Layer** - Collect options from user (via tabbed extra_page)
+2. **Validation Layer** - Ensure at least one option selected + valid ranges
+3. **Command Builder** - Construct FFmpeg command based on options
+4. **Execution Layer** - Run via ProcessThread with progress updates
+5. **Completion Layer** - Auto-load result via handle_task_completion()
+
+### Implementation Pattern
+
+```python
+# In extra_page.py - UI component
+def create_audio_tools_tab():
+    # Create checkboxes, spinners, dropdowns
+    return {
+        "trim_first_cb": trim_first_cb,
+        "trim_first_spin": trim_first_spin,
+        # ... more controls ...
+    }
+
+# In main.py - Handler method
+def trim_audio(self):
+    # 1. VALIDATE
+    if not self.video_path:
+        QMessageBox.warning(...)
+        return
+    
+    if not (trim_first_cb.isChecked() or trim_last_cb.isChecked() or trim_range_cb.isChecked()):
+        QMessageBox.warning(...)
+        return
+    
+    # 2. SHOW PROGRESS SPLASH
+    self.export_splash = ModernSplashScreen(...)
+    self.export_splash.cancel_btn.clicked.connect(...)
+    self.export_splash.show()
+    
+    # 3. GATHER PARAMETERS
+    trim_first = self.trim_first_spin.value() if self.trim_first_cb.isChecked() else None
+    trim_last = self.trim_last_spin.value() if self.trim_last_cb.isChecked() else None
+    trim_range = (...) if self.trim_range_cb.isChecked() else None
+    
+    # 4. CALCULATE OUTPUT PATH
+    base_name = os.path.splitext(os.path.basename(self.video_path))[0]
+    out = os.path.join(self.settings["download_directory"], f"{base_name}_trimmed.mp3")
+    
+    # 5. BUILD FFMPEG COMMAND
+    # Calculate trim times from parameters
+    start_time, end_time = calculate_trim_times(duration, trim_first, trim_last, trim_range)
+    cmd = [ffmpeg_path, "-ss", start_time, "-to", end_time, ...]
+    
+    # 6. EXECUTE VIA PROCESS THREAD
+    self.launch_async_task(cmd, out, "trim_task", override_duration=...)
+
+# Helper: Build format-specific commands
+def build_format_conversion_cmd(input_file, output_file, target_fmt, bitrate):
+    """Adapt FFmpeg command based on target format"""
+    if target_fmt == "mp3":
+        return [ffmpeg, ..., "-acodec", "libmp3lame", "-b:a", bitrate, output]
+    elif target_fmt == "wav":
+        return [ffmpeg, ..., "-acodec", "pcm_s16le", output]
+    # ... more formats ...
+```
+
+### Key Principles
+
+1. **Validation First** - Ensure valid inputs before processing
+2. **Smart UI** - Show splash with cancel button during long operations
+3. **Intelligent Command Building** - Adapt FFmpeg to source/target formats
+4. **Fast Paths** - Use `-c copy` when possible (no re-encoding)
+5. **Auto-Load** - Result automatically loads into player
+6. **Progress Updates** - ProcessThread streams progress to splash
+
+### Adding New Audio Processing Features
+
+To add another processing feature (e.g., normalization, effects):
+
+1. **Add UI** to extra_page.py Audio Tools tab:
+   ```python
+   norm_checkbox = QCheckBox("Normalize Loudness")
+   norm_spinner = QDoubleSpinBox()  # Target LUFS
+   ```
+
+2. **Add Handler** in main.py:
+   ```python
+   def normalize_audio(self):
+       # Validate, build command, execute
+       cmd = [ffmpeg, "-af", f"loudnorm=I={target_lufs}", ...]
+       self.launch_async_task(cmd, output, "norm_task")
+   ```
+
+3. **Wire Button** in main.py setup_ui():
+   ```python
+   norm_button.clicked.connect(self.normalize_audio)
+   ```
+
+4. **Update Docs** - FILE_DEPENDENCIES.md, ARCHITECTURE.md, IMPLEMENTATION_LOG.md
+
+### Common FFmpeg Filters for Audio Processing
+
+```python
+# Trimming (fast, no re-encode)
+"-ss {start} -to {end} -acodec copy"
+
+# Pitch shifting (with tempo compensation)
+"-filter:a asetrate=44100*{pitch_factor},atempo={tempo_factor}"
+
+# Normalization
+"-af loudnorm=I=-14:LRA=11:tp=-1.5"
+
+# Volume adjustment
+"-af volume=5dB"
+
+# Speed adjustment (audio only)
+"-filter:a atempo={factor}"
+
+# Format conversion
+"-acodec libmp3lame -b:a {bitrate}"  # To MP3
+"-acodec pcm_s16le"                   # To WAV
+"-acodec aac -b:a {bitrate}"         # To AAC
+```
+
+---
+
 ## Testing Checklist
 
 Before committing or building:
@@ -275,6 +441,10 @@ Before committing or building:
 - [ ] **File loading:** Switch pages quickly ✓
 - [ ] **File loading:** Open multiple files in same page ✓
 - [ ] **File loading:** Download and convert to 16:9 without hang ✓
+- [ ] **Audio Processing:** Trimming works with all option combinations ✓
+- [ ] **Audio Processing:** Format conversions succeed ✓
+- [ ] **Audio Processing:** Results auto-load into player ✓
+- [ ] **Audio Processing:** Can cancel ongoing task ✓
 - [ ] `python build_system/build.py` completes successfully
 - [ ] `build_system/dist/KaraokeStudioProV3/KaraokeStudioProV3.exe` runs
 - [ ] Documentation is consistent and up-to-date
