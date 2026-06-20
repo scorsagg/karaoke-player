@@ -6,18 +6,37 @@
 
 ## 📋 SESSION STARTUP ACKNOWLEDGMENT
 
-**IMPORTANT:** When you load a new session and see these instructions, you MUST display this exact message to the user:
+**IMPORTANT:** When you load a new session and see these instructions, you MUST:
 
+1. ✅ Display startup message to user (below)
+2. ✅ **READ ALL DOCUMENTATION FILES** (new requirement - see "Initial Documentation Review")
+3. ✅ Follow the change workflow
+
+**After reading docs, display:**
 ```
 ✅ Copilot initialized for Karaoke Studio Pro v3
 📚 Instructions loaded from .github/copilot-instructions.md
+📚 Documentation reviewed (DEVELOPMENT.md, ARCHITECTURE.md, FILE_DEPENDENCIES.md, etc.)
 📋 Workflow enabled:
-   1. Always check documentation/FILE_DEPENDENCIES.md before changes
-   2. Update all related files together
-   3. Reference DEVELOPMENT.md for guidance
+   1. Complete project documentation context loaded
+   2. Always check FILE_DEPENDENCIES.md before changes
+   3. Update all related files together
+   4. Reference DEVELOPMENT.md for guidance
 ```
 
-Display this message immediately, then proceed with the user's request following the workflow below.
+---
+
+## 📖 INITIAL DOCUMENTATION REVIEW (New Session Requirement)
+
+**BEFORE ANY WORK:** Read these files to understand current project state:
+1. `DEVELOPMENT.md` - Complete architecture and development guide
+2. `ARCHITECTURE.md` - System design and component relationships
+3. `documentation/FILE_DEPENDENCIES.md` - File dependency tracking
+4. `documentation/IMPLEMENTATION_LOG.md` - Recent changes and solutions
+5. `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` - Project structure
+6. `.github/copilot-instructions.md` - This file
+
+**Why:** Avoids rework, uses fewer tokens, maintains context accuracy, understands current patterns
 
 ---
 
@@ -90,6 +109,38 @@ When starting a new session:
 1. ✅ Check all modified files for syntax errors
 2. ✅ Verify documentation is consistent across all files
 3. ✅ Confirm all dependency files listed in FILE_DEPENDENCIES.md were updated
+
+---
+
+## ⚡ TOKEN EFFICIENCY RULES (Critical for Budget)
+
+**Get it RIGHT the first time - no rework!**
+
+1. **Before making ANY edits:**
+   - Read the complete context needed (do parallel reads, not sequential)
+   - Plan ALL changes at once
+   - Use multi_replace_string_in_file for multiple edits in one call
+   - Never make multiple sequential edits when one parallel call will work
+
+2. **When reading files:**
+   - Read large ranges in single calls (not many small reads)
+   - Parallel-read unrelated files together
+   - Use grep_search for targeted lookups in large files
+
+3. **When editing:**
+   - Batch related edits together
+   - Plan includes 3-5 lines of context to avoid failed replacements
+   - Double-check oldString EXACTLY matches (spacing, newlines, characters)
+   - One replacement attempt per string (failed attempts waste tokens)
+
+4. **When problem-solving:**
+   - Understand root cause completely before fixing
+   - Implement correct solution first time (not incremental fixes)
+   - Reference existing patterns instead of designing new approaches
+
+5. **Documentation:**
+   - Update all 5 sync files together in ONE multi_replace call
+   - Don't create new summary files (too expensive, keep in memory instead)
 
 ---
 
