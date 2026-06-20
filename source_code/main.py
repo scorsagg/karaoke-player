@@ -253,6 +253,14 @@ class KaraokeApp(QWidget):
         trim_export_btn.clicked.connect(self.trim_audio)
         convert_btn.clicked.connect(self.convert_audio_format)
         normalize_btn.clicked.connect(self.normalize_audio)
+        # Feature 19: DAT file conversion
+        self.dat_convert_btn = extra_page_components["dat_convert_btn"]
+        self.dat_source_combo = extra_page_components["dat_source_combo"]
+        self.dat_target_combo = extra_page_components["dat_target_combo"]
+        self.dat_quality_combo = extra_page_components["dat_quality_combo"]
+        self.dat_analyze_cb = extra_page_components["dat_analyze_cb"]
+        self.dat_status_label = extra_page_components["dat_status_label"]
+        self.dat_convert_btn.clicked.connect(self.convert_dat_file)
         self.history_list.itemDoubleClicked.connect(lambda item: self.load_history_item(item.toolTip()))
         
         # Initialize state flags
@@ -1191,6 +1199,103 @@ class KaraokeApp(QWidget):
         duration = self.get_video_duration_via_ffprobe(abs_in)
         self.launch_async_task(cmd, abs_out, "normalize_task", override_duration=duration)
 
+    def convert_dat_file(self):
+        """Convert DAT/WhatsApp files to standard formats (Feature 19)"""
+        # First, user needs to load a DAT file
+        if not self.video_path:
+            # If no file loaded, open file dialog
+            file_dialog = QFileDialog()
+            file_dialog.setWindowTitle("Select DAT or WhatsApp file")
+            file_dialog.setFileMode(QFileDialog.ExistingFile)
+            file_dialog.setNameFilters([
+                "All Supported Files (*.dat *.opus *.amr *.aac *.m4a);;",
+                "DAT Files (*.dat);;",
+                "OPUS Audio (*.opus);;",
+                "AMR Audio (*.amr);;",
+                "AAC Audio (*.aac);;",
+                "M4A Audio (*.m4a);;",
+                "All Files (*.*)"
+            ])
+            
+            if file_dialog.exec():
+                dat_file = file_dialog.selectedFiles()[0]
+            else:
+                return
+        else:
+            dat_file = self.video_path
+        
+        if not os.path.exists(dat_file):
+            QMessageBox.warning(self, "File Not Found", f"File not found: {dat_file}")
+            return
+        
+        # Get conversion parameters
+        source_fmt_text = self.dat_source_combo.currentText()
+        target_fmt_text = self.dat_target_combo.currentText()
+        quality_text = self.dat_quality_combo.currentText()
+        
+        # Extract target format
+        if "WAV" in target_fmt_text:
+            target_fmt = "wav"
+        elif "MP3" in target_fmt_text:
+            target_fmt = "mp3"
+        elif "MP4" in target_fmt_text:
+            target_fmt = "mp4"
+        elif "M4A" in target_fmt_text:
+            target_fmt = "m4a"
+        else:
+            target_fmt = "wav"  # Default
+        
+        # Extract bitrate
+        bitrate_map = {
+            "High (320kbps)": "320k",
+            "Medium (192kbps)": "192k",
+            "Low (128kbps)": "128k"
+        }
+        bitrate = bitrate_map.get(quality_text, "192k")
+        
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+        
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("dat_task"))
+        self.export_splash.show()
+        
+        base_name = os.path.splitext(os.path.basename(dat_file))[0]
+        out = os.path.join(self.settings["download_directory"], f"{base_name}_converted.{target_fmt}")
+        
+        abs_in = os.path.abspath(dat_file).replace("\\", "/")
+        abs_out = os.path.abspath(out).replace("\\", "/")
+        
+        # Build FFmpeg command for DAT conversion
+        cmd = self.build_dat_conversion_cmd(abs_in, abs_out, target_fmt, bitrate)
+        
+        duration = self.get_video_duration_via_ffprobe(abs_in)
+        self.launch_async_task(cmd, abs_out, "dat_task", override_duration=duration)
+        self.dat_status_label.setText(f"Converting {os.path.basename(dat_file)} to {target_fmt.upper()}...")
+
+    def build_dat_conversion_cmd(self, input_file, output_file, target_fmt, bitrate):
+        """Build FFmpeg command for DAT/WhatsApp file conversion (Feature 19)"""
+        ffmpeg_path = self.settings["ffmpeg_path"]
+        
+        if target_fmt == "wav":
+            # Extract to WAV (lossless, CD quality)
+            return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", output_file]
+        elif target_fmt == "mp3":
+            # Convert to MP3 (high quality)
+            return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "libmp3lame", "-b:a", bitrate, output_file]
+        elif target_fmt == "m4a":
+            # Convert to M4A (AAC in MP4 container)
+            return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "aac", "-b:a", bitrate, output_file]
+        elif target_fmt == "mp4":
+            # Convert to MP4 (try to preserve video if it exists, otherwise audio-only)
+            # First try with video, if no video stream, FFmpeg will just use audio
+            return [ffmpeg_path, "-y", "-i", input_file, "-c:v", "libx264", "-preset", "fast",
+                    "-acodec", "aac", "-b:a", bitrate, output_file]
+        else:
+            # Default to WAV
+            return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", output_file]
+
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
         self.kill_allocated_task(task_key)
 
@@ -1237,7 +1342,7 @@ class KaraokeApp(QWidget):
 
         if out_path and os.path.exists(out_path):
             # For audio operations, show audio visualization
-            is_audio_task = task_key in ["extract_task", "trim_task", "convert_task"]
+            is_audio_task = task_key in ["extract_task", "trim_task", "convert_task", "dat_task"]
             self.load_video(out_path, is_audio_only=is_audio_task)
             
             # For extraction task, update audio_tools_file_path and UI
@@ -1256,10 +1361,17 @@ class KaraokeApp(QWidget):
                 output_name = os.path.basename(out_path)
                 self.audio_file_status.setText(f"✅ {output_name} (Processed Audio)")
             
+            # For DAT conversion
+            if task_key == "dat_task":
+                self.audio_tools_file_path = out_path
+                output_name = os.path.basename(out_path)
+                self.audio_file_status.setText(f"✅ {output_name} (DAT Converted)")
+                self.dat_status_label.setText(f"✅ Conversion complete: {output_name}")
+            
             QMessageBox.information(self, "Success", f"Output loaded successfully:\n{os.path.basename(out_path)}")
             
             # Navigate back to Audio Tools page for audio operations
-            if task_key in ["extract_task", "trim_task", "convert_task"]:
+            if task_key in ["extract_task", "trim_task", "convert_task", "dat_task"]:
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(3))
 
     def update_ui(self):

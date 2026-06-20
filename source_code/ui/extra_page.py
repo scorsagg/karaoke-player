@@ -440,6 +440,102 @@ def create_audio_tools_page():
     norm_scroll.setStyleSheet("QScrollArea { background-color: #1e1e1e; border: none; }")
     tab_widget.addTab(norm_scroll, "📊 Normalization")
 
+    # Tab 5: DAT/WhatsApp File Conversion (Feature 19)
+    dat_tab_page = QWidget()
+    dat_layout = QVBoxLayout(dat_tab_page)
+    dat_layout.setContentsMargins(10, 10, 10, 10)
+
+    # ===== DAT CONVERSION CONTROLS =====
+    dat_title = QLabel("<b>📱 DAT/WhatsApp Converter</b>")
+    dat_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
+    dat_layout.addWidget(dat_title)
+
+    # Info about DAT files
+    dat_info = QLabel(
+        "💡 Convert DAT files from WhatsApp, karaoke machines, or other sources\n"
+        "Supported input formats: .dat, .opus, .amr, .aac, and more"
+    )
+    dat_info.setStyleSheet("color: #aaa; font-size: 10px; margin: 5px; padding: 8px; background-color: #2a2a2a; border-left: 2px solid #f39c12;")
+    dat_layout.addWidget(dat_info)
+    dat_layout.addSpacing(10)
+
+    # Source Format (with auto-detect)
+    dat_source_row = QHBoxLayout()
+    dat_source_label = QLabel("Source Format:")
+    dat_source_label.setStyleSheet("font-weight: bold;")
+    dat_source_combo = QComboBox()
+    dat_source_combo.addItems(["Auto-detect (Recommended)", ".dat (Generic)", ".opus (Audio Codec)", 
+                                ".amr (Narrow-band)", ".aac (Audio Codec)", ".m4a (Audio MPEG-4)"])
+    dat_source_combo.setCurrentIndex(0)
+    dat_source_row.addWidget(dat_source_label)
+    dat_source_row.addWidget(dat_source_combo)
+    dat_source_row.addStretch()
+    dat_layout.addLayout(dat_source_row)
+
+    # Target Format
+    dat_target_row = QHBoxLayout()
+    dat_target_label = QLabel("Convert To:")
+    dat_target_label.setStyleSheet("font-weight: bold;")
+    dat_target_combo = QComboBox()
+    dat_target_combo.addItems(["WAV (Lossless, CD Quality)", "MP3 (High Quality, Smaller)", 
+                                "MP4 (Video Container)", "M4A (Audio MPEG-4)"])
+    dat_target_combo.setCurrentIndex(0)  # Default to WAV
+    dat_target_row.addWidget(dat_target_label)
+    dat_target_row.addWidget(dat_target_combo)
+    dat_target_row.addStretch()
+    dat_layout.addLayout(dat_target_row)
+
+    # Quality selector (for lossy formats)
+    dat_quality_row = QHBoxLayout()
+    dat_quality_label = QLabel("Quality (MP3/M4A):")
+    dat_quality_label.setStyleSheet("font-weight: bold;")
+    dat_quality_combo = QComboBox()
+    dat_quality_combo.addItems(["High (320kbps)", "Medium (192kbps)", "Low (128kbps)"])
+    dat_quality_combo.setCurrentIndex(0)  # Default to High
+    dat_quality_row.addWidget(dat_quality_label)
+    dat_quality_row.addWidget(dat_quality_combo)
+    dat_quality_row.addStretch()
+    dat_layout.addLayout(dat_quality_row)
+
+    # Analysis option (for codec detection)
+    dat_analyze_row = QHBoxLayout()
+    dat_analyze_cb = QCheckBox("Auto-detect codec before conversion")
+    dat_analyze_cb.setChecked(True)
+    dat_analyze_row.addWidget(dat_analyze_cb)
+    dat_analyze_row.addStretch()
+    dat_layout.addLayout(dat_analyze_row)
+
+    dat_layout.addSpacing(15)
+
+    # Convert button
+    dat_convert_btn = QPushButton("🚀 Convert DAT File")
+    dat_convert_btn.setStyleSheet("background-color: #f39c12; height: 35px; font-weight: bold; color: white;")
+    dat_layout.addWidget(dat_convert_btn)
+
+    # Status/Log area
+    dat_status_label = QLabel("Ready to convert")
+    dat_status_label.setStyleSheet("color: #2ecc71; font-size: 10px; padding: 5px;")
+    dat_layout.addWidget(dat_status_label)
+
+    # WhatsApp formats note
+    whatsapp_note = QLabel(
+        "📋 Common WhatsApp formats detected:\n"
+        "• .dat files (audio/video from WhatsApp Media/temp)\n"
+        "• .opus files (WhatsApp voice messages)\n"
+        "• .aac files (WhatsApp audio files)"
+    )
+    whatsapp_note.setStyleSheet("color: #999; font-size: 9px; margin: 10px; padding: 8px; background-color: #1a1a1a; border: 1px solid #333;")
+    dat_layout.addWidget(whatsapp_note)
+
+    dat_layout.addSpacing(10)
+
+    # Wrap in scroll area
+    dat_scroll = QScrollArea()
+    dat_scroll.setWidget(dat_tab_page)
+    dat_scroll.setWidgetResizable(True)
+    dat_scroll.setStyleSheet("QScrollArea { background-color: #1e1e1e; border: none; }")
+    tab_widget.addTab(dat_scroll, "📱 DAT Converter")
+
     # Add tab widget to main layout
     layout.addWidget(tab_widget)
     layout.addStretch()  # Allow tabs to expand and fill remaining space
@@ -476,4 +572,11 @@ def create_audio_tools_page():
         "normalize_cb": normalize_cb,
         "normalize_lufs_combo": normalize_lufs_combo,
         "normalize_btn": normalize_btn,
+        # DAT/WhatsApp Conversion controls (Feature 19)
+        "dat_source_combo": dat_source_combo,
+        "dat_target_combo": dat_target_combo,
+        "dat_quality_combo": dat_quality_combo,
+        "dat_analyze_cb": dat_analyze_cb,
+        "dat_convert_btn": dat_convert_btn,
+        "dat_status_label": dat_status_label,
     }
