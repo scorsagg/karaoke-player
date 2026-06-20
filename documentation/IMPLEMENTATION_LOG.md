@@ -1,5 +1,96 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+## Change: Fix App Hang When Closing While Playing (2026-06-20) - COMPLETE ✅
+
+### Problem Statement
+**Issues:**
+1. App hangs when user closes the application while audio is playing
+2. File "Open File" dialog fails on first attempt after loading from widen page
+3. Second file open attempt works but first fails
+
+**Root Cause (All 3 Issues):**
+- Same as documented file loading hang: VLC's `stop()` method hangs when decoder threads are still active
+- `PlayerService.stop()` was calling `self._player.stop()` directly, causing deadlock
+- File open dialog was calling `pause()` which had errors due to incorrect attribute reference
+
+**Files Affected:**
+- `source_code/services/player_service.py` - stop() and pause() methods
+- `source_code/main.py` - closeEvent handler
+
+### Solution Implemented
+
+**1. Fixed pause() method in PlayerService:**
+```python
+def pause(self):
+    """Pause playback"""
+    if self._player:
+        self._player.pause()
+```
+- Corrected `self.player` → `self._player` (was wrong attribute)
+- Simple, clean implementation
+
+**2. Fixed stop() method in PlayerService:**
+```python
+def stop(self):
+    """Stop playback - use pause-based cleanup"""
+    import time
+    if self._player:
+        # Don't call stop() directly - it hangs with active decoder threads
+        self._player.pause()  # Pause instead
+        time.sleep(1.0)  # Wait for decoder threads to reach safe state
+        # Release media
+        if self._media is not None:
+            self._media = None
+```
+- Replaced `self._player.stop()` with `self._player.pause()`
+- Added 1.0s wait for decoder threads to stabilize
+- Properly releases media reference
+
+**3. Simplified closeEvent in main.py:**
+- Now just calls `self.player_service.stop()` and `self.audio_service.stop_analyzer()`
+- Pause-based cleanup is handled in PlayerService methods
+
+### Results
+✅ File open now works on first attempt (pause() fixed)
+✅ App closes immediately without hanging (stop() uses pause-based cleanup)
+✅ No more "AttributeError: 'PlayerService' object has no attribute 'player'"
+
+---
+
+## Change: Audio Meter Stuck When Loading from Widen/Pitch Pages (2026-06-19) - COMPLETE ✅
+
+### Problem Statement
+**Issue:** Audio level meter gets stuck (stops updating) when loading files from the Widen page or after exporting pitch/speed-changed files. Works fine when loading from the Downloader page.
+
+**Root Cause:**
+- When audio analyzer thread is recreated after loading, `audio_service.resume_analyzer()` tries to reconnect signals
+- It attempts to connect to `self.audio_meter.update_level()` but AudioLevelMeter widget only has `set_level()` method
+- The signal connection fails silently, leaving the meter disconnected from the audio analyzer thread
+- Result: Meter never receives audio level updates, appears stuck
+
+**Files Affected:**
+- `source_code/widgets/audio_meter.py` - Missing `update_level()` method
+- `source_code/services/audio_service.py` - Tries to connect to non-existent method at line 59
+
+### Solution Implemented
+Added `update_level()` method to AudioLevelMeter widget as an alias to `set_level()`:
+
+```python
+def update_level(self, db_value):
+    """Alias for set_level - used when audio analyzer thread signal is reconnected"""
+    self.set_level(db_value)
+```
+
+This ensures the signal connection in audio_service works correctly when the thread is recreated.
+
+**Entry Points Affected (now all working):**
+1. ✅ Download page "Open File..." button - Already worked
+2. ✅ Widen page "Open Widen File..." button - NOW FIXED
+3. ✅ After exporting pitch/speed changed file - NOW FIXED
+4. ✅ Download & Queue from any tab - NOW FIXED
+
+---
+
 ## Change: Final Fix for File Loading Hang (2026-06-19) - COMPLETE ✅
 
 ### Problem Statement

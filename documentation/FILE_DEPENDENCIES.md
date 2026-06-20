@@ -42,7 +42,7 @@
 ### 5. AUDIO FEATURES (SPL, dBFS, Auto-Reduce, AudioService)
 **Related files:**
 - `source_code/services/audio_service.py` → AudioService implementation
-- `source_code/widgets/audio_meter.py` → Measurement mode logic, SPL calculation
+- `source_code/widgets/audio_meter.py` → Measurement mode logic, SPL calculation, **HAS BOTH set_level() and update_level() methods (aliases)**
 - `source_code/main.py` → Audio level handler, settings integration
 - `source_code/dialogs/settings_dialog.py` → Audio settings fields
 - `config/settings.json` → measurement_mode, auto_reduce_threshold fields
@@ -50,6 +50,12 @@
 - `documentation/INSTALLATION.txt` → Audio calibration section, features
 - `documentation/ARCHITECTURE.md` → Audio system section
 - `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → AudioService in services/
+
+**CRITICAL SIGNAL CONNECTIONS:**
+- When audio analyzer thread is recreated (pause/resume), audio_service.py line 59 calls: `new_thread.level_updated.connect(self.audio_meter.update_level)`
+- AudioLevelMeter widget MUST have BOTH methods:
+  - `set_level(db_value)` - Called directly from main.py's on_audio_level_updated()
+  - `update_level(db_value)` - Called from audio_service when thread is recreated (alias to set_level)
 
 ### 6. SETTINGS/CONFIG CHANGES
 **File:** `config/settings.json`

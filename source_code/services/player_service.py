@@ -79,9 +79,11 @@ class PlayerService(QObject):
         print(f"[PlayerService.play] ✓ EXIT")
 
     def pause(self):
+        """Pause playback"""
         print(f"[PlayerService.pause] ⏸️  ENTRY")
-        self._player.pause()
-        print(f"[PlayerService.pause] ⏸️  Pause command sent")
+        if self._player:
+            self._player.pause()
+            print(f"[PlayerService.pause] ✓ Pause command sent")
         print(f"[PlayerService.pause] ✓ EXIT")
     
     def clear_media(self):
@@ -105,16 +107,28 @@ class PlayerService(QObject):
         print(f"[PlayerService.clear_media] ✓ EXIT")
 
     def stop(self):
+        """Stop playback - use pause-based cleanup to prevent VLC decoder thread hang"""
+        import time
         print(f"[PlayerService.stop] 🛑 ENTRY")
-        self._player.stop()
-        print(f"[PlayerService.stop] ✓ Player stopped")
-        # Release media to free resources
-        if self._media is not None:
-            try:
-                self._media = None
-                print(f"[PlayerService.stop] ✓ Media released")
-            except:
-                pass
+        try:
+            if self._player:
+                # Don't call stop() directly - it hangs with active decoder threads
+                # Instead use pause and let VLC auto-cleanup
+                self._player.pause()
+                print(f"[PlayerService.stop] ⏸️  Paused instead of stop to prevent hang")
+                
+                # Wait for decoder threads to reach safe state
+                time.sleep(1.0)
+                
+                # Clear media reference to allow VLC cleanup
+                if self._media is not None:
+                    try:
+                        self._media = None
+                        print(f"[PlayerService.stop] ✓ Media released")
+                    except:
+                        pass
+        except Exception as e:
+            print(f"[PlayerService.stop] ⚠️  Error during stop: {e}")
         print(f"[PlayerService.stop] ✓ EXIT")
 
     def is_playing(self):

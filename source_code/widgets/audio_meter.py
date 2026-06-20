@@ -23,6 +23,10 @@ class AudioLevelMeter(QWidget):
         self.db_level = self.smoothed_db
         self.level_percent = ((self.db_level + 80.0) / 80.0) * 100.0
         self.update()
+    
+    def update_level(self, db_value):
+        """Alias for set_level - used when audio analyzer thread signal is reconnected"""
+        self.set_level(db_value)
 
     def get_approximate_spl(self):
         """Convert dBFS to approximate SPL (Sound Pressure Level in dB)"""

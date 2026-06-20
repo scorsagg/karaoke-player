@@ -1,3 +1,4 @@
+import time
 import sys
 import os
 import subprocess
@@ -913,6 +914,23 @@ class KaraokeApp(QWidget):
                     return
 
     def closeEvent(self, event):
+        """Handle window close event - proper cleanup is now in PlayerService.stop()"""
+        try:
+            # Stop player (uses pause-based cleanup to prevent VLC hang)
+            if hasattr(self, 'player_service') and self.player_service:
+                self.player_service.stop()
+        except Exception as e:
+            print(f"Error stopping player on close: {e}")
+        
+        try:
+            # Stop audio analyzer
+            if hasattr(self, 'audio_service') and self.audio_service:
+                if hasattr(self.audio_service, 'stop_analyzer'):
+                    self.audio_service.stop_analyzer()
+        except Exception as e:
+            print(f"Error stopping audio on close: {e}")
+        
+        event.accept()
         # Exit fullscreen mode first if active
         try:
             if self.is_video_fullscreen:
