@@ -220,6 +220,9 @@ class KaraokeApp(QWidget):
         self.audio_overlay = self.create_audio_overlay()
         self.audio_overlay.setParent(self.video_frame)
         
+        # Reposition overlay automatically whenever the video frame resizes
+        self.video_frame.set_resize_callback(self._reposition_audio_overlay)
+        
         # Connect signals for button events
         self.nav_list.currentRowChanged.connect(self.handle_navigation_change)
         self.widen_video_btn.clicked.connect(lambda: self.handle_navigation_change(2))
@@ -275,13 +278,12 @@ class KaraokeApp(QWidget):
             is_audio_only = getattr(self, '_current_is_audio_only', False)
         
         # Adjust video frame height based on page
-        if idx == 3:  # Audio Tools - reduce video frame height and hide full video button
+        # Adjust video frame height based on page
+        if idx == 3:  # Audio Tools - shrink video frame
             if is_audio_only:
-                # For audio-only, minimize video frame to give more space to tabs
                 self.video_frame.setMinimumHeight(80)
                 self.video_frame.setMaximumHeight(100)
             else:
-                # For video content, give more space
                 self.video_frame.setMinimumHeight(280)
                 self.video_frame.setMaximumHeight(320)
             self.fullscreen_btn.setVisible(False)
@@ -306,12 +308,48 @@ class KaraokeApp(QWidget):
                 
                 # Update extraction controls visibility
                 self.update_extraction_ui(is_video)
+        elif idx == 2:  # Widen Video - cap video frame to guarantee space for controls
+            self.video_frame.setMinimumHeight(80)
+            self.video_frame.setMaximumHeight(350)
+            self.fullscreen_btn.setVisible(True)
         else:
-            self.video_frame.setMinimumHeight(420)
-            self.video_frame.setMaximumHeight(16777215)  # Reset to no max height
+            self.video_frame.setMinimumHeight(80)
+            self.video_frame.setMaximumHeight(16777215)
             self.fullscreen_btn.setVisible(True)
         
+        # Change page
         self.stack.setCurrentIndex(idx)
+        
+        # Force layout recalculation
+        if self.layout():
+            self.layout().invalidate()
+        
+        # Schedule scroll reset and layout activation for next event loop iteration
+        from PySide6.QtCore import QTimer
+        
+        def reset_scroll_and_activate():
+            # Activate layout
+            if self.layout():
+                self.layout().activate()
+            
+            # Reset scroll position for pages that have scroll areas
+            if idx == 2:  # Widen Video page (wrapped in scroll area)
+                widen_page = self.extra_page_components["page"]
+                if hasattr(widen_page, 'verticalScrollBar'):
+                    widen_page.verticalScrollBar().setValue(0)  # Scroll to top
+            elif idx == 3:  # Audio Tools page (has tab widget with scroll areas)
+                tab_widget = self.extra_page_components["tab_widget"]
+                # Reset scroll position for all tabs
+                for i in range(tab_widget.count()):
+                    tab_page = tab_widget.widget(i)
+                    if hasattr(tab_page, 'verticalScrollBar'):
+                        tab_page.verticalScrollBar().setValue(0)  # Scroll to top
+            
+            # Reposition audio overlay after video frame has resized
+            if getattr(self, '_current_is_audio_only', False):
+                self.show_audio_visualization()
+        
+        QTimer.singleShot(10, reset_scroll_and_activate)
 
     def browse_widen_video(self):
         f, _ = QFileDialog.getOpenFileName(
@@ -548,9 +586,8 @@ class KaraokeApp(QWidget):
         
         # Show/hide audio visualization overlay
         if is_audio_only:
-            # Use a delay to ensure frame is resized and laid out before positioning overlay
-            from PySide6.QtCore import QTimer
-            QTimer.singleShot(150, self.show_audio_visualization)
+            # Show immediately; resize callback will reposition if frame size changes later
+            self.show_audio_visualization()
         else:
             self.hide_audio_visualization()
 
@@ -572,6 +609,11 @@ class KaraokeApp(QWidget):
         """)
         overlay.hide()  # Hidden by default
         return overlay
+
+    def _reposition_audio_overlay(self):
+        """Called automatically on video frame resize — repositions overlay if visible."""
+        if hasattr(self, 'audio_overlay') and self.audio_overlay.isVisible():
+            self.show_audio_visualization()
     
     def show_audio_visualization(self):
         """Show audio visualization overlay when audio-only file is loaded"""

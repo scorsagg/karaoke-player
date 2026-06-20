@@ -35,10 +35,11 @@ def create_main_layout(settings):
     # Create content container
     content_container = QVBoxLayout()
 
-    # Video frame
+    # Video frame — low initial minimum so Qt calculates a small window minimum size;
+    # actual minimum is set per-page in handle_navigation_change
     video_frame = VideoFrame()
     video_frame.setStyleSheet("background-color: #000;")
-    video_frame.setMinimumHeight(420)
+    video_frame.setMinimumHeight(80)
     content_container.addWidget(video_frame, 10)
     components["video_frame"] = video_frame
 
@@ -79,8 +80,7 @@ def create_main_layout(settings):
     components["extra_page_components"] = extra_page_components
 
     components["stack"] = stack
-    content_container.addWidget(stack)
-    content_container.addStretch()
+    content_container.addWidget(stack, 1)
 
     main_h_layout.addLayout(content_container)
 

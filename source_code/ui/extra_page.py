@@ -1,7 +1,7 @@
 """Extra tools pages UI component - video widening and audio tools (separate pages)"""
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QLineEdit, QFrame,
-                               QTabWidget, QCheckBox, QDoubleSpinBox, QComboBox, QHBoxLayout, QSpinBox, QScrollArea)
+                               QTabWidget, QCheckBox, QDoubleSpinBox, QComboBox, QHBoxLayout, QSpinBox, QScrollArea, QSizePolicy)
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
 
@@ -103,8 +103,8 @@ def create_widen_page():
     Returns:
         dict: Dictionary containing page widget and control references
     """
-    page = QWidget()
-    layout = QVBoxLayout(page)
+    widen_content = QWidget()
+    layout = QVBoxLayout(widen_content)
     layout.setContentsMargins(10, 5, 10, 5)
 
     title = QLabel("<b>📐 ASPECT-RATIO LAYOUT PAD ENGINE</b>")
@@ -149,7 +149,7 @@ def create_widen_page():
     layout.addStretch()
 
     return {
-        "page": page,
+        "page": widen_content,
         "widen_file_btn": widen_file_btn,
         "widen_url_input": widen_url_input,
         "widen_dl_btn": widen_dl_btn,
