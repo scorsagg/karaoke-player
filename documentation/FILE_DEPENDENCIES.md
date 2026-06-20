@@ -105,7 +105,171 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 4. Download & Queue button completion
 5. Convert to 16:9 button completion
 
-### 9. DEPRECATED/DELETED FILES
+### 9. AUDIO PROCESSING FEATURES (Features 6 & 7) ✅ COMPLETE
+**Status:** Fully Implemented & Enhanced in v3
+
+**Related files:**
+- `source_code/ui/extra_page.py` → UI with tabbed interface + TimePickerWidget class
+- `source_code/main.py` → trim_audio(), convert_audio_format(), build_format_conversion_cmd() methods, audio overlay, history loading
+- `documentation/ARCHITECTURE.md` → Audio Processing section
+- `documentation/IMPLEMENTATION_LOG.md` → Features 6 & 7 + UX improvements entry
+
+**Feature 6: Audio Trimming ✅ COMPLETE**
+- Trim first X seconds, last X seconds, keep range, or combinations
+- Supports all audio formats (MP3, WAV, AAC, M4A)
+- FFmpeg command: `-ss {start} -to {end} -acodec copy`
+- **UI Component:** `TimePickerWidget` class with three spinboxes
+  - Separate Hour/Minute/Second controls (0-59 range each)
+  - Total time calculated as: hours * 3600 + minutes * 60 + seconds
+  - Display format: HH:MM:SS
+  - Each unit increments independently
+- **UI Location:** Extra Tools → Audio Tools tab → Trimming section
+- **Checkbox Controls:**
+  - ☑ Trim First X seconds (with H/M/S picker)
+  - ☑ Trim Last X seconds (with H/M/S picker)
+  - ☑ Keep Range (from A to B) with Start and End H/M/S pickers
+  - Output format selector (MP3, WAV, AAC, M4A)
+
+**Feature 7: Format Conversion ✅ COMPLETE**
+- Convert between audio/video formats: MP3, WAV, M4A, AAC, DAT, MP4, MKV, AVI, WebM
+- Quality selector for lossy formats (High 320kbps, Medium 192kbps, Low 128kbps)
+- Intelligent FFmpeg command builder handles all format combinations
+- **UI Location:** Extra Tools → Audio Tools tab → Converter section
+- **Controls:**
+  - Source format dropdown (Auto-detect + specific formats)
+  - Target format dropdown
+  - Quality selector (for lossy formats)
+  - Convert & Export button
+
+**Quality Mappings (for MP3 and other lossy formats):**
+- High (320kbps) → bitrate=320k
+- Medium (192kbps) → bitrate=192k
+- Low (128kbps) → bitrate=128k
+
+**Format Conversion Examples:**
+- MP3 → WAV: `ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 output.wav`
+- WAV → MP3: `ffmpeg -i input.wav -acodec libmp3lame -b:a 192k output.mp3`
+- DAT → MP3: `ffmpeg -i input.dat -vn -acodec libmp3lame -b:a 192k output.mp3`
+- MP4 → M4A: `ffmpeg -i input.mp4 -vn -acodec aac -b:a 192k output.m4a`
+
+**UX Improvements ✅ COMPLETE**
+- **Audio Visualization Overlay:** Green glowing widget shows "🎵 Audio File Loaded" for audio-only files
+- **Navigation Fix:** After trim/convert/extract, page stays on Audio Tools (auto-navigates back)
+- **TimePickerWidget:** Custom QWidget with separate H/M/S spinners for better UX
+  - Methods: `get_total_seconds()`, `set_total_seconds(seconds)`, `get_display_text()`
+  - Displays time clearly in HH:MM:SS format
+- **History Detection:** Audio files loaded from history now show visualization automatically
+
+**Auto-Reload:** After export, file automatically loads into player (via handle_task_completion)
+
+### 10. AUDIO EXTRACTION UI STATE MANAGEMENT ✅ COMPLETE
+**Status:** Fixed - Extraction UI now properly updates for all loading scenarios
+
+**Related files:**
+- `source_code/main.py` → 
+  - `update_extraction_ui(is_video)` helper method (new)
+  - `load_audio_tools_file()` updated to call helper
+  - `load_history_item()` updated to call helper
+  - `handle_navigation_change()` updated to call helper
+  - `show_audio_visualization()` enhanced with retry logic
+  - `finish_loading()` delay increased to 150ms
+
+**What Changed:**
+- **New helper method `update_extraction_ui(is_video)`** centralizes all extraction UI logic
+  - Shows extraction controls (checkbox, button, format selector) when is_video=True
+  - Shows "Load a video to extract audio" message when is_video=False
+  - Called from three locations to ensure consistency
+
+- **Updated `load_audio_tools_file()`**
+  - Detects file type (video vs audio) from extension
+  - Calls `update_extraction_ui(is_video)` to update controls
+  - Updates audio_file_status label with detected type
+
+- **Updated `load_history_item()`**
+  - Detects file type using extension sets (audio_exts and video_exts)
+  - If on Audio Tools page, updates audio_tools_file_path and calls `update_extraction_ui()`
+  - Ensures extraction UI is correct for files loaded from history
+
+- **Updated `handle_navigation_change()`**
+  - When navigating to Audio Tools page, detects current file type
+  - Updates audio_file_status label if showing "No file loaded"
+  - Calls `update_extraction_ui()` to show appropriate controls
+  - Ensures UI is consistent when navigating after file is already loaded elsewhere
+
+- **Enhanced `show_audio_visualization()`**
+  - Retries with 100ms delay if frame dimensions are 0
+  - Prevents early return before frame layout completes
+  - Better visibility with 250 alpha (instead of 240)
+
+**File Type Detection Logic:**
+```python
+video_exts = {'.mp4', '.avi', '.mkv', '.mov', '.webm'}
+audio_exts = {'.mp3', '.wav', '.aac', '.m4a', '.flac', '.ogg', '.opus', '.wma'}
+is_video = os.path.splitext(file_path)[1].lower() in video_exts
+```
+
+**Three File Loading Scenarios Now Handled:**
+1. User opens file via "Load File" button → calls `load_audio_tools_file()`
+2. User double-clicks file in history → calls `load_history_item()`
+3. User loads file on another page, then navigates to Audio Tools → `handle_navigation_change()` detects and updates
+
+### 11. AUDIO LOUDNESS NORMALIZATION (Feature 8) ✅ COMPLETE
+**Status:** Fully Implemented - Normalizes audio to consistent LUFS level
+
+**Related files:**
+- `source_code/ui/extra_page.py` → Normalization tab with controls
+- `source_code/main.py` → `normalize_audio()` method with FFmpeg loudnorm filter
+- `documentation/IMPLEMENTATION_LOG.md` → Feature 8 implementation entry
+
+**Feature 8: Audio Loudness Normalization ✅ COMPLETE**
+- Normalizes audio files to consistent loudness levels using FFmpeg `loudnorm` filter
+- Three preset LUFS targets for different use cases
+- **UI Location:** Extra Tools → Audio Tools tab → Normalization section (Tab 4)
+- **Controls:**
+  - ☑ Normalize Loudness (checkbox, checked by default)
+  - Target LUFS dropdown with three presets:
+    - -14 LUFS (Streaming) - Spotify, Apple Music, YouTube
+    - -16 LUFS (Broadcast) - TV, Radio standard
+    - -18 LUFS (Loud) - Maximum output
+  - "Normalize & Export" button (green, 35px height)
+
+**FFmpeg Implementation:**
+- Uses `loudnorm` audio filter with configurable LUFS targets
+- Filter parameters: `loudnorm=I={LUFS_VALUE}:LRA=11:tp=-1.5`
+  - I (Integrated LUFS): Target loudness level (-14, -16, or -18)
+  - LRA (Loudness Range): 11 LUFS (standard range)
+  - tp (True Peak): -1.5 dB (prevents clipping)
+- Output format: WAV with 44100 Hz sample rate (CD quality)
+- Output file naming: `{original_name}_normalized.wav`
+
+**LUFS Standards:**
+- **-14 LUFS**: Streaming platforms (loudest)
+  - Spotify, Apple Music, YouTube Music use loudness normalization around this level
+  - Best for: Modern streaming delivery, consistent across platforms
+- **-16 LUFS**: Broadcast standard (medium)
+  - Industry standard for broadcast TV and radio
+  - Best for: Professional audio that needs to match broadcast specifications
+- **-18 LUFS**: Loud output (quietest target)
+  - Less common, use when maximum perceived loudness is needed
+  - Caution: May risk clipping or audio artifacts
+
+**Workflow:**
+1. User loads audio or video file (any format)
+2. Selects target LUFS from dropdown (default: -14 LUFS)
+3. Ensures "Normalize Loudness" checkbox is checked
+4. Clicks "Normalize & Export" button
+5. FFmpeg analyzes audio and applies normalization filter
+6. Output saved as `{filename}_normalized.wav` in download directory
+7. File automatically loads into player (via handle_task_completion)
+
+**Technical Details:**
+- Two-pass processing: FFmpeg handles analysis and application in single command
+- Loudnorm filter automatically detects input loudness and applies correct gain
+- Output always PCM WAV format for maximum compatibility
+- Sample rate standardized to 44100 Hz (CD quality)
+- Processing preserves original duration and audio quality
+
+### 12. DEPRECATED/DELETED FILES
 **Current deprecated files:**
 - karaoke_app.py
 - v2-karaoke_app - Copy.py
@@ -118,7 +282,7 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Check build_system/KaraokeStudioPro.spec doesn't reference it
 - Check .gitignore if needed
 
-### 10. GITIGNORE & LOCAL FILES
+### 13. GITIGNORE & LOCAL FILES
 **Current:**
 - config/history.json (local user data, not tracked)
 - __pycache__/, *.pyc
@@ -128,7 +292,7 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Add to .gitignore
 - Document in FOLDER_ORGANIZATION_SUMMARY.txt
 
-### 11. DOCUMENTATION SYNC CHECKLIST
+### 14. DOCUMENTATION SYNC CHECKLIST
 **When updating docs, ensure consistency across:**
 - README.md (project overview, features)
 - ARCHITECTURE.md (technical design, components)

@@ -32,7 +32,11 @@
 │  │  ├─ playback_bar.py          (Play/pause/seek/volume/audio meter)
 │  │  ├─ download_page.py         (File loading & URL streaming)
 │  │  ├─ pitch_page.py            (Pitch shift & speed controls)
-│  │  └─ extra_page.py            (Aspect ratio widening tool)
+│  └─ extra_page.py            (Tabbed interface: Aspect ratio widening + Audio tools)
+│                              ├─ Tab 1: Video Widening (Feature - convert 9:16 to 16:9)
+│                              ├─ Tab 2: Audio Tools (NEW Features 6 & 7)
+│                              │  ├─ Audio Trimming (trim first/last/range, any combo)
+│                              │  └─ Format Converter (MP3↔WAV, DAT→MP3, video→audio, etc)
 │  │
 │  ├─ 📁 widgets/
 │  │  ├─ __init__.py
@@ -144,6 +148,20 @@ Build Standalone Executable (v3):
 ✅ Build System (v3):
    • Version bumped to 3 in build.py and spec file
    • INSTALLATION.txt copied to dist/ root for user visibility
+
+✅ Audio Processing (2026-06-20 - Features 6 & 7):
+   • Audio Trimming (Feature 6): Trim first X, last X, range, or any combination
+     - Supports flexible checkbox-based options
+     - Fast processing using -acodec copy (no re-encoding)
+     - Output format selector (MP3, WAV, AAC, M4A)
+   • Format Conversion (Feature 7): Convert between audio/video formats
+     - Source formats: MP3, WAV, M4A, AAC, DAT, MP4, MKV, AVI, WebM
+     - Target formats: MP3, WAV, M4A, AAC, MP4, MKV
+     - Quality selector: High (320k), Medium (192k), Low (128k)
+     - Intelligent FFmpeg command builder for any format pair
+   • UI Location: Extra Tools → Audio Tools tab (alongside Video Widening)
+   • Auto-reload: Both features automatically load results into player
+   • Integrated with ProcessThread for progress updates and cancellation
    • Validates all prerequisites before building
    • Optimization level adjusted for NumPy compatibility
 

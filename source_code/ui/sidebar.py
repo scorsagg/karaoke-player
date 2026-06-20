@@ -47,6 +47,10 @@ def create_sidebar(parent):
     widen_video_btn = QPushButton("📐 Widen Video")
     widen_video_btn.setStyleSheet("background-color: #2d2d2d; color: #aaa; padding: 8px 15px; border: none; text-align: left; margin-left: 15px; margin-right: 10px;")
     extra_tools_container_layout.addWidget(widen_video_btn)
+
+    audio_tools_btn = QPushButton("🎵 Audio Tools")
+    audio_tools_btn.setStyleSheet("background-color: #2d2d2d; color: #aaa; padding: 8px 15px; border: none; text-align: left; margin-left: 15px; margin-right: 10px;")
+    extra_tools_container_layout.addWidget(audio_tools_btn)
     side_layout.addWidget(extra_tools_container)
 
     line = QFrame()
@@ -105,6 +109,7 @@ def create_sidebar(parent):
         "extra_tools_toggle_btn": extra_tools_toggle_btn,
         "extra_tools_container": extra_tools_container,
         "widen_video_btn": widen_video_btn,
+        "audio_tools_btn": audio_tools_btn,
         "history_toggle_btn": history_toggle_btn,
         "history_container": history_container,
         "clear_hist_btn": clear_hist_btn,

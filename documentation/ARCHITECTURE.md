@@ -253,6 +253,82 @@ else:
 
 ---
 
+### Audio Processing (Features 6 & 7) ✅ NEW
+
+**Audio Trimming (Feature 6) & Format Conversion (Feature 7)**
+
+**Purpose:** Advanced audio/video processing via FFmpeg with intelligent command building
+
+**Responsibilities:**
+- Trim audio with flexible options (first X, last X, range, combinations)
+- Convert between audio/video formats intelligently
+- Calculate trim points from duration data
+- Build format-specific FFmpeg commands
+- Execute via ProcessThread with progress updates
+- Auto-reload processed files
+
+**UI Location:** Extra Tools → Audio Tools tab (two sub-sections)
+
+**Feature 6: Audio Trimming Methods:**
+```python
+trim_audio() - Orchestrates trimming based on checkboxes:
+├─ trim_first: Skip first N seconds
+├─ trim_last: Skip last N seconds  
+├─ trim_range: Keep seconds A to B (overrides other trims)
+└─ Supports all combinations (first+last, first+range, last+range, all three)
+```
+
+**Feature 7: Format Conversion Methods:**
+```python
+convert_audio_format() - Converts based on dropdown selections:
+├─ Source format: Auto-detect or specific (MP3, WAV, M4A, AAC, DAT, MP4, MKV, AVI, WebM)
+├─ Target format: MP3, WAV, M4A, AAC, MP4, MKV
+└─ Quality selector: High (320k), Medium (192k), Low (128k)
+
+build_format_conversion_cmd() - Builds FFmpeg command:
+├─ Audio→Audio: Extract audio only, apply encoder
+├─ Video→Audio: Strip video, extract audio
+├─ Audio→Video: Wrap audio in container
+└─ Video→Video: Re-encode as needed
+```
+
+**Key Methods:**
+- `trim_audio()` - Check trim options, calculate times, execute
+- `convert_audio_format()` - Get format selections, build command, execute
+- `build_format_conversion_cmd()` - Intelligent command builder for any format pair
+
+**FFmpeg Command Examples:**
+```bash
+# Trimming (fast, no re-encode)
+ffmpeg -ss {start} -to {end} -i input -acodec copy output
+
+# Format conversions
+ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 output.wav
+ffmpeg -i input.wav -acodec libmp3lame -b:a 192k output.mp3
+ffmpeg -i input.dat -vn -acodec libmp3lame -b:a 192k output.mp3
+ffmpeg -i input.mp4 -vn -acodec aac -b:a 192k output.m4a
+```
+
+**Data Flow:**
+```
+User selects trim/convert options
+    ↓
+Validates at least one option selected
+    ↓
+Shows loading splash screen
+    ↓
+Calculates trim times / builds format command
+    ↓
+Executes via ProcessThread
+    ↓
+Progress updates stream to splash
+    ↓
+On completion: handle_task_completion()
+    ↓
+Auto-loads result into player
+```
+
+---
 
 ### Widgets
 
