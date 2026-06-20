@@ -202,3 +202,13 @@ class PlayerService(QObject):
             self._instance.release()
         except Exception:
             pass
+    
+    # ===== Helper Function for Feature 9 =====
+    
+    def get_video_speed_adjustment_command(self, ffmpeg_path, input_file, output_file, speed_factor):
+        """Feature 9: Build FFmpeg command for video-only speed adjustment"""
+        video_pts_factor = 1 / speed_factor
+        filter_complex = f"[0:v]setpts={video_pts_factor}*PTS[v];[0:a]atempo=1.0[a]"
+        
+        return [ffmpeg_path, "-y", "-i", input_file, "-filter_complex", filter_complex,
+                "-map", "[v]", "-map", "[a]", output_file]

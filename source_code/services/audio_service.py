@@ -156,3 +156,52 @@ class AudioService:
                 self.audio_analyzer.wait(1000)
             except Exception as e:
                 print(f"Error cleaning up audio service: {e}")
+    
+    # ===== Helper Functions for Features 5, 20, 12 =====
+    
+    def get_file_duration(self, ffprobe_path, file_path):
+        """Feature 20: Get audio/video file duration in seconds"""
+        import subprocess
+        import os
+        import sys
+        
+        if not os.path.exists(file_path):
+            return 0.0
+        
+        try:
+            cmd = [ffprobe_path, "-v", "error", "-show_entries", "format=duration",
+                   "-of", "default=noprint_wrappers=1:nokey=1", file_path]
+            startupinfo = None
+            if sys.platform == "win32":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    startupinfo=startupinfo, text=True, timeout=3)
+            return float(result.stdout.strip())
+        except Exception as e:
+            print(f"[AudioService.get_file_duration] Error: {e}")
+            return 0.0
+    
+    def get_volume_adjustment_command(self, ffmpeg_path, input_file, output_file, volume_db, apply_limiter=True):
+        """Feature 5: Build FFmpeg command for volume adjustment"""
+        volume_filter = f"volume={volume_db}dB"
+        
+        if apply_limiter:
+            volume_filter += ",alimiter=limit=0.95"
+        
+        return [ffmpeg_path, "-y", "-i", input_file, "-af", volume_filter,
+                "-c:v", "copy", "-c:a", "aac", output_file]
+    
+    def calculate_speed_ratio(self, duration_a, duration_b):
+        """Feature 12: Calculate speed ratio to match two files"""
+        if duration_b == 0:
+            return 1.0
+        return duration_a / duration_b
+    
+    def get_speed_adjustment_command(self, ffmpeg_path, input_file, output_file, speed_ratio):
+        """Feature 12: Build FFmpeg command for speed synchronization"""
+        filter_complex = f"[0:v]setpts={1/speed_ratio}*PTS[v];[0:a]atempo={speed_ratio}[a]"
+        
+        return [ffmpeg_path, "-y", "-i", input_file, "-filter_complex", filter_complex,
+                "-map", "[v]", "-map", "[a]", output_file]
