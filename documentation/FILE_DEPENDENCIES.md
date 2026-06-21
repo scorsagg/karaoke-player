@@ -31,13 +31,33 @@
 
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:
-- main_layout.py, sidebar.py, playback_bar.py, download_page.py, pitch_page.py, extra_page.py
+- main_layout.py, sidebar.py, playback_bar.py, download_page.py, pitch_page.py, extra_page.py, video_tools_page.py
 
 **Files to update when modifying UI:**
 - `build_system/KaraokeStudioPro.spec` → hiddenimports for new UI modules
 - `source_code/main.py` → imports from ui package, setup_ui() method
 - `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → UI folder structure
 - `documentation/ARCHITECTURE.md` → UI architecture section
+
+**Page index map (CRITICAL — do not change):**
+- 0: Downloader | 1: Pitch & Speed | 2: Widen Video | 3: Audio Tools | 4: Video Tools
+
+**Scroll Areas (added 2026-06-21):**
+- Pages 3 (Audio Tools) and 4 (Video Tools) are wrapped in `QScrollArea` in `main_layout.py`
+- This means `stack.widget(3)` is a `QScrollArea`, not the page widget directly
+- The actual page widget is accessed via `scroll_area.widget()`
+- `QScrollArea` and `Qt` must be imported in main_layout.py
+
+**Video Frame Height Rules (handle_navigation_change in main.py):**
+- idx 0/1 (Downloader, Pitch & Speed): min=420, max=unlimited
+- idx 2 (Widen Video): min=80, max=350
+- idx 3 (Audio Tools): min=80, max=100 (audio-only) or max=220 (video)
+- idx 4 (Video Tools): min=80, max=220
+
+**Navigation Signal (IMPORTANT):**
+- Use `nav_list.itemClicked` NOT `nav_list.currentRowChanged`
+- `currentRowChanged` fires on programmatic changes and causes spurious navigation
+- After `nav_list.setCurrentRow(0)` in `__init__`, call `handle_navigation_change(0)` explicitly
 
 ### 5. AUDIO FEATURES (SPL, dBFS, Auto-Reduce, AudioService)
 **Related files:**
@@ -397,7 +417,85 @@ ffmpeg -y -i input.dat -c:v libx264 -preset fast -acodec aac -b:a 192k output.mp
 - MP4 conversion: ~5-10 seconds per minute (may re-encode video)
 - Depends on file size and target format
 
-### 15. DEPRECATED/DELETED FILES
+### 15. VIDEO TOOLS - VIDEO TRIMMING ✅ COMPLETE
+**Status:** Fully Implemented with Video Tools page and trim functionality
+
+**Related files:**
+- `source_code/ui/video_tools_page.py` → New UI page for video tools
+- `source_code/ui/sidebar.py` → New "Video Tools" button in Extra Tools
+- `source_code/ui/main_layout.py` → Added video_tools_page to stacked widget (Index 3)
+- `source_code/main.py` → `trim_video()` and `build_video_trim_cmd()` methods
+- `build_system/KaraokeStudioPro.spec` → Added source_code.ui.video_tools_page to hiddenimports
+- `documentation/IMPLEMENTATION_LOG.md` → Video Tools entry
+
+**Feature: Video Trimming ✅ COMPLETE**
+- Trim first X seconds, last X seconds, keep range, or combinations
+- Supports multiple output formats: MP4, MKV, WebM, AVI
+- Format-specific codec optimization (H.264 for MP4, VP9 for WebM, etc.)
+- **UI Location:** Extra Tools → Video Tools (new sidebar button)
+- **Controls:**
+  - ☑ Trim First X seconds (with H/M/S picker using TimePickerWidget)
+  - ☑ Trim Last X seconds (with H/M/S picker)
+  - ☑ Keep Range (from A to B) with Start and End H/M/S pickers
+  - Output format selector (MP4, MKV, WebM, AVI)
+  - "✂️ Trim Video" button (orange)
+
+**Output Format Details:**
+- **MP4**: H.264 video codec (fast preset), AAC audio (192kbps) - Best for web/streaming
+- **MKV**: Copy video codec (fastest), AAC audio (192kbps) - Preserves original quality
+- **WebM**: VP9 video codec (crf 30), Opus audio (192kbps) - Modern web format
+- **AVI**: MPEG-4 video (q 5), MP3 audio (192kbps) - Legacy format compatibility
+
+**FFmpeg Commands Generated:**
+```bash
+# Trim to MP4 (H.264 re-encode)
+ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v libx264 -preset fast -c:a aac -b:a 192k output.mp4
+
+# Trim to MKV (fast, preserves codec)
+ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v copy -c:a aac -b:a 192k output.mkv
+
+# Trim to WebM (VP9 encoding)
+ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v libvpx-vp9 -crf 30 -b:v 0 -c:a libopus -b:a 192k output.webm
+
+# Trim to AVI (MPEG-4)
+ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k output.avi
+```
+
+**Workflow:**
+1. Navigate to Video Tools (via sidebar "Video Tools" button)
+2. Load a video file (any format supported by FFmpeg)
+3. Select trim options:
+   - Check "Trim First" and set hours/minutes/seconds to skip from beginning
+   - Check "Trim Last" and set hours/minutes/seconds to remove from end
+   - OR Check "Keep Range" and set exact start and end times
+4. Select output format (MP4, MKV, WebM, AVI)
+5. Click "✂️ Trim Video" button
+6. FFmpeg trims and encodes video
+7. Output saved as `{filename}_trimmed.{format}` in download directory
+8. Status shows trimming progress
+9. File automatically loads into player after completion
+
+**Processing Speed:**
+- MP4 output: ~1-2 seconds per 10 seconds of video (H.264 encoding)
+- MKV output: ~0.5-1 second per 10 seconds (codec copy, fastest)
+- WebM output: ~2-3 seconds per 10 seconds (VP9 encoding, slower)
+- AVI output: ~1-2 seconds per 10 seconds (MPEG-4 encoding)
+
+**Output File Naming:**
+- Input: `video.mp4`
+- Output: `video_trimmed.mp4` (or .mkv/.webm/.avi)
+- Location: Download directory (configurable in settings)
+
+**Key Features:**
+- ✅ TimePickerWidget for precise H:M:S time selection
+- ✅ Multiple trim options: trim first, trim last, keep range
+- ✅ Auto-validates time ranges before processing
+- ✅ Format-optimized FFmpeg commands
+- ✅ Progress splash screen with cancel button
+- ✅ Auto-loads trimmed video into player after completion
+- ✅ Status feedback during trimming
+
+### 16. DEPRECATED/DELETED FILES
 **Current deprecated files:**
 - karaoke_app.py
 - v2-karaoke_app - Copy.py
@@ -410,7 +508,7 @@ ffmpeg -y -i input.dat -c:v libx264 -preset fast -acodec aac -b:a 192k output.mp
 - Check build_system/KaraokeStudioPro.spec doesn't reference it
 - Check .gitignore if needed
 
-### 16. GITIGNORE & LOCAL FILES
+### 17. GITIGNORE & LOCAL FILES
 **Current:**
 - config/history.json (local user data, not tracked)
 - __pycache__/, *.pyc
@@ -420,35 +518,7 @@ ffmpeg -y -i input.dat -c:v libx264 -preset fast -acodec aac -b:a 192k output.mp
 - Add to .gitignore
 - Document in FOLDER_ORGANIZATION_SUMMARY.txt
 
-### 17. DOCUMENTATION SYNC CHECKLIST
-**When updating docs, ensure consistency across:**
-- README.md (project overview, features)
-- ARCHITECTURE.md (technical design, components)
-- INSTALLATION.txt (user guide, features, settings)
-- FOLDER_ORGANIZATION_SUMMARY.txt (structure, recent improvements)
-**Current deprecated files:**
-- karaoke_app.py
-- v2-karaoke_app - Copy.py
-- v2-VLC_version.py
-
-**When removing files:**
-- Delete actual file
-- Remove from version control (git)
-- Update documentation (mark as deprecated or remove mention)
-- Check build_system/KaraokeStudioPro.spec doesn't reference it
-- Check .gitignore if needed
-
-### 13. GITIGNORE & LOCAL FILES
-**Current:**
-- config/history.json (local user data, not tracked)
-- __pycache__/, *.pyc
-- build_system/build/, build_system/dist/
-
-**When adding local-only files:**
-- Add to .gitignore
-- Document in FOLDER_ORGANIZATION_SUMMARY.txt
-
-### 14. DOCUMENTATION SYNC CHECKLIST
+### 18. DOCUMENTATION SYNC CHECKLIST
 **When updating docs, ensure consistency across:**
 - README.md (project overview, features)
 - ARCHITECTURE.md (technical design, components)
@@ -486,3 +556,62 @@ ffmpeg -y -i input.dat -c:v libx264 -preset fast -acodec aac -b:a 192k output.mp
 3. Update imports in main.py
 4. Update FOLDER_ORGANIZATION_SUMMARY.txt with folder structure
 5. Update ARCHITECTURE.md with UI section
+
+---
+
+## 📋 FEATURE IMPLEMENTATION STATUS
+
+### ✅ FULLY IMPLEMENTED & ACTIVE
+- **Feature 6**: Audio Trimming with H/M/S controls
+- **Feature 7**: Format Conversion (MP3, WAV, M4A, AAC, MP4, MKV, AVI, WebM)
+- **Feature 8**: Audio Loudness Normalization (LUFS presets)
+- **Feature 15**: Audio Stream Extraction from videos
+- **Feature 19**: DAT/WhatsApp File Conversion
+- **Feature 21**: YouTube video downloads (already in app)
+- **Feature 32**: Playback with start/end time controls
+- **Feature 33**: Stop/unload video functionality
+
+### ⚙️ HELPER FUNCTIONS ONLY (Not requiring full UI)
+These are available as service methods for future feature use:
+- **Feature 5**: Volume Adjustment (`AudioService.get_volume_adjustment_command()`)
+- **Feature 9**: Video Speed Adjustment (`PlayerService.get_video_speed_adjustment_command()`)
+- **Feature 12**: Speed Synchronization (`AudioService.calculate_speed_ratio()`, `get_speed_adjustment_command()`)
+- **Feature 20**: Duration Analysis (`AudioService.get_file_duration()`)
+
+### ❌ NOT REQUIRED - FUTURE CONSIDERATION ONLY
+These features have been marked as not required for the current roadmap. They can be added in future versions if needed.
+
+| Feature # | Name | Status | Reason |
+|-----------|------|--------|--------|
+| 1 | Pitch/Key Adjustment | Not Required | Use case unclear, complex audio filter chain |
+| 2 | Tempo/Speed Adjustment (Audio Only) | Not Required | Speed sync (Feature 12) available for video+audio |
+| 3 | Combined Pitch-Tempo | Not Required | Would require rubberband filter, not prioritized |
+| 4 | Basic Audio Format Conversion | Not Required | Feature 7 already covers all format conversion |
+| 10 | Sample Rate Management | Not Required | All features auto-standardize to 44100 Hz |
+| 11 | Video Speed Adjustment (Independent) | Not Required | Feature 12 handles video-audio sync |
+| 13 | Subtitle Burning/Embedding | Not Required | SRT integration not in scope |
+| 14 | Video Codec Handling (Optimization) | Not Required | Current setup uses -c:v copy where appropriate |
+| 16 | Karaoke Video Creation | Not Required | Combines video+audio, less priority |
+| 17 | Duration Matching (Feature) | Not Required | Helper functions exist via Feature 20+12 |
+| 18 | Multi-Audio Track Mixing | Not Required | Complex amix filter, not prioritized |
+| 19 | Frame-by-Frame Sync (PTS) | Not Required | Video-audio sync via atempo/setpts sufficient |
+| 24 | BPM Detection Prep | Not Required | Would require music analysis library |
+| 26 | Vocal Separation | Not Required | Requires external tool, out of scope |
+| 27 | File Merging/Concatenation | Not Required | Concat demuxer complex, low priority |
+| 28 | Background Image Overlay | Not Required | Video editing features lower priority |
+| 29 | Platform Codec Compatibility | Not Required | Can add presets if needed later |
+| 30 | Batch Processing | Not Required | Single-file operations sufficient for MVP |
+| 9 | Mono Conversion | Not Required | Stereo conversion not required |
+| 25 | Advanced Loudness (LUFS) | ✅ IMPLEMENTED | This is Feature 8 |
+
+### 🎯 IMPLEMENTATION COMPLETE
+
+**Current Version:** v3  
+**Total Features in Scope:** 8 fully implemented  
+**Helper Functions:** 4 available for future UI wrapping  
+
+**What This Means:**
+- ✅ All required features are COMPLETE
+- ✅ Helper functions are available if needed for future expansion
+- ✅ No additional features are required for current roadmap
+- ✅ If you add new features in the future, update this section

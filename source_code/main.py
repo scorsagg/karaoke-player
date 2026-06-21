@@ -46,6 +46,7 @@ class KaraokeApp(QWidget):
 
         self.setup_ui()
         self.nav_list.setCurrentRow(0)
+        self.handle_navigation_change(0)  # explicitly init video frame + stack for Downloader
 
         self.timer = QTimer()
         self.timer.setInterval(200)
@@ -130,6 +131,7 @@ class KaraokeApp(QWidget):
         self.extra_tools_toggle_btn = sidebar_components["extra_tools_toggle_btn"]
         self.extra_tools_container = sidebar_components["extra_tools_container"]
         self.widen_video_btn = sidebar_components["widen_video_btn"]
+        self.video_tools_btn = sidebar_components["video_tools_btn"]
         self.audio_tools_btn = sidebar_components["audio_tools_btn"]
         self.history_toggle_btn = sidebar_components["history_toggle_btn"]
         self.history_container = sidebar_components["history_container"]
@@ -213,7 +215,39 @@ class KaraokeApp(QWidget):
         self.normalize_cb = extra_page_components["normalize_cb"]
         self.normalize_lufs_combo = extra_page_components["normalize_lufs_combo"]
         normalize_btn = extra_page_components["normalize_btn"]
+        # Feature 19: DAT file conversion
+        self.dat_convert_btn = extra_page_components["dat_convert_btn"]
+        self.dat_source_combo = extra_page_components["dat_source_combo"]
+        self.dat_target_combo = extra_page_components["dat_target_combo"]
+        self.dat_quality_combo = extra_page_components["dat_quality_combo"]
+        self.dat_analyze_cb = extra_page_components["dat_analyze_cb"]
+        self.dat_status_label = extra_page_components["dat_status_label"]
         
+        # Extract video tools page components
+        video_tools_page_components = components["video_tools_page_components"]
+        self.video_current_file_label = video_tools_page_components["video_current_file_label"]
+        self.video_trim_first_cb = video_tools_page_components["trim_first_cb"]
+        self.video_trim_first_picker = video_tools_page_components["trim_first_picker"]
+        self.video_trim_last_cb = video_tools_page_components["trim_last_cb"]
+        self.video_trim_last_picker = video_tools_page_components["trim_last_picker"]
+        self.video_trim_range_cb = video_tools_page_components["keep_range_cb"]
+        self.video_trim_range_start = video_tools_page_components["keep_range_start_picker"]
+        self.video_trim_range_end = video_tools_page_components["keep_range_end_picker"]
+        self.video_trim_format_combo = video_tools_page_components["trim_format_combo"]
+        video_trim_btn = video_tools_page_components["trim_btn"]
+        self.video_trim_status_label = video_tools_page_components["trim_status_label"]
+        # Playback Window controls
+        self.pw_skip_cb = video_tools_page_components["pw_skip_cb"]
+        self.pw_skip_picker = video_tools_page_components["pw_skip_picker"]
+        self.pw_stop_cb = video_tools_page_components["pw_stop_cb"]
+        self.pw_stop_picker = video_tools_page_components["pw_stop_picker"]
+        self.pw_range_cb = video_tools_page_components["pw_range_cb"]
+        self.pw_range_start_picker = video_tools_page_components["pw_range_start_picker"]
+        self.pw_range_end_picker = video_tools_page_components["pw_range_end_picker"]
+        self.pw_apply_btn = video_tools_page_components["pw_apply_btn"]
+        self.pw_clear_btn = video_tools_page_components["pw_clear_btn"]
+        self.pw_status_label = video_tools_page_components["pw_status_label"]
+
         self.stack = components["stack"]
         
         # Create audio visualization overlay for Audio Tools (parented to video_frame)
@@ -224,9 +258,10 @@ class KaraokeApp(QWidget):
         self.video_frame.set_resize_callback(self._reposition_audio_overlay)
         
         # Connect signals for button events
-        self.nav_list.currentRowChanged.connect(self.handle_navigation_change)
+        self.nav_list.itemClicked.connect(lambda item: self.handle_navigation_change(self.nav_list.row(item)))
         self.widen_video_btn.clicked.connect(lambda: self.handle_navigation_change(2))
         self.audio_tools_btn.clicked.connect(lambda: self.handle_navigation_change(3))
+        self.video_tools_btn.clicked.connect(lambda: self.handle_navigation_change(4))
         self.extra_tools_toggle_btn.clicked.connect(self.toggle_extra_tools)
         self.history_toggle_btn.clicked.connect(self.toggle_history)
         self.clear_hist_btn.clicked.connect(self.clear_history)
@@ -234,7 +269,7 @@ class KaraokeApp(QWidget):
         self.load_btn.clicked.connect(lambda: self.load_video())
         dl_btn_download.clicked.connect(lambda: self.download_video(from_widen_tab=False))
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
-        self.play_btn.clicked.connect(self.player.play)
+        self.play_btn.clicked.connect(self.handle_play)
         self.pause_btn.clicked.connect(self.player.pause)
         self.back_btn.clicked.connect(lambda: self.jump_time(-10000))
         self.fwd_btn.clicked.connect(lambda: self.jump_time(10000))
@@ -254,13 +289,11 @@ class KaraokeApp(QWidget):
         convert_btn.clicked.connect(self.convert_audio_format)
         normalize_btn.clicked.connect(self.normalize_audio)
         # Feature 19: DAT file conversion
-        self.dat_convert_btn = extra_page_components["dat_convert_btn"]
-        self.dat_source_combo = extra_page_components["dat_source_combo"]
-        self.dat_target_combo = extra_page_components["dat_target_combo"]
-        self.dat_quality_combo = extra_page_components["dat_quality_combo"]
-        self.dat_analyze_cb = extra_page_components["dat_analyze_cb"]
-        self.dat_status_label = extra_page_components["dat_status_label"]
         self.dat_convert_btn.clicked.connect(self.convert_dat_file)
+        # Video Tools: Video Trimming (uses video loaded from Downloader page)
+        video_trim_btn.clicked.connect(self.trim_video)
+        self.pw_apply_btn.clicked.connect(self.handle_play)
+        self.pw_clear_btn.clicked.connect(self.clear_playback_window)
         self.history_list.itemDoubleClicked.connect(lambda item: self.load_history_item(item.toolTip()))
         
         # Initialize state flags
@@ -271,7 +304,7 @@ class KaraokeApp(QWidget):
         self.load_history_from_disk()
 
     def handle_navigation_change(self, idx, is_audio_only=None):
-        if idx == 2 or idx == 3:  # Widen or Audio Tools
+        if idx == 2 or idx == 3 or idx == 4:  # Widen, Audio Tools, or Video Tools
             self.nav_list.blockSignals(True)
             self.nav_list.clearSelection()
             self.nav_list.setCurrentRow(-1)
@@ -292,8 +325,8 @@ class KaraokeApp(QWidget):
                 self.video_frame.setMinimumHeight(80)
                 self.video_frame.setMaximumHeight(100)
             else:
-                self.video_frame.setMinimumHeight(280)
-                self.video_frame.setMaximumHeight(320)
+                self.video_frame.setMinimumHeight(80)
+                self.video_frame.setMaximumHeight(220)
             self.fullscreen_btn.setVisible(False)
             
             # Update extraction UI and status based on current file type
@@ -316,12 +349,23 @@ class KaraokeApp(QWidget):
                 
                 # Update extraction controls visibility
                 self.update_extraction_ui(is_video)
+        elif idx == 4:  # Video Tools - shrink video frame to show controls
+            self.video_frame.setMinimumHeight(80)
+            self.video_frame.setMaximumHeight(220)
+            self.fullscreen_btn.setVisible(False)
+            # Update the "currently working on" label
+            if self.video_path:
+                self.video_current_file_label.setText(f"✅ Working on: {os.path.basename(self.video_path)}")
+                self.video_current_file_label.setStyleSheet("color: #2ecc71; font-size: 10px; font-style: normal; padding: 2px 5px;")
+            else:
+                self.video_current_file_label.setText("No video loaded — use the Downloader page to load a video")
+                self.video_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
         elif idx == 2:  # Widen Video - cap video frame to guarantee space for controls
             self.video_frame.setMinimumHeight(80)
             self.video_frame.setMaximumHeight(350)
             self.fullscreen_btn.setVisible(True)
         else:
-            self.video_frame.setMinimumHeight(80)
+            self.video_frame.setMinimumHeight(420)
             self.video_frame.setMaximumHeight(16777215)
             self.fullscreen_btn.setVisible(True)
         
@@ -339,19 +383,6 @@ class KaraokeApp(QWidget):
             # Activate layout
             if self.layout():
                 self.layout().activate()
-            
-            # Reset scroll position for pages that have scroll areas
-            if idx == 2:  # Widen Video page (wrapped in scroll area)
-                widen_page = self.extra_page_components["page"]
-                if hasattr(widen_page, 'verticalScrollBar'):
-                    widen_page.verticalScrollBar().setValue(0)  # Scroll to top
-            elif idx == 3:  # Audio Tools page (has tab widget with scroll areas)
-                tab_widget = self.extra_page_components["tab_widget"]
-                # Reset scroll position for all tabs
-                for i in range(tab_widget.count()):
-                    tab_page = tab_widget.widget(i)
-                    if hasattr(tab_page, 'verticalScrollBar'):
-                        tab_page.verticalScrollBar().setValue(0)  # Scroll to top
             
             # Reposition audio overlay after video frame has resized
             if getattr(self, '_current_is_audio_only', False):
@@ -572,6 +603,8 @@ class KaraokeApp(QWidget):
     def finish_loading(self, loader, is_audio_only=False):
         self.pitch_input.setValue(0.0)
         self.speed_input.setValue(1.0)
+        # Reset playback window on every new file load
+        self.clear_playback_window()
         if self.video_path: self.filename_label.setText(f"Playing: {os.path.basename(self.video_path)}")
 
         loader.set_progress(100, "Ready")
@@ -980,11 +1013,14 @@ class KaraokeApp(QWidget):
 
     def extract_audio_from_video(self):
         """Extract audio from video file and load it with selected format (WAV, MP3, AAC)"""
-        if not hasattr(self, 'audio_tools_file_path') or not self.audio_tools_file_path:
-            QMessageBox.warning(self, "No File", "Load a video file first")
+        # Use Audio Tools specific file if loaded, otherwise fall back to currently loaded video
+        video_path = (self.audio_tools_file_path
+                      if hasattr(self, 'audio_tools_file_path') and self.audio_tools_file_path
+                      else self.video_path)
+        if not video_path:
+            QMessageBox.warning(self, "No File", "Load a file in Audio Tools or load a video from the Downloader page first")
             return
-        
-        video_path = self.audio_tools_file_path
+
         base_name = os.path.splitext(os.path.basename(video_path))[0]
         
         # Get selected format from combo
@@ -1296,6 +1332,112 @@ class KaraokeApp(QWidget):
             # Default to WAV
             return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", output_file]
 
+    def trim_video(self):
+        """Trim video file with first, last, or range trimming (uses currently loaded video)"""
+        if not self.video_path:
+            QMessageBox.warning(self, "No Video Loaded", "Load a video from the Downloader page first")
+            return
+
+        # Get trimming parameters
+        trim_first = self.video_trim_first_picker.get_total_seconds() if self.video_trim_first_cb.isChecked() else None
+        trim_last = self.video_trim_last_picker.get_total_seconds() if self.video_trim_last_cb.isChecked() else None
+        trim_range = (self.video_trim_range_start.get_total_seconds(), self.video_trim_range_end.get_total_seconds()) if self.video_trim_range_cb.isChecked() else None
+        
+        # Extract target format
+        target_fmt_text = self.video_trim_format_combo.currentText()
+        if "MP4" in target_fmt_text:
+            target_fmt = "mp4"
+        elif "MKV" in target_fmt_text:
+            target_fmt = "mkv"
+        elif "WebM" in target_fmt_text:
+            target_fmt = "webm"
+        elif "AVI" in target_fmt_text:
+            target_fmt = "avi"
+        else:
+            target_fmt = "mp4"
+
+        # Validate that at least one trim option is selected
+        if trim_first is None and trim_last is None and trim_range is None:
+            QMessageBox.warning(self, "No Trim Options", "Select at least one trimming option (trim first, trim last, or keep range)")
+            return
+
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("video_trim_task"))
+        self.export_splash.show()
+
+        # Calculate trim points
+        duration = self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/"))
+        start_time = 0
+        end_time = duration
+
+        # Apply trim_first
+        if trim_first is not None:
+            start_time = trim_first
+
+        # Apply trim_last
+        if trim_last is not None:
+            end_time = duration - trim_last
+
+        # Apply trim_range (overrides other trims)
+        if trim_range is not None:
+            start_time = trim_range[0]
+            end_time = trim_range[1]
+
+        # Ensure valid range
+        if start_time >= end_time:
+            QMessageBox.warning(self, "Invalid Range", "Start time must be before end time")
+            if self.export_splash:
+                self.export_splash.close()
+                self.export_splash = None
+            return
+
+        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
+        out = os.path.join(self.settings["download_directory"], f"{base_name}_trimmed.{target_fmt}")
+
+        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
+        abs_out = os.path.abspath(out).replace("\\", "/")
+
+        # Build FFmpeg command for video trimming
+        cmd = self.build_video_trim_cmd(abs_in, abs_out, target_fmt, start_time, end_time)
+
+        trimmed_duration = end_time - start_time
+        self.launch_async_task(cmd, abs_out, "video_trim_task", override_duration=trimmed_duration)
+        self.video_trim_status_label.setText(f"Trimming video ({trimmed_duration:.1f}s)...")
+
+    def build_video_trim_cmd(self, input_file, output_file, target_fmt, start_time, end_time):
+        """Build FFmpeg command for video trimming with format-specific codec selection"""
+        ffmpeg_path = self.settings["ffmpeg_path"]
+        duration = end_time - start_time
+        
+        if target_fmt == "mp4":
+            # MP4: Re-encode with H.264 for best compatibility
+            return [ffmpeg_path, "-y", "-ss", str(start_time), "-to", str(end_time), 
+                    "-i", input_file, "-c:v", "libx264", "-preset", "fast", 
+                    "-c:a", "aac", "-b:a", "192k", output_file]
+        elif target_fmt == "mkv":
+            # MKV: Copy video codec (faster), re-encode audio as AAC
+            return [ffmpeg_path, "-y", "-ss", str(start_time), "-to", str(end_time),
+                    "-i", input_file, "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", output_file]
+        elif target_fmt == "webm":
+            # WebM: Use VP9 for video, Opus for audio
+            return [ffmpeg_path, "-y", "-ss", str(start_time), "-to", str(end_time),
+                    "-i", input_file, "-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "0",
+                    "-c:a", "libopus", "-b:a", "192k", output_file]
+        elif target_fmt == "avi":
+            # AVI: Use MPEG-4 for video, MP3 for audio
+            return [ffmpeg_path, "-y", "-ss", str(start_time), "-to", str(end_time),
+                    "-i", input_file, "-c:v", "mpeg4", "-q:v", "5",
+                    "-c:a", "libmp3lame", "-b:a", "192k", output_file]
+        else:
+            # Default to MP4
+            return [ffmpeg_path, "-y", "-ss", str(start_time), "-to", str(end_time),
+                    "-i", input_file, "-c:v", "libx264", "-preset", "fast",
+                    "-c:a", "aac", "-b:a", "192k", output_file]
+
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
         self.kill_allocated_task(task_key)
 
@@ -1386,6 +1528,7 @@ class KaraokeApp(QWidget):
                     self.last_mouse_pos = current_mouse_pos
             
             if self.player.is_active():
+                self._player_was_active = True
                 dur = self.player.get_length()
                 if dur > 0 and not self.is_user_sliding:
                     pos = self.player.get_position()
@@ -1393,14 +1536,26 @@ class KaraokeApp(QWidget):
                     ms = self.player.get_time()
                     self.time_label.setText(f"{max(0, (ms//1000)//60):02d}:{(ms//1000)%60:02d}")
                     self.duration_label.setText(f"{(dur//1000)//60:02d}:{(dur//1000)%60:02d}")
-                    if pos >= 0.99:
+                    # Playback Window: stop at end cutoff
+                    pw_end_ms = getattr(self, '_pw_end_ms', None)
+                    if pw_end_ms is not None and ms >= pw_end_ms:
                         self.audio_service.stop_audio_monitoring()
+                        self._player_was_active = False
+                        self.seek_slider.setValue(0)
+                        self.time_label.setText("00:00")
+                        self.pw_status_label.setText("Playback window ended")
+                        QTimer.singleShot(100, self.player.stop)
+                    elif pos >= 0.99:
+                        self.audio_service.stop_audio_monitoring()
+                        self._player_was_active = False
                         self.seek_slider.setValue(0)
                         self.time_label.setText("00:00")
                         QTimer.singleShot(100, self.player.stop)
             else:
-                # Not playing or paused - stop audio monitoring
-                self.audio_service.stop_audio_monitoring()
+                # Only stop monitoring once when transitioning from active → inactive
+                if getattr(self, '_player_was_active', False):
+                    self.audio_service.stop_audio_monitoring()
+                    self._player_was_active = False
         except Exception as e:
             print(f"UI loop fault: {e}")
 
@@ -1408,7 +1563,69 @@ class KaraokeApp(QWidget):
     def on_slider_released(self):
         self.is_user_sliding = False
         if self.player.is_active():
-            self.player.set_position(self.seek_slider.value() / 1000.0)
+            target = self.seek_slider.value() / 1000.0
+            self.player.set_position(target)
+            # Re-apply playback window start if user seeks back to zero
+            if target == 0.0:
+                QTimer.singleShot(150, self.apply_playback_window)
+
+    def handle_play(self):
+        """Play button handler — applies Playback Window settings then plays."""
+        self.apply_playback_window()
+        self.player.play()
+
+    def apply_playback_window(self):
+        """Apply active Playback Window settings: seek to start, register end cutoff."""
+        self._pw_end_ms = None
+        if not self.video_path:
+            return
+        dur_ms = self.player.get_length()
+
+        # Determine effective start and end from the three options (range wins if checked)
+        start_ms = None
+        end_ms = None
+
+        if self.pw_range_cb.isChecked():
+            start_ms = self.pw_range_start_picker.get_total_seconds() * 1000
+            end_ms = self.pw_range_end_picker.get_total_seconds() * 1000
+        else:
+            if self.pw_skip_cb.isChecked():
+                start_ms = self.pw_skip_picker.get_total_seconds() * 1000
+            if self.pw_stop_cb.isChecked() and dur_ms > 0:
+                stop_before_ms = self.pw_stop_picker.get_total_seconds() * 1000
+                end_ms = max(0, dur_ms - stop_before_ms)
+
+        if start_ms is not None and start_ms > 0:
+            self.player.set_time(int(start_ms))
+
+        self._pw_end_ms = end_ms if end_ms and end_ms > 0 else None
+
+        # Update status label
+        parts = []
+        if start_ms: parts.append(f"start {int(start_ms)//1000}s")
+        if self._pw_end_ms: parts.append(f"stop at {int(self._pw_end_ms)//1000}s")
+        if parts:
+            self.pw_status_label.setText("Active: " + ", ".join(parts))
+            self.pw_status_label.setStyleSheet("color: #2ecc71; font-size: 10px;")
+        else:
+            self.pw_status_label.setText("No playback window active")
+            self.pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
+
+    def clear_playback_window(self):
+        """Reset all Playback Window controls to zero/unchecked."""
+        self._pw_end_ms = None
+        for cb in (self.pw_skip_cb, self.pw_stop_cb, self.pw_range_cb):
+            cb.setChecked(False)
+        # Block signals so resetting spinboxes doesn't re-check the checkboxes
+        for picker in (self.pw_skip_picker, self.pw_stop_picker,
+                       self.pw_range_start_picker, self.pw_range_end_picker):
+            for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
+                sp.blockSignals(True)
+            picker.set_total_seconds(0)
+            for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
+                sp.blockSignals(False)
+        self.pw_status_label.setText("No playback window active")
+        self.pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
 
     def toggle_video_fullscreen(self):
         """Toggle true window fullscreen mode while expanding the controls cleanly"""
@@ -1666,12 +1883,6 @@ class KaraokeApp(QWidget):
 
         # Stop all background tasks
         self.stop_all_tasks()
-
-        # Clean up VLC player and instance
-        try:
-            self.player.stop()
-            self.player.release()
-        except Exception: pass
 
         event.accept()
 

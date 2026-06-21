@@ -1,12 +1,14 @@
 """Main application layout orchestrator - combines all UI components"""
 
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QStackedWidget
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QStackedWidget, QScrollArea
+from PySide6.QtCore import Qt
 from source_code.widgets.video_frame import VideoFrame
 from source_code.ui.sidebar import create_sidebar
 from source_code.ui.playback_bar import create_playback_bar
 from source_code.ui.download_page import create_download_page
 from source_code.ui.pitch_page import create_pitch_page
 from source_code.ui.extra_page import create_widen_page, create_audio_tools_page
+from source_code.ui.video_tools_page import create_video_tools_page
 from PySide6.QtWidgets import QLabel, QWidget
 from PySide6.QtGui import QFont
 
@@ -70,10 +72,27 @@ def create_main_layout(settings):
     stack.addWidget(widen_page_components["page"])
     components["widen_page_components"] = widen_page_components
     
-    # Index 3: Audio Tools page (with internal tabs for trimming and conversion)
+    # Index 3: Audio Tools page (wrapped in scroll area so controls are reachable)
     audio_tools_page_components = create_audio_tools_page()
-    stack.addWidget(audio_tools_page_components["page"])
+    audio_scroll = QScrollArea()
+    audio_scroll.setWidget(audio_tools_page_components["page"])
+    audio_scroll.setWidgetResizable(True)
+    audio_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    audio_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    audio_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+    stack.addWidget(audio_scroll)
     components["audio_tools_page_components"] = audio_tools_page_components
+
+    # Index 4: Video Tools page (wrapped in scroll area so controls are reachable)
+    video_tools_page_components = create_video_tools_page()
+    video_tools_scroll = QScrollArea()
+    video_tools_scroll.setWidget(video_tools_page_components["page"])
+    video_tools_scroll.setWidgetResizable(True)
+    video_tools_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    video_tools_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    video_tools_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+    stack.addWidget(video_tools_scroll)
+    components["video_tools_page_components"] = video_tools_page_components
     
     # Combine widen and audio tools into extra_page_components for backward compatibility
     extra_page_components = {**widen_page_components, **audio_tools_page_components}

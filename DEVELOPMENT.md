@@ -158,6 +158,25 @@ config/
 - Appears when loading from browser, history, extraction, or conversion
 - Visual confirmation that audio is active in player
 
+### Feature: Video Tools - Playback Window ✅
+- **Tab 2** of the Video Tools page (stack idx 4)
+- Three modes (can be combined):
+  - **Skip to position**: seeks to specified H:M:S when Play is pressed
+  - **Stop N seconds before end**: auto-stops N seconds before track ends
+  - **Play range A→B**: plays only between two time points
+- **"▶ Apply & Play"** button — applies window settings and starts playback
+- **"Clear"** button — resets all controls to zero (signal-blocked to prevent auto-check)
+- Settings are cleared automatically on every new file load (`clear_playback_window()`)
+- Timer loop in `update_ui()` enforces the end-cutoff via `_pw_end_ms`
+
+### UI Architecture Notes (updated 2026-06-21)
+- **Scroll areas**: Audio Tools (idx 3) and Video Tools (idx 4) pages are wrapped in
+  `QScrollArea` in `main_layout.py` — content scrolls when window is small
+- **Navigation signal**: `nav_list.itemClicked` (not `currentRowChanged`) prevents
+  spurious page changes when Qt internally updates selection
+- **Video frame heights**: set per-page in `handle_navigation_change()`
+  — Downloader gets 420px minimum for comfortable viewing
+
 ### Navigation Improvements ✅
 - Stays on Audio Tools page after trim/convert/extract operations
 - Auto-navigates back to Audio Tools after processing

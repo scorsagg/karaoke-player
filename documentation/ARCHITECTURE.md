@@ -87,6 +87,25 @@ source_code/
     └── process_thread.py          # Generic subprocess executor
 ```
 
+### Page Layout & Scroll Architecture (updated 2026-06-21)
+
+Pages 3 and 4 in the QStackedWidget are wrapped in QScrollArea:
+
+```
+QStackedWidget
+├── [0] download_page (QWidget)
+├── [1] pitch_page (QWidget)
+├── [2] widen_page (QWidget)
+├── [3] QScrollArea → audio_tools_page (QWidget)   ← scroll area wrapper
+└── [4] QScrollArea → video_tools_page (QWidget)   ← scroll area wrapper
+```
+
+Video frame height is controlled per-page in `handle_navigation_change()`:
+- Pages 0/1: min=420px, no max — large video area
+- Page 2: min=80px, max=350px
+- Page 3: min=80px, max=100px (audio-only) / 220px (video)
+- Page 4: min=80px, max=220px
+
 ---
 
 ## Core Components
