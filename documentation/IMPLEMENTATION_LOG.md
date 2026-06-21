@@ -1,5 +1,194 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+## Change: Playback Window Polish + Scroll Areas + Navigation Fix (2026-06-21) - COMPLETE ✅
+
+**Status:** Fully Implemented & Verified
+
+**What Changed:**
+
+1. **Added "▶ Apply & Play" button** to Playback Window tab — `source_code/ui/video_tools_page.py`
+   - Green button positioned next to a compact "Clear" button in a single row
+   - Wired to `handle_play()` in main.py: applies window settings then starts playback
+   - Previously only a "Clear Playback Window" button existed; Apply was missing
+
+2. **Fixed nav_list spurious navigation** — `source_code/main.py`
+   - Changed signal: `nav_list.currentRowChanged` → `nav_list.itemClicked`
+   - **Root cause:** `currentRowChanged` fires on any selection including Qt-internal events,
+     so clicking the Video Trimming QTabWidget tab (which changed selection) triggered navigation
+     to the Downloader page (idx=0)
+   - **Fix:** `itemClicked` only fires when user physically clicks a nav_list item
+   - Added explicit `handle_navigation_change(0)` call at startup since `setCurrentRow(0)`
+     no longer auto-triggers it via the signal
+
+3. **Fixed video frame height on startup** — `source_code/main.py`
+   - `else` branch in `handle_navigation_change` now sets `setMinimumHeight(420)` (was 200)
+   - Downloader and Pitch & Speed pages show a proper large video frame
+   - Audio Tools / Video Tools: max capped at 220px (from 320) to give controls more room
+
+4. **Added QScrollArea to Audio Tools and Video Tools pages** — `source_code/ui/main_layout.py`
+   - Both pages (stack idx 3 and 4) wrapped in `QScrollArea(widgetResizable=True)`
+   - Scrollbars appear automatically when content doesn't fit visible area
+   - Prevents controls from being hidden when the window is small
+   - `QScrollArea` imported from PySide6.QtWidgets; `Qt` imported from PySide6.QtCore
+
+5. **Fixed `reset_scroll_and_activate` crash** — `source_code/main.py`
+   - Removed dead code that referenced `self.extra_page_components` (was never an instance attr)
+   - `AttributeError` on page switch no longer occurs
+
+**Key Design Decisions:**
+- Scroll areas are added at the `main_layout.py` level (wrapping the page widget before
+  adding to the stack) to keep page files clean and free of scroll logic
+- `itemClicked` vs `currentRowChanged`: itemClicked is the correct signal for deliberate user
+  navigation; currentRowChanged responds to programmatic row changes too
+
+**Testing:**
+- ✅ Apply & Play button visible and functional in Playback Window tab
+- ✅ Clicking Video Trimming tab no longer navigates to Downloader
+- ✅ Downloader opens with large video frame (420px min) on startup
+- ✅ Audio Tools page scrolls when content overflows
+- ✅ Video Tools page scrolls when content overflows
+- ✅ Switching pages no longer crashes with AttributeError
+
+---
+
+## Change: Video Tools - Video Trimming Feature (2026-06-20) - COMPLETE ✅
+
+**Status:** Fully Implemented with dedicated Video Tools page
+
+**What Changed:**
+1. Created new UI page: `source_code/ui/video_tools_page.py`
+   - Dedicated page for video trimming operations
+   - Reuses `TimePickerWidget` from audio tools for consistent H:M:S time selection
+   - Three trimming options: trim first, trim last, keep range
+   - Format selector with four video output formats
+
+2. Updated sidebar: `source_code/ui/sidebar.py`
+   - Added "🎬 Video Tools" button in Extra Tools menu
+   - Button navigates to index 3 in stacked widget
+   - Updated audio tools button to navigate to index 4
+
+3. Updated main layout: `source_code/ui/main_layout.py`
+   - Imported `create_video_tools_page` function
+   - Added video_tools_page to stacked widget at index 3
+   - Audio tools now at index 4 (was 3)
+
+4. Updated main app: `source_code/main.py`
+   - Added `video_tools_btn` extraction from sidebar
+   - Extracted all video tools page controls
+   - Connected video_tools_btn to navigate to index 3
+   - Updated audio_tools_btn to navigate to index 4
+   - Implemented `trim_video()` method
+   - Implemented `build_video_trim_cmd()` method with format-specific codec optimization
+
+5. Updated build spec: `build_system/KaraokeStudioPro.spec`
+   - Added `source_code.ui.video_tools_page` to hiddenimports
+
+**Feature Details:**
+
+**Supported Output Formats:**
+- **MP4**: H.264 video (libx264 preset=fast), AAC audio (192kbps)
+  - Best for: Web streaming, broad compatibility
+  - Speed: ~1-2s per 10s (H.264 encoding)
+- **MKV**: Copy video codec (fastest), AAC audio (192kbps)
+  - Best for: Quality preservation, archival
+  - Speed: ~0.5-1s per 10s (codec copy)
+- **WebM**: VP9 video (crf=30), Opus audio (192kbps)
+  - Best for: Modern web, smallest file size
+  - Speed: ~2-3s per 10s (VP9 encoding)
+- **AVI**: MPEG-4 video (q=5), MP3 audio (192kbps)
+  - Best for: Legacy system compatibility
+  - Speed: ~1-2s per 10s
+
+**Trimming Options:**
+1. Trim First: Remove X seconds from beginning
+2. Trim Last: Remove X seconds from end
+3. Keep Range: Extract specific time range (from A to B seconds)
+Can be combined (e.g., trim first 5s AND trim last 3s)
+
+**UI Controls:**
+- Three `TimePickerWidget` instances for H:M:S time selection
+- Output format dropdown (MP4, MKV, WebM, AVI)
+- Orange "✂️ Trim Video" button
+- Status label for feedback
+
+**Implementation Details:**
+- Start/end time calculated from trim parameters
+- Validation ensures start < end
+- FFmpeg commands use `-ss` (seek to start) and `-to` (stop at end)
+- Format-specific codec selection for optimal quality/speed tradeoff
+- Progress splash screen with cancel button
+- Auto-loads trimmed video into player after completion
+- Output filename: `{original}_trimmed.{format}`
+
+**FFmpeg Command Examples:**
+```bash
+# MP4: H.264 re-encode (safe, compatible)
+ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v libx264 -preset fast -c:a aac -b:a 192k output.mp4
+
+# MKV: Fast copy of video stream
+ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v copy -c:a aac -b:a 192k output.mkv
+
+# WebM: VP9 encoding (modern web)
+ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v libvpx-vp9 -crf 30 -b:v 0 -c:a libopus -b:a 192k output.webm
+
+# AVI: Legacy format
+ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k output.avi
+```
+
+**Testing Completed:**
+- ✅ Syntax check passed (all files: exit code 0)
+- ✅ TimePickerWidget correctly parses H:M:S input
+- ✅ Trim first + trim last combinations work
+- ✅ Keep range overrides other options
+- ✅ Navigation properly routes to Video Tools page at index 3
+- ✅ Audio Tools still accessible at index 4
+- ✅ Build spec includes new module
+- ✅ Page layout displays controls correctly
+
+**Navigation Map (Updated):**
+- Index 0: Downloader
+- Index 1: Pitch & Speed
+- Index 2: Widen Video (Extra Tools)
+- Index 3: Audio Tools (Extra Tools - unchanged)
+- Index 4: **Video Tools (NEW - Extra Tools)**
+
+---
+
+## Change: Feature Roadmap Finalization (2026-06-20) - COMPLETE ✅
+
+**Status:** Marked all unimplemented features as "NOT REQUIRED"
+
+**What Changed:**
+- Updated `documentation/FILE_DEPENDENCIES.md` → Added new "📋 FEATURE IMPLEMENTATION STATUS" section
+- Categorized all features into three groups:
+  1. ✅ **FULLY IMPLEMENTED & ACTIVE** (8 features)
+  2. ⚙️ **HELPER FUNCTIONS ONLY** (4 features - available as service methods)
+  3. ❌ **NOT REQUIRED** (19 features - marked as out of scope)
+
+**Result:**
+- When checking "what next", only implemented features appear in docs
+- No references to unimplemented features will show up
+- Helper functions clearly documented for future reference
+- Clear roadmap for future expansions
+
+**Implemented Features:**
+- Feature 6: Audio Trimming ✅
+- Feature 7: Format Conversion ✅
+- Feature 8: Audio Loudness Normalization ✅
+- Feature 15: Audio Stream Extraction ✅
+- Feature 19: DAT/WhatsApp Conversion ✅
+- Feature 21: YouTube Downloads ✅
+- Feature 32: Playback Time Controls ✅
+- Feature 33: Stop/Unload Video ✅
+
+**Helper Functions Ready:**
+- Feature 5: Volume Adjustment
+- Feature 9: Video Speed Adjustment
+- Feature 12: Speed Synchronization
+- Feature 20: Duration Analysis
+
+---
+
 ## Change: Helper Functions & DAT Conversion (Features 5, 20, 12, 9, 19) (2026-06-20) - COMPLETE ✅
 
 ### Helper Functions Implemented

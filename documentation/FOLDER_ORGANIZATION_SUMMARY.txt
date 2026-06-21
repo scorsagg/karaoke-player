@@ -32,11 +32,12 @@
 │  │  ├─ playback_bar.py          (Play/pause/seek/volume/audio meter)
 │  │  ├─ download_page.py         (File loading & URL streaming)
 │  │  ├─ pitch_page.py            (Pitch shift & speed controls)
-│  └─ extra_page.py            (Tabbed interface: Aspect ratio widening + Audio tools)
-│                              ├─ Tab 1: Video Widening (Feature - convert 9:16 to 16:9)
-│                              ├─ Tab 2: Audio Tools (NEW Features 6 & 7)
-│                              │  ├─ Audio Trimming (trim first/last/range, any combo)
-│                              │  └─ Format Converter (MP3↔WAV, DAT→MP3, video→audio, etc)
+│  │  ├─ extra_page.py            (Tabbed interface: Aspect ratio widening + Audio tools)
+│  │  │                           ├─ Tab 1: Video Widening (Feature - convert 9:16 to 16:9)
+│  │  │                           ├─ Tab 2-5: Audio Tools (Extraction, Trimming, Conversion, Normalization, DAT)
+  └─ video_tools_page.py      (Video Tools page - two tabs)
+│                              ├─ Tab 1: Video Trimming (trim first/last/range, H/M/S pickers, MP4/MKV/WebM/AVI)
+│                              └─ Tab 2: Playback Window (skip-to, stop-before-end, play-range A→B + Apply&Play button)
 │  │
 │  ├─ 📁 widgets/
 │  │  ├─ __init__.py
@@ -148,6 +149,34 @@ Build Standalone Executable (v3):
 ✅ Build System (v3):
    • Version bumped to 3 in build.py and spec file
    • INSTALLATION.txt copied to dist/ root for user visibility
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 FEATURE ROADMAP STATUS (2026-06-20):
+
+✅ COMPLETE - 9 Features Fully Implemented:
+   1. Feature 6 - Audio Trimming (with H/M/S controls)
+   2. Feature 7 - Format Conversion (MP3, WAV, M4A, AAC, MP4, MKV, AVI, WebM)
+   3. Feature 8 - Audio Loudness Normalization (LUFS presets)
+   4. Feature 15 - Audio Stream Extraction from videos
+   5. Feature 19 - DAT/WhatsApp File Conversion
+   6. Feature 21 - YouTube video downloads
+   7. Feature 32 - Playback with start/end time controls
+   8. Feature 33 - Stop/unload video functionality
+   9. NEW - Video Trimming (trim first/last/range, MP4/MKV/WebM/AVI formats)
+
+⚙️ HELPER FUNCTIONS - 4 Available for Future Use:
+   • Feature 5 - Volume Adjustment (AudioService method)
+   • Feature 9 - Video Speed Adjustment (PlayerService method)
+   • Feature 12 - Speed Synchronization (AudioService methods)
+   • Feature 20 - Duration Analysis (AudioService method)
+
+📋 NOT REQUIRED - 19+ Features Marked as Out of Scope:
+   • All other features from improvements.txt are NOT REQUIRED
+   • See documentation/FILE_DEPENDENCIES.md → "📋 FEATURE IMPLEMENTATION STATUS"
+   • Can be added in future versions if needed
+
+✅ ROADMAP COMPLETE - NO ADDITIONAL FEATURES IN CURRENT SCOPE
 
 ✅ Audio Processing (2026-06-20 - Features 6 & 7):
    • Audio Trimming (Feature 6): Trim first X, last X, range, or any combination

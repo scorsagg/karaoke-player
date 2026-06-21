@@ -39,6 +39,7 @@ a = Analysis(
         'PySide6',
         'numpy',
         'source_code.services.file_loading_service',
+        'source_code.ui.video_tools_page',
     ],
     
     # Modules to exclude (reduces bundle size)

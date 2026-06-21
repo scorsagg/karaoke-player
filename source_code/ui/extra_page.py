@@ -42,8 +42,8 @@ class TimePickerWidget(QWidget):
         self.hour_spin.setRange(0, 59)
         self.hour_spin.setValue(0)
         self.hour_spin.setSingleStep(1)
-        self.hour_spin.setMinimumWidth(45)
-        self.hour_spin.setMaximumWidth(48)
+        self.hour_spin.setMinimumWidth(55)
+        self.hour_spin.setMaximumWidth(65)
         self.hour_spin.setMinimumHeight(40)
         self.hour_spin.setStyleSheet(spinbox_style)
         layout.addWidget(QLabel("H:"))
@@ -55,8 +55,8 @@ class TimePickerWidget(QWidget):
         self.min_spin.setRange(0, 59)
         self.min_spin.setValue(0)
         self.min_spin.setSingleStep(1)
-        self.min_spin.setMinimumWidth(45)
-        self.min_spin.setMaximumWidth(48)
+        self.min_spin.setMinimumWidth(55)
+        self.min_spin.setMaximumWidth(65)
         self.min_spin.setMinimumHeight(40)
         self.min_spin.setStyleSheet(spinbox_style)
         layout.addWidget(QLabel("M:"))
@@ -68,8 +68,8 @@ class TimePickerWidget(QWidget):
         self.sec_spin.setRange(0, 59)
         self.sec_spin.setValue(0)
         self.sec_spin.setSingleStep(1)
-        self.sec_spin.setMinimumWidth(45)
-        self.sec_spin.setMaximumWidth(48)
+        self.sec_spin.setMinimumWidth(55)
+        self.sec_spin.setMaximumWidth(65)
         self.sec_spin.setMinimumHeight(40)
         self.sec_spin.setStyleSheet(spinbox_style)
         layout.addWidget(QLabel("S:"))
@@ -284,6 +284,8 @@ def create_audio_tools_page():
     # Trim First
     trim_first_cb = QCheckBox("Trim First X seconds:")
     trim_first_spin = TimePickerWidget()
+    for _sp in (trim_first_spin.hour_spin, trim_first_spin.min_spin, trim_first_spin.sec_spin):
+        _sp.valueChanged.connect(lambda _v, cb=trim_first_cb: cb.setChecked(True))
     trim_first_row = QHBoxLayout()
     trim_first_row.addWidget(trim_first_cb)
     trim_first_row.addWidget(trim_first_spin)
@@ -293,6 +295,8 @@ def create_audio_tools_page():
     # Trim Last
     trim_last_cb = QCheckBox("Trim Last X seconds:")
     trim_last_spin = TimePickerWidget()
+    for _sp in (trim_last_spin.hour_spin, trim_last_spin.min_spin, trim_last_spin.sec_spin):
+        _sp.valueChanged.connect(lambda _v, cb=trim_last_cb: cb.setChecked(True))
     trim_last_row = QHBoxLayout()
     trim_last_row.addWidget(trim_last_cb)
     trim_last_row.addWidget(trim_last_spin)
@@ -304,6 +308,9 @@ def create_audio_tools_page():
     trim_range_start = TimePickerWidget()
     trim_range_end = TimePickerWidget()
     trim_range_end.set_total_seconds(60)  # Default to 1 minute end
+    for _sp in (trim_range_start.hour_spin, trim_range_start.min_spin, trim_range_start.sec_spin,
+                trim_range_end.hour_spin, trim_range_end.min_spin, trim_range_end.sec_spin):
+        _sp.valueChanged.connect(lambda _v, cb=trim_range_cb: cb.setChecked(True))
     trim_range_row = QHBoxLayout()
     trim_range_row.addWidget(trim_range_cb)
     trim_range_row.addWidget(QLabel("Start:"))
