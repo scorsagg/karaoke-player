@@ -1539,6 +1539,7 @@ class KaraokeApp(QWidget):
                     # Playback Window: stop at end cutoff
                     pw_end_ms = getattr(self, '_pw_end_ms', None)
                     if pw_end_ms is not None and ms >= pw_end_ms:
+                        self._pw_end_ms = None  # clear immediately to prevent re-triggering on next tick
                         self.audio_service.stop_audio_monitoring()
                         self._player_was_active = False
                         self.seek_slider.setValue(0)
