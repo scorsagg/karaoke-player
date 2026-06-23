@@ -110,6 +110,7 @@ config/
 | **UI component** | ui/ files, spec, main.py, docs |
 | **Settings field** | settings.json, settings_dialog.py, main.py |
 | **New service/worker** | spec (hiddenimports), main.py, docs |
+| **Fullscreen logic** | main.py `toggle_video_fullscreen()` only — must clear height cap on enter, restore on exit |
 
 **See [`documentation/FILE_DEPENDENCIES.md`](documentation/FILE_DEPENDENCIES.md) for complete details.**
 

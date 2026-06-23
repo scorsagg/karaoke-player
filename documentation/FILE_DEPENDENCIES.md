@@ -233,6 +233,20 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 2. User double-clicks file in history → calls `load_history_item()`
 3. User loads file on another page, then navigates to Audio Tools → `handle_navigation_change()` detects and updates
 
+### 12. WIDEN VIDEO FIXES (2026-06-23) ✅ COMPLETE
+**Files changed:** `source_code/main.py` only
+
+**What changed:**
+- `widen_active_video_canvas()` → restored original working FFmpeg filter + added `-preset ultrafast`
+  - Filter: `crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`
+  - Speed flag: `-preset ultrafast` (without `-c:v`, `-threads 0`, or `-pix_fmt` to avoid VLC h264 warnings)
+- `toggle_video_fullscreen()` → removes `video_frame` height cap on enter, restores on exit
+- `handle_task_completion()` → widen_task post-completion now updates status label, path, and navigates to page 2
+
+**Known issue (resolved):** `-threads 0` caused `[h264] get_buffer() failed` VLC decoder warnings
+  because multi-threaded encoding produces complex frame dependencies that VLC's decoder trips over.
+  Solution: omit `-threads 0`, keep only `-preset ultrafast`.
+
 ### 11. AUDIO LOUDNESS NORMALIZATION (Feature 8) ✅ COMPLETE
 **Status:** Fully Implemented - Normalizes audio to consistent LUFS level
 

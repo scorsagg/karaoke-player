@@ -106,6 +106,9 @@ Video frame height is controlled per-page in `handle_navigation_change()`:
 - Page 3: min=80px, max=100px (audio-only) / 220px (video)
 - Page 4: min=80px, max=220px
 
+**Fullscreen:** `toggle_video_fullscreen()` removes the height cap on enter (sets max=unlimited),
+then calls `handle_navigation_change(current_idx)` on exit to restore page-correct constraints.
+
 ---
 
 ## Core Components

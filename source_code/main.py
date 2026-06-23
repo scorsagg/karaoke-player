@@ -930,8 +930,10 @@ class KaraokeApp(QWidget):
         abs_in = os.path.abspath(target_input).replace("\\", "/")
         abs_out = os.path.abspath(out).replace("\\", "/")
 
+        # Original working filter confirmed by user — ultrafast preset for speed, no -threads flag (causes VLC h264 decoder warnings)
         filter_str = "crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080"
-        cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-vf", filter_str, "-c:a", "copy", abs_out]
+        cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-vf", filter_str,
+               "-preset", "ultrafast", "-c:a", "copy", abs_out]
 
         duration = self.get_video_duration_via_ffprobe(abs_in)
         self.launch_async_task(cmd, abs_out, "widen_task", override_duration=duration)
@@ -1510,11 +1512,20 @@ class KaraokeApp(QWidget):
                 self.audio_file_status.setText(f"✅ {output_name} (DAT Converted)")
                 self.dat_status_label.setText(f"✅ Conversion complete: {output_name}")
             
+            # For widen task, update widen page status and navigate back
+            if task_key == "widen_task":
+                self.widen_tab_video_path = out_path
+                self.widen_file_status_label.setText(f"Queued File for Widening: {os.path.basename(out_path)} (Widened)")
+
             QMessageBox.information(self, "Success", f"Output loaded successfully:\n{os.path.basename(out_path)}")
             
             # Navigate back to Audio Tools page for audio operations
             if task_key in ["extract_task", "trim_task", "convert_task", "dat_task"]:
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(3))
+
+            # Navigate back to Widen Video page after widening
+            if task_key == "widen_task":
+                QTimer.singleShot(100, lambda: self.handle_navigation_change(2))
 
     def update_ui(self):
         try:
@@ -1643,6 +1654,10 @@ class KaraokeApp(QWidget):
             self.showFullScreen()
             self.is_video_fullscreen = True
 
+            # 4a. Remove video frame height cap so it fills the full screen
+            self.video_frame.setMinimumHeight(0)
+            self.video_frame.setMaximumHeight(16777215)
+
             # 4. Enforce 100% Width and clean styles on the control bar container
             self.playback_widget.setStyleSheet("""
                 QWidget {
@@ -1754,6 +1769,9 @@ class KaraokeApp(QWidget):
             self.sidebar.show()
             self.stack.show()
             self.filename_label.show()
+
+            # Restore correct video frame height constraints for the current page
+            self.handle_navigation_change(self.stack.currentIndex())
 
             self.fullscreen_btn.setText("🖥 Full Video")
             self.fullscreen_btn.setToolTip("Maximize video area, hide controls")
