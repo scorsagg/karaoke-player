@@ -29,7 +29,6 @@ class KaraokeApp(QWidget):
     def __init__(self):
         super().__init__()
         self.video_path = ""
-        self.widen_tab_video_path = ""
         self.audio_tools_file_path = ""  # For audio tools file loader
         self.active_tasks = {}
         self.is_video_fullscreen = False
@@ -82,7 +81,6 @@ class KaraokeApp(QWidget):
         self.file_loading_service = FileLoadingService(self.audio_service, self.player)
 
         # Initialize download service
-        self._download_from_widen = False
         self.download_service = DownloadService(self.settings, ProcessThread)
         self.download_service.download_progress.connect(self._on_download_progress)
         self.download_service.download_finished.connect(self._on_download_finished)
@@ -130,7 +128,6 @@ class KaraokeApp(QWidget):
         self.nav_list = sidebar_components["nav_list"]
         self.extra_tools_toggle_btn = sidebar_components["extra_tools_toggle_btn"]
         self.extra_tools_container = sidebar_components["extra_tools_container"]
-        self.widen_video_btn = sidebar_components["widen_video_btn"]
         self.video_tools_btn = sidebar_components["video_tools_btn"]
         self.audio_tools_btn = sidebar_components["audio_tools_btn"]
         self.history_toggle_btn = sidebar_components["history_toggle_btn"]
@@ -181,11 +178,6 @@ class KaraokeApp(QWidget):
         self.export_btn = pitch_page_components["export_btn"]
         
         extra_page_components = components["extra_page_components"]
-        widen_file_btn = extra_page_components["widen_file_btn"]
-        self.widen_url_input = extra_page_components["widen_url_input"]
-        widen_dl_btn = extra_page_components["widen_dl_btn"]
-        self.widen_file_status_label = extra_page_components["widen_file_status_label"]
-        self.widen_exec_btn = extra_page_components["widen_exec_btn"]
         # Audio Tools File Loader controls
         audio_file_btn = extra_page_components["audio_file_btn"]
         self.audio_file_status = extra_page_components["audio_file_status"]
@@ -225,7 +217,10 @@ class KaraokeApp(QWidget):
         
         # Extract video tools page components
         video_tools_page_components = components["video_tools_page_components"]
+        self.video_tools_tabs = video_tools_page_components["tabs"]
         self.video_current_file_label = video_tools_page_components["video_current_file_label"]
+        self.widen_current_file_label = video_tools_page_components["widen_current_file_label"]
+        self.widen_exec_btn = video_tools_page_components["widen_exec_btn"]
         self.video_trim_first_cb = video_tools_page_components["trim_first_cb"]
         self.video_trim_first_picker = video_tools_page_components["trim_first_picker"]
         self.video_trim_last_cb = video_tools_page_components["trim_last_cb"]
@@ -259,15 +254,15 @@ class KaraokeApp(QWidget):
         
         # Connect signals for button events
         self.nav_list.itemClicked.connect(lambda item: self.handle_navigation_change(self.nav_list.row(item)))
-        self.widen_video_btn.clicked.connect(lambda: self.handle_navigation_change(2))
-        self.audio_tools_btn.clicked.connect(lambda: self.handle_navigation_change(3))
-        self.video_tools_btn.clicked.connect(lambda: self.handle_navigation_change(4))
+        self.audio_tools_btn.clicked.connect(lambda: self.handle_navigation_change(2))
+        self.video_tools_btn.clicked.connect(lambda: self.handle_navigation_change(3))
+        self.video_tools_tabs.currentChanged.connect(self._on_video_tools_tab_changed)
         self.extra_tools_toggle_btn.clicked.connect(self.toggle_extra_tools)
         self.history_toggle_btn.clicked.connect(self.toggle_history)
         self.clear_hist_btn.clicked.connect(self.clear_history)
         self.settings_btn.clicked.connect(self.open_settings)
         self.load_btn.clicked.connect(lambda: self.load_video())
-        dl_btn_download.clicked.connect(lambda: self.download_video(from_widen_tab=False))
+        dl_btn_download.clicked.connect(lambda: self.download_video())
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
         self.play_btn.clicked.connect(self.handle_play)
         self.pause_btn.clicked.connect(self.player.pause)
@@ -279,8 +274,6 @@ class KaraokeApp(QWidget):
         self.seek_slider.sliderReleased.connect(self.on_slider_released)
         self.speed_input.valueChanged.connect(lambda v: self.player.set_rate(v))
         self.export_btn.clicked.connect(self.export_video)
-        widen_file_btn.clicked.connect(self.browse_widen_video)
-        widen_dl_btn.clicked.connect(lambda: self.download_video(from_widen_tab=True))
         self.widen_exec_btn.clicked.connect(self.widen_active_video_canvas)
         audio_file_btn.clicked.connect(self.load_audio_tools_file)
         audio_dl_btn.clicked.connect(lambda: self.download_audio(audio_url_input))
@@ -304,7 +297,7 @@ class KaraokeApp(QWidget):
         self.load_history_from_disk()
 
     def handle_navigation_change(self, idx, is_audio_only=None):
-        if idx == 2 or idx == 3 or idx == 4:  # Widen, Audio Tools, or Video Tools
+        if idx == 2 or idx == 3:  # Audio Tools or Video Tools
             self.nav_list.blockSignals(True)
             self.nav_list.clearSelection()
             self.nav_list.setCurrentRow(-1)
@@ -319,8 +312,7 @@ class KaraokeApp(QWidget):
             is_audio_only = getattr(self, '_current_is_audio_only', False)
         
         # Adjust video frame height based on page
-        # Adjust video frame height based on page
-        if idx == 3:  # Audio Tools - shrink video frame
+        if idx == 2:  # Audio Tools - shrink video frame
             if is_audio_only:
                 self.video_frame.setMinimumHeight(80)
                 self.video_frame.setMaximumHeight(100)
@@ -349,21 +341,19 @@ class KaraokeApp(QWidget):
                 
                 # Update extraction controls visibility
                 self.update_extraction_ui(is_video)
-        elif idx == 4:  # Video Tools - shrink video frame to show controls
-            self.video_frame.setMinimumHeight(80)
-            self.video_frame.setMaximumHeight(220)
-            self.fullscreen_btn.setVisible(False)
-            # Update the "currently working on" label
+        elif idx == 3:  # Video Tools (includes Widen Video tab)
+            # Update the "currently working on" labels for both Video Tools and Widen tab
             if self.video_path:
-                self.video_current_file_label.setText(f"✅ Working on: {os.path.basename(self.video_path)}")
+                fname = os.path.basename(self.video_path)
+                self.video_current_file_label.setText(f"✅ Working on: {fname}")
                 self.video_current_file_label.setStyleSheet("color: #2ecc71; font-size: 10px; font-style: normal; padding: 2px 5px;")
+                self.widen_current_file_label.setText(f"✅ Working on: {fname}")
+                self.widen_current_file_label.setStyleSheet("color: #2ecc71; font-size: 10px; font-style: normal; padding: 2px 5px;")
             else:
                 self.video_current_file_label.setText("No video loaded — use the Downloader page to load a video")
                 self.video_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
-        elif idx == 2:  # Widen Video - cap video frame to guarantee space for controls
-            self.video_frame.setMinimumHeight(80)
-            self.video_frame.setMaximumHeight(350)
-            self.fullscreen_btn.setVisible(True)
+                self.widen_current_file_label.setText("No video loaded — use the Downloader page to load a video")
+                self.widen_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
         else:
             self.video_frame.setMinimumHeight(420)
             self.video_frame.setMaximumHeight(16777215)
@@ -384,21 +374,30 @@ class KaraokeApp(QWidget):
             if self.layout():
                 self.layout().activate()
             
+            # Apply Video Tools tab-specific frame sizing after stack has switched
+            if idx == 3:
+                self._on_video_tools_tab_changed(self.video_tools_tabs.currentIndex())
+            
             # Reposition audio overlay after video frame has resized
             if getattr(self, '_current_is_audio_only', False):
                 self.show_audio_visualization()
         
         QTimer.singleShot(10, reset_scroll_and_activate)
 
-    def browse_widen_video(self):
-        f, _ = QFileDialog.getOpenFileName(
-            self, "Select Widen Target Video", self.settings["base_directory"],
-            "Media Feeds (*.mp4 *.avi *.mkv *.mov *.webm);;All System Inputs (*.*)"
-        )
-        if f:
-            self.widen_tab_video_path = os.path.normpath(f)
-            self.widen_file_status_label.setText(f"Queued File for Widening: {os.path.basename(self.widen_tab_video_path)}")
-            self.load_video(self.widen_tab_video_path)
+    def _on_video_tools_tab_changed(self, tab_idx):
+        """Adjust video frame height and fullscreen button based on active Video Tools tab."""
+        if tab_idx == 2:  # Widen Video tab - large frame
+            self.video_frame.setMinimumHeight(80)
+            self.video_frame.setMaximumHeight(350)
+            self.fullscreen_btn.setVisible(True)
+        else:  # Trimming / Playback Window - compact frame
+            self.video_frame.setMinimumHeight(80)
+            self.video_frame.setMaximumHeight(160)
+            self.fullscreen_btn.setVisible(False)
+        self.video_frame.updateGeometry()
+        if self.layout():
+            self.layout().invalidate()
+            self.layout().activate()
 
     def open_settings(self):
         # Pause audio analyzer while settings dialog is open to prevent conflicts
@@ -723,14 +722,13 @@ class KaraokeApp(QWidget):
             self.audio_overlay.hide()
             self.audio_overlay.setFixedSize(300, 150)  # Reset to default size when hidden
 
-    def download_video(self, from_widen_tab=False):
-        input_widget = self.widen_url_input if from_widen_tab else self.url_input
+    def download_video(self):
+        input_widget = self.url_input
         url = input_widget.text().strip()
         if not url.startswith("http"):
             QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
             return
 
-        self._download_from_widen = from_widen_tab
         self.status_label.setText("Status: Deploying Downloader Task Pipes...")
         loading_path = get_resource_path("Loading.png")
         pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
@@ -780,12 +778,7 @@ class KaraokeApp(QWidget):
                 
                 # Wait for file to be completely written and stable (not locked)
                 if self._wait_for_file_ready(full_p):
-                    if self._download_from_widen:
-                        self.widen_url_input.clear()
-                        self.widen_tab_video_path = full_p
-                        self.widen_file_status_label.setText(f"Queued File for Widening: {os.path.basename(full_p)}")
-                        self.load_video(full_p)
-                    elif getattr(self, '_download_from_audio_tools', False):
+                    if getattr(self, '_download_from_audio_tools', False):
                         # Audio download from Audio Tools page
                         from source_code.ui.extra_page import audio_url_input
                         # Clear URL input - need to get reference from components
@@ -911,7 +904,7 @@ class KaraokeApp(QWidget):
         self.launch_async_task(cmd, abs_out, "exporter", override_duration=duration)
 
     def widen_active_video_canvas(self):
-        target_input = self.widen_tab_video_path if self.widen_tab_video_path else self.video_path
+        target_input = self.video_path
         if not target_input or not os.path.exists(target_input):
             QMessageBox.warning(self, "Missing Asset Input", "Load a file path or complete a download segment beforehand.")
             return
@@ -1512,20 +1505,19 @@ class KaraokeApp(QWidget):
                 self.audio_file_status.setText(f"✅ {output_name} (DAT Converted)")
                 self.dat_status_label.setText(f"✅ Conversion complete: {output_name}")
             
-            # For widen task, update widen page status and navigate back
+            # For widen task, navigate back to widen page
             if task_key == "widen_task":
-                self.widen_tab_video_path = out_path
-                self.widen_file_status_label.setText(f"Queued File for Widening: {os.path.basename(out_path)} (Widened)")
+                pass  # output already loaded via load_video in launch_async_task
 
             QMessageBox.information(self, "Success", f"Output loaded successfully:\n{os.path.basename(out_path)}")
             
             # Navigate back to Audio Tools page for audio operations
             if task_key in ["extract_task", "trim_task", "convert_task", "dat_task"]:
-                QTimer.singleShot(100, lambda: self.handle_navigation_change(3))
-
-            # Navigate back to Widen Video page after widening
-            if task_key == "widen_task":
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(2))
+
+            # Navigate back to Video Tools page after widening
+            if task_key == "widen_task":
+                QTimer.singleShot(100, lambda: self.handle_navigation_change(3))
 
     def update_ui(self):
         try:
