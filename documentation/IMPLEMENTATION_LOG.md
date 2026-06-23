@@ -1,5 +1,50 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+## Change: Widen Video Fixes — Fullscreen + FFmpeg + Post-Completion (2026-06-23) - COMPLETE ✅
+
+**Status:** Fully Implemented & Verified
+
+**Files Changed:** `source_code/main.py` only
+
+### 1. Fullscreen video frame height bug (`toggle_video_fullscreen`)
+**Root cause:** Every page sets a `video_frame.setMaximumHeight()` cap (e.g. 350px for Widen page).  
+When fullscreen was triggered the sidebar/stack were hidden but the video frame cap remained, so  
+the frame could never grow beyond 350px despite the window being full-screen.
+
+**Fix:**
+- **Enter fullscreen** → `video_frame.setMinimumHeight(0)` + `setMaximumHeight(16777215)` (unlimited)
+- **Exit fullscreen** → `handle_navigation_change(self.stack.currentIndex())` restores the correct  
+  per-page height constraints cleanly
+
+### 2. FFmpeg filter (reverted to confirmed-working original)
+Multiple filter variants were tried and rejected:
+- `decrease + pad` (pillarbox) → content appeared smaller ❌
+- `increase + crop` (fill+trim) → cropped top of video ❌  
+- **Restored original:** `crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`  ✅
+
+This filter crops the centre strip of the source, scales it up 10% beyond 1920×1080, then  
+center-crops to exactly 1920×1080 — the user-verified approach for their karaoke video format.
+
+**Speed improvement:** Added `-preset ultrafast` (no `-c:v`, no `-threads 0`, no `-pix_fmt`).
+- `-threads 0` was removed because multi-threaded encoding produced a bitstream that caused  
+  VLC h264 decoder warnings (`get_buffer() failed`, `thread_get_buffer() failed`) on playback startup.
+
+### 3. Post-completion handling (`handle_task_completion`)
+After `widen_task` completes:
+- Updates `self.widen_tab_video_path` to the output file path
+- Updates `widen_file_status_label` to show output filename
+- Navigates back to Widen Video page (idx 2) via `QTimer.singleShot(100, ...)`
+
+**Testing:**
+- ✅ Fullscreen fills entire screen from any page (Widen, Downloader, etc.)
+- ✅ Exiting fullscreen restores correct per-page video frame height
+- ✅ Widen operation produces correct output video
+- ✅ No VLC h264 decoder warnings after widen
+- ✅ Status label updated and page navigates back after completion
+- ✅ Speed improved vs. original (ultrafast preset)
+
+---
+
 ## Change: Playback Window Polish + Scroll Areas + Navigation Fix (2026-06-21) - COMPLETE ✅
 
 **Status:** Fully Implemented & Verified
