@@ -18,6 +18,11 @@ def create_video_tools_page():
     outer_layout.addSpacing(4)
 
     tabs = QTabWidget()
+    tabs.setStyleSheet("""
+        QTabWidget::pane { border: 1px solid #3a3a3a; }
+        QTabBar::tab { background-color: #2a2a2a; color: #fff; padding: 8px 20px; }
+        QTabBar::tab:selected { background-color: #0e639c; }
+    """)
     outer_layout.addWidget(tabs)
 
     # ── TAB 1: VIDEO TRIMMING ────────────────────────────────────────────────
@@ -48,7 +53,6 @@ def create_video_tools_page():
     keep_range_cb = QCheckBox("Keep Range (from A to B):")
     keep_range_start_picker = TimePickerWidget()
     keep_range_end_picker = TimePickerWidget()
-    keep_range_end_picker.set_total_seconds(60)
     for _sp in (keep_range_start_picker.hour_spin, keep_range_start_picker.min_spin, keep_range_start_picker.sec_spin,
                 keep_range_end_picker.hour_spin, keep_range_end_picker.min_spin, keep_range_end_picker.sec_spin):
         _sp.valueChanged.connect(lambda _v, cb=keep_range_cb: cb.setChecked(True))
@@ -138,9 +142,34 @@ def create_video_tools_page():
 
     tabs.addTab(pw_tab, "⏱ Playback Window")
 
+    # ── TAB 3: WIDEN VIDEO ────────────────────────────────────────────────
+    widen_tab = QWidget()
+    widen_layout = QVBoxLayout(widen_tab)
+    widen_layout.setContentsMargins(6, 8, 6, 6)
+
+    widen_title = QLabel("<b>📐 ASPECT-RATIO LAYOUT PAD ENGINE</b>")
+    widen_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
+    widen_layout.addWidget(widen_title)
+
+    widen_current_file_label = QLabel("No video loaded - use the Downloader page to load a video")
+    widen_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
+    widen_layout.addWidget(widen_current_file_label)
+    widen_layout.addSpacing(10)
+
+    widen_exec_btn = QPushButton("Scale Active Video to Wide 16:9 Canvas")
+    widen_exec_btn.setStyleSheet("background-color: #e67e22; height: 45px; font-weight: bold; font-size: 13px; color: white; border-radius: 4px;")
+    widen_layout.addWidget(widen_exec_btn)
+    widen_layout.addStretch()
+
+    tabs.addTab(widen_tab, "📐 Widen Video")
+
     return {
         "page": page,
+        "tabs": tabs,
         "video_current_file_label": video_current_file_label,
+        # Widen Video tab
+        "widen_current_file_label": widen_current_file_label,
+        "widen_exec_btn": widen_exec_btn,
         # Trim tab
         "trim_first_cb": trim_first_cb,
         "trim_first_picker": trim_first_picker,
