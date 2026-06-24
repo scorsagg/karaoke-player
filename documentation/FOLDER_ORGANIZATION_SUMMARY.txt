@@ -241,5 +241,5 @@ The application is fully functional, all imports work correctly, and the build
 system is configured to bundle all dependencies for zero-setup distribution.
 
 Documentation has been centralized in the documentation/ folder for better organization.
-
+      ├─ karaoke_app.py              (REMOVED - consolidated into main.py)
 Status: READY FOR TEAM DISTRIBUTION 🎉

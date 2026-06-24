@@ -24,6 +24,7 @@ from source_code.services.download_service import DownloadService
 from source_code.services.audio_service import AudioService
 from source_code.services.file_loading_service import FileLoadingService
 from source_code.ui.main_layout import create_main_layout
+from source_code.ui.extra_page import TimePickerWidget
 
 class KaraokeApp(QWidget):
     def __init__(self):
@@ -217,6 +218,7 @@ class KaraokeApp(QWidget):
         
         # Extract video tools page components
         video_tools_page_components = components["video_tools_page_components"]
+        self.video_tools_page_components = video_tools_page_components
         self.video_tools_tabs = video_tools_page_components["tabs"]
         self.video_current_file_label = video_tools_page_components["video_current_file_label"]
         self.widen_current_file_label = video_tools_page_components["widen_current_file_label"]
@@ -231,14 +233,17 @@ class KaraokeApp(QWidget):
         self.video_trim_format_combo = video_tools_page_components["trim_format_combo"]
         video_trim_btn = video_tools_page_components["trim_btn"]
         self.video_trim_status_label = video_tools_page_components["trim_status_label"]
-        # Playback Window controls
-        self.pw_skip_cb = video_tools_page_components["pw_skip_cb"]
-        self.pw_skip_picker = video_tools_page_components["pw_skip_picker"]
-        self.pw_stop_cb = video_tools_page_components["pw_stop_cb"]
-        self.pw_stop_picker = video_tools_page_components["pw_stop_picker"]
-        self.pw_range_cb = video_tools_page_components["pw_range_cb"]
-        self.pw_range_start_picker = video_tools_page_components["pw_range_start_picker"]
-        self.pw_range_end_picker = video_tools_page_components["pw_range_end_picker"]
+        # Playback Window controls (ranges container)
+        self.pw_ranges_container = video_tools_page_components["pw_ranges_container"]
+        self.pw_add_range_btn = video_tools_page_components["pw_add_range_btn"]
+        # Function to programmatically add a range row with defaults
+        self.pw_add_range = video_tools_page_components.get("pw_add_range")
+        # Provide video length getter to UI so it can default new rows when last row removed
+        try:
+            import source_code.ui.video_tools_page as vtp
+            vtp.video_length_getter = lambda: max(0, int(self.player.get_length() // 1000))
+        except Exception:
+            pass
         self.pw_apply_btn = video_tools_page_components["pw_apply_btn"]
         self.pw_clear_btn = video_tools_page_components["pw_clear_btn"]
         self.pw_status_label = video_tools_page_components["pw_status_label"]
@@ -287,6 +292,11 @@ class KaraokeApp(QWidget):
         video_trim_btn.clicked.connect(self.trim_video)
         self.pw_apply_btn.clicked.connect(self.handle_play)
         self.pw_clear_btn.clicked.connect(self.clear_playback_window)
+        # Connect Add Range button to a handler that computes sensible defaults
+        try:
+            self.pw_add_range_btn.clicked.connect(self._on_pw_add_range)
+        except Exception:
+            pass
         self.history_list.itemDoubleClicked.connect(lambda item: self.load_history_item(item.toolTip()))
         
         # Initialize state flags
@@ -631,6 +641,25 @@ class KaraokeApp(QWidget):
         else:
             self.hide_audio_visualization()
 
+        # Set initial playback window defaults: first row start=0, end=video length
+        try:
+            total_ms = max(0, int(self.player.get_length()))
+            total_s = total_ms // 1000
+            # Try to set first row pickers if present
+            container = getattr(self, 'pw_ranges_container', None)
+            if container is not None:
+                layout = container.layout()
+                if layout and layout.count() > 0:
+                    row = layout.itemAt(0).widget()
+                    if row:
+                        pickers = row.findChildren(TimePickerWidget)
+                        if len(pickers) >= 2:
+                            # start = 0, end = video length
+                            pickers[0].set_total_seconds(0)
+                            pickers[1].set_total_seconds(total_s)
+        except Exception:
+            pass
+
     def create_audio_overlay(self):
         """Create an audio visualization overlay for the video frame area"""
         overlay = QLabel()
@@ -892,7 +921,33 @@ class KaraokeApp(QWidget):
         while curr_t < 0.5: atempo_list.append("atempo=0.5"); curr_t /= 0.5
         atempo_list.append(f"atempo={round(curr_t, 4)}")
 
-        out = os.path.join(self.settings["download_directory"], f"karaoke_export_{int(time.time())}.mp4")
+        # Build output filename from original file name + pitch/speed tokens
+        orig_name = os.path.splitext(os.path.basename(self.video_path))[0]
+        def fmt(v):
+            try:
+                return ('%g' % float(v)).replace('.', '_')
+            except:
+                return str(v)
+
+        p_token = None
+        if p != 0:
+            if p < 0:
+                p_token = f"down_{fmt(abs(p))}"
+            else:
+                p_token = f"up_{fmt(p)}"
+
+        s_token = None
+        if s != 1.0:
+            if s < 1.0:
+                s_token = f"down_{fmt(s)}"
+            else:
+                s_token = f"up_{fmt(s)}"
+
+        parts = [orig_name]
+        if p_token: parts.append(p_token)
+        if s_token: parts.append(s_token)
+        out_name = "_".join(parts) + ".mp4"
+        out = os.path.join(self.settings["download_directory"], out_name)
         abs_in = os.path.abspath(self.video_path).replace("\\", "/")
         abs_out = os.path.abspath(out).replace("\\", "/")
 
@@ -908,6 +963,59 @@ class KaraokeApp(QWidget):
         if not target_input or not os.path.exists(target_input):
             QMessageBox.warning(self, "Missing Asset Input", "Load a file path or complete a download segment beforehand.")
             return
+        # Verify video aspect ratio first: if already ~16:9, warn user and ask confirmation
+        try:
+            # Probe video resolution
+            cmd_probe = [self.settings["ffprobe_path"], "-v", "error", "-select_streams", "v:0",
+                         "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", target_input]
+            startupinfo = None
+            if sys.platform == "win32":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+            res = subprocess.run(cmd_probe, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, text=True, timeout=2)
+            out = res.stdout.strip()
+            if out:
+                parts = out.split('x')
+                if len(parts) == 2:
+                    try:
+                        w = float(parts[0])
+                        h = float(parts[1])
+                        if h > 0:
+                            ratio = w / h
+                            target_ratio = 16.0 / 9.0
+                            # Improved detection logic:
+                            # - If within 4% of 16:9, consider it already 16:9 and warn the user.
+                            # - If clearly narrow/portrait (ratio < 1.5) assume widening is appropriate.
+                            # - If ambiguous (1.5 <= ratio < ~1.7), ask the user with detected resolution and ratio.
+                            lower_wide = target_ratio * 0.96
+                            upper_wide = target_ratio * 1.04
+                            if lower_wide <= ratio <= upper_wide:
+                                # Very close to 16:9 — warn and ask
+                                reply = QMessageBox.question(self, "Already 16:9?",
+                                                             f"Detected resolution: {int(w)}x{int(h)} (ratio {ratio:.3f}).\n"
+                                                             "This appears to already be near 16:9. Running widen may undesirably crop/zoom. Continue?",
+                                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                                if reply != QMessageBox.Yes:
+                                    return
+                            elif ratio < 1.5:
+                                # Clearly not wide — proceed without warning
+                                pass
+                            else:
+                                # Ambiguous range — show more informative prompt with detected values
+                                reply = QMessageBox.question(self, "Widen Video - Confirm",
+                                                             f"Detected resolution: {int(w)}x{int(h)} (ratio {ratio:.3f}).\n"
+                                                             "This video is not exactly 16:9 and may be close to portrait/vertical.\n"
+                                                             "Do you want to run the widen operation anyway?",
+                                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                                if reply != QMessageBox.Yes:
+                                    return
+                    except Exception:
+                        # Parsing failed; continue and let widen attempt run
+                        pass
+        except Exception:
+            # If ffprobe is unavailable or fails, continue without verification
+            pass
 
         loading_path = get_resource_path("Loading.png")
         pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
@@ -1542,13 +1650,28 @@ class KaraokeApp(QWidget):
                     # Playback Window: stop at end cutoff
                     pw_end_ms = getattr(self, '_pw_end_ms', None)
                     if pw_end_ms is not None and ms >= pw_end_ms:
-                        self._pw_end_ms = None  # clear immediately to prevent re-triggering on next tick
-                        self.audio_service.stop_audio_monitoring()
-                        self._player_was_active = False
-                        self.seek_slider.setValue(0)
-                        self.time_label.setText("00:00")
-                        self.pw_status_label.setText("Playback window ended")
-                        QTimer.singleShot(100, self.player.stop)
+                        # If there are more ranges queued, advance to next range
+                        ranges = getattr(self, '_pw_ranges', []) or []
+                        idx = getattr(self, '_pw_range_idx', 0)
+                        if ranges and idx + 1 < len(ranges):
+                            # advance
+                            print(f"[main.update_ui] advancing from range {idx} to {idx+1}")
+                            self._pw_range_idx = idx + 1
+                            next_start, next_end = ranges[self._pw_range_idx]
+                            # seek to next start and set new end cutoff
+                            QTimer.singleShot(50, lambda ns=next_start: self.player.set_time(int(ns)))
+                            self._pw_end_ms = next_end
+                            # update status
+                            parts = [f"{(s//1000)//60:02d}:{(s//1000)%60:02d}-{(e//1000)//60:02d}:{(e//1000)%60:02d}" for s, e in ranges]
+                            self.pw_status_label.setText("Ranges: " + ", ".join(parts))
+                        else:
+                            self._pw_end_ms = None  # clear immediately to prevent re-triggering on next tick
+                            self.audio_service.stop_audio_monitoring()
+                            self._player_was_active = False
+                            self.seek_slider.setValue(0)
+                            self.time_label.setText("00:00")
+                            self.pw_status_label.setText("Playback window ended")
+                            QTimer.singleShot(100, self.player.stop)
                     elif pos >= 0.99:
                         self.audio_service.stop_audio_monitoring()
                         self._player_was_active = False
@@ -1579,57 +1702,131 @@ class KaraokeApp(QWidget):
         self.player.play()
 
     def apply_playback_window(self):
-        """Apply active Playback Window settings: seek to start, register end cutoff."""
+        """Apply active Playback Window settings: collect ranges, seek to first start, register first end cutoff."""
         self._pw_end_ms = None
-        if not self.video_path:
-            return
-        dur_ms = self.player.get_length()
+        self._pw_ranges = []
+        self._pw_range_idx = 0
 
-        # Determine effective start and end from the three options (range wins if checked)
-        start_ms = None
-        end_ms = None
+        # Collect ranges from UI rows
+        try:
+            container = getattr(self, 'pw_ranges_container', None)
+            layout = container.layout()
+            for i in range(layout.count()):
+                row = layout.itemAt(i).widget()
+                if not row:
+                    continue
+                pickers = row.findChildren(TimePickerWidget)
+                if len(pickers) >= 2:
+                    s = int(pickers[0].get_total_seconds() * 1000)
+                    e = int(pickers[1].get_total_seconds() * 1000)
+                    if e > s:
+                        self._pw_ranges.append((s, e))
+        except Exception:
+            self._pw_ranges = []
 
-        if self.pw_range_cb.isChecked():
-            start_ms = self.pw_range_start_picker.get_total_seconds() * 1000
-            end_ms = self.pw_range_end_picker.get_total_seconds() * 1000
-        else:
-            if self.pw_skip_cb.isChecked():
-                start_ms = self.pw_skip_picker.get_total_seconds() * 1000
-            if self.pw_stop_cb.isChecked() and dur_ms > 0:
-                stop_before_ms = self.pw_stop_picker.get_total_seconds() * 1000
-                end_ms = max(0, dur_ms - stop_before_ms)
+        # Sort ranges by start time
+        self._pw_ranges.sort(key=lambda x: x[0])
+        # Debug log collected ranges
+        try:
+            print(f"[main.apply_playback_window] collected ranges: {self._pw_ranges}")
+        except Exception:
+            pass
 
-        if start_ms is not None and start_ms > 0:
-            self.player.set_time(int(start_ms))
-
-        self._pw_end_ms = end_ms if end_ms and end_ms > 0 else None
-
-        # Update status label
-        parts = []
-        if start_ms: parts.append(f"start {int(start_ms)//1000}s")
-        if self._pw_end_ms: parts.append(f"stop at {int(self._pw_end_ms)//1000}s")
-        if parts:
-            self.pw_status_label.setText("Active: " + ", ".join(parts))
-            self.pw_status_label.setStyleSheet("color: #2ecc71; font-size: 10px;")
-        else:
+        if not self._pw_ranges:
+            # Nothing to apply
             self.pw_status_label.setText("No playback window active")
             self.pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
+            return
+
+        # Start with first range
+        start_ms, end_ms = self._pw_ranges[0]
+        if start_ms > 0:
+            self.player.set_time(int(start_ms))
+        self._pw_range_idx = 0
+        self._pw_end_ms = end_ms
+
+        # Display active ranges in status
+        parts = [f"{(s//1000)//60:02d}:{(s//1000)%60:02d}-{(e//1000)//60:02d}:{(e//1000)%60:02d}" for s, e in self._pw_ranges]
+        self.pw_status_label.setText("Ranges: " + ", ".join(parts))
+        self.pw_status_label.setStyleSheet("color: #2ecc71; font-size: 10px;")
 
     def clear_playback_window(self):
         """Reset all Playback Window controls to zero/unchecked."""
         self._pw_end_ms = None
-        for cb in (self.pw_skip_cb, self.pw_stop_cb, self.pw_range_cb):
-            cb.setChecked(False)
-        # Block signals so resetting spinboxes doesn't re-check the checkboxes
-        for picker in (self.pw_skip_picker, self.pw_stop_picker,
-                       self.pw_range_start_picker, self.pw_range_end_picker):
-            for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
-                sp.blockSignals(True)
-            picker.set_total_seconds(0)
-            for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
-                sp.blockSignals(False)
+        self._pw_ranges = []
+        self._pw_range_idx = 0
+        # Reset all range rows to zero (keep rows present)
+        try:
+            container = getattr(self, 'pw_ranges_container', None)
+            layout = container.layout()
+            for i in range(layout.count()):
+                row = layout.itemAt(i).widget()
+                if not row:
+                    continue
+                pickers = row.findChildren(TimePickerWidget)
+                for picker in pickers:
+                    for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
+                        sp.blockSignals(True)
+                    picker.set_total_seconds(0)
+                    for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
+                        sp.blockSignals(False)
+        except Exception:
+            pass
         self.pw_status_label.setText("No playback window active")
         self.pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
+
+    def _on_pw_add_range(self):
+        """Handler for Add Range button: compute sensible defaults based on last row and video length."""
+        try:
+            # Get total video length in seconds
+            total_ms = max(0, int(self.player.get_length()))
+            total_s = total_ms // 1000
+
+            # Determine previous end (if any)
+            prev_end_s = 0
+            container = getattr(self, 'pw_ranges_container', None)
+            if container is not None:
+                layout = container.layout()
+                if layout and layout.count() > 0:
+                    last_row = layout.itemAt(layout.count() - 1).widget()
+                    if last_row:
+                        pickers = last_row.findChildren(TimePickerWidget)
+                        if len(pickers) >= 2:
+                            prev_end_s = int(pickers[1].get_total_seconds())
+
+            # New start is previous end + 1 second, but not less than 0
+            # Prevent adding if previous end already reaches or exceeds video end
+            if prev_end_s >= total_s:
+                # Inform user briefly via status label
+                try:
+                    self.pw_status_label.setText("Cannot add range — already covers to video end")
+                    self.pw_status_label.setStyleSheet("color: #e67e22; font-size: 10px;")
+                except Exception:
+                    pass
+                return
+
+            # New start is previous end + 1 second, but not less than 0
+            new_start = max(0, int(prev_end_s) + 1)
+            # New end defaults to video length
+            new_end = max(new_start, int(total_s))
+
+            # Use provided add function from UI if available
+            if hasattr(self, 'pw_add_range') and callable(self.pw_add_range):
+                self.pw_add_range(new_start, new_end)
+            else:
+                # Fallback: directly add a raw row widget to container
+                container = getattr(self, 'pw_ranges_container', None)
+                if container is not None:
+                    layout = container.layout()
+                    if layout is not None:
+                        # Create a new row using the same widget class
+                        from source_code.ui.video_tools_page import make_range_row
+                        try:
+                            layout.addWidget(make_range_row(new_start, new_end))
+                        except Exception:
+                            pass
+        except Exception:
+            pass
 
     def toggle_video_fullscreen(self):
         """Toggle true window fullscreen mode while expanding the controls cleanly"""

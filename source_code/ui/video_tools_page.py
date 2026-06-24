@@ -1,5 +1,8 @@
 ﻿"""Video Tools page UI component - video trimming and playback window"""
 
+# Module-level hook that main can set to provide the current video length (seconds)
+video_length_getter = lambda: 0
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox,
                                QComboBox, QTabWidget)
 from PySide6.QtGui import QFont
@@ -93,37 +96,88 @@ def create_video_tools_page():
     pw_layout.addWidget(pw_desc)
     pw_layout.addSpacing(6)
 
-    # Skip Start: jump to this position when Play is pressed
-    pw_skip_cb = QCheckBox("Skip to position:")
-    pw_skip_picker = TimePickerWidget()
-    for _sp in (pw_skip_picker.hour_spin, pw_skip_picker.min_spin, pw_skip_picker.sec_spin):
-        _sp.valueChanged.connect(lambda _v, cb=pw_skip_cb: cb.setChecked(True))
-    r = QHBoxLayout()
-    r.addWidget(pw_skip_cb); r.addWidget(pw_skip_picker); r.addStretch()
-    pw_layout.addLayout(r)
+    # Playback Ranges: allow multiple Start/End rows (add/remove)
+    ranges_container = QWidget()
+    ranges_layout = QVBoxLayout(ranges_container)
+    ranges_layout.setContentsMargins(0, 0, 0, 0)
+    ranges_layout.setSpacing(8)
 
-    # Stop Before End: stop this many seconds before the track ends
-    pw_stop_cb = QCheckBox("Stop N seconds before end:")
-    pw_stop_picker = TimePickerWidget()
-    for _sp in (pw_stop_picker.hour_spin, pw_stop_picker.min_spin, pw_stop_picker.sec_spin):
-        _sp.valueChanged.connect(lambda _v, cb=pw_stop_cb: cb.setChecked(True))
-    r = QHBoxLayout()
-    r.addWidget(pw_stop_cb); r.addWidget(pw_stop_picker); r.addStretch()
-    pw_layout.addLayout(r)
+    def make_range_row(default_start=None, default_end=None):
+        row_w = QWidget()
+        row_l = QHBoxLayout(row_w)
+        start_picker = TimePickerWidget()
+        end_picker = TimePickerWidget()
+        # Apply provided defaults (seconds)
+        try:
+            if default_start is not None:
+                start_picker.set_total_seconds(int(default_start))
+            if default_end is not None:
+                end_picker.set_total_seconds(int(default_end))
+        except Exception:
+            pass
+        remove_btn = QPushButton("Remove")
+        remove_btn.setFixedWidth(80)
+        remove_btn.setStyleSheet("background-color: #b00020; color: white;")
 
-    # Play Range: play only from A to B
-    pw_range_cb = QCheckBox("Play range from A to B:")
-    pw_range_start_picker = TimePickerWidget()
-    pw_range_end_picker = TimePickerWidget()
-    for _sp in (pw_range_start_picker.hour_spin, pw_range_start_picker.min_spin, pw_range_start_picker.sec_spin,
-                pw_range_end_picker.hour_spin, pw_range_end_picker.min_spin, pw_range_end_picker.sec_spin):
-        _sp.valueChanged.connect(lambda _v, cb=pw_range_cb: cb.setChecked(True))
-    r = QHBoxLayout()
-    r.addWidget(pw_range_cb)
-    r.addWidget(QLabel("From:")); r.addWidget(pw_range_start_picker)
-    r.addWidget(QLabel("To:")); r.addWidget(pw_range_end_picker)
-    r.addStretch()
-    pw_layout.addLayout(r)
+        row_l.addWidget(QLabel("Start:"))
+        row_l.addWidget(start_picker)
+        row_l.addSpacing(10)
+        row_l.addWidget(QLabel("End:"))
+        row_l.addWidget(end_picker)
+        row_l.addWidget(remove_btn)
+        row_l.addStretch()
+
+        # Remove handler
+        def _remove():
+            for i in range(ranges_layout.count()):
+                if ranges_layout.itemAt(i).widget() is row_w:
+                    item = ranges_layout.takeAt(i)
+                    w = item.widget()
+                    if w:
+                        w.deleteLater()
+                    break
+            # If no rows remain, add a default row with end = video length (if available)
+            try:
+                cnt = ranges_layout.count()
+                if cnt == 0:
+                    add_range_row(0, int(video_length_getter()))
+                elif cnt == 1:
+                    # If one row remains, ensure its end equals video length
+                    remaining_row = ranges_layout.itemAt(0).widget()
+                    if remaining_row:
+                        pickers = remaining_row.findChildren(TimePickerWidget)
+                        if len(pickers) >= 2:
+                            try:
+                                pickers[1].set_total_seconds(int(video_length_getter()))
+                            except Exception:
+                                pass
+            except Exception:
+                # best-effort; ignore failures
+                pass
+        remove_btn.clicked.connect(_remove)
+        return row_w
+
+    # Helper to add a range row with optional defaults
+    def add_range_row(start_seconds=None, end_seconds=None):
+        ranges_layout.addWidget(make_range_row(start_seconds, end_seconds))
+
+    # Initial single range row (defaults to 0:00 - 0:00; main will adjust end to video length)
+    add_range_row()
+
+    # Add Range button
+    pw_add_range_btn = QPushButton("Add Range")
+    pw_add_range_btn.setFixedWidth(120)
+    pw_add_range_btn.setStyleSheet("background-color: #0e639c; color: white;")
+    # Expose add function for the host (main) to compute defaults
+    pw_add_range_btn_func = add_range_row
+    # Note: main.py should connect `pw_add_range_btn.clicked` to its own handler
+
+    # Layout: label, ranges container, add button
+    pw_layout.addWidget(QLabel("Playback Ranges (played sequentially):"))
+    pw_layout.addWidget(ranges_container)
+    add_row = QHBoxLayout()
+    add_row.addStretch(); add_row.addWidget(pw_add_range_btn)
+    pw_layout.addLayout(add_row)
 
     pw_layout.addSpacing(8)
     btn_row = QHBoxLayout()
@@ -182,13 +236,9 @@ def create_video_tools_page():
         "trim_btn": trim_btn,
         "trim_status_label": trim_status_label,
         # Playback Window tab
-        "pw_skip_cb": pw_skip_cb,
-        "pw_skip_picker": pw_skip_picker,
-        "pw_stop_cb": pw_stop_cb,
-        "pw_stop_picker": pw_stop_picker,
-        "pw_range_cb": pw_range_cb,
-        "pw_range_start_picker": pw_range_start_picker,
-        "pw_range_end_picker": pw_range_end_picker,
+        "pw_ranges_container": ranges_container,
+        "pw_add_range_btn": pw_add_range_btn,
+        "pw_add_range": pw_add_range_btn_func,
         "pw_apply_btn": pw_apply_btn,
         "pw_clear_btn": pw_clear_btn,
         "pw_status_label": pw_status_label,

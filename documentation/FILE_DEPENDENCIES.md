@@ -510,8 +510,8 @@ ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192
 - ✅ Status feedback during trimming
 
 ### 16. DEPRECATED/DELETED FILES
-**Current deprecated files:**
-- karaoke_app.py
+**Current deprecated / removed files:**
+- karaoke_app.py (REMOVED - consolidated into `source_code/main.py`)
 - v2-karaoke_app - Copy.py
 - v2-VLC_version.py
 
