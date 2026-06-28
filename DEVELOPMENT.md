@@ -45,6 +45,10 @@ cd d:\Srikanth\Academics\Python\karaoke-player
 python source_code\main.py
 ```
 
+Note (Windows): VLC runtime path setup is handled automatically in `source_code/services/player_service.py`
+when `resources/libvlc.dll` and `resources/plugins/` are present. Manual PATH or
+`VLC_PLUGIN_PATH` export is not required for normal source runs.
+
 ### Building Standalone Executable
 ```powershell
 cd d:\Srikanth\Academics\Python\karaoke-player
@@ -209,6 +213,8 @@ config/
 3. **Integrate in main app**
    - Update `main.py` to use new setting/feature
    - Call `audio_service.pause_analyzer()` before settings dialog if needed
+   - If audio analyzer threads are recreated, keep the main reference synchronized via
+     `analyzer_replaced_handler` to avoid stale signal wiring
 
 4. **Update build**
    - Update `build_system/KaraokeStudioPro.spec` if new modules
@@ -217,6 +223,21 @@ config/
    - Update `documentation/INSTALLATION.txt` (features/config sections)
    - Update `documentation/ARCHITECTURE.md` (audio system)
    - Update `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` (recent improvements)
+
+Audio analyzer note:
+- `AudioAnalyzerThread` now tries multiple InputStream configs automatically
+   (2ch/1ch, 44.1k/48k). Check console logs from `AudioAnalyzerThread` for stream open/failure diagnostics.
+- On Windows it attempts `WASAPI loopback` on the default output device first to track
+   actual playback output; if unavailable, it falls back to default input capture.
+- It also scans WASAPI output-capable devices (not just one default) so behavior remains
+   portable across laptops/desktops with different audio hardware routing.
+- With `sounddevice` 0.5.x, do not pass `loopback=` to `WasapiSettings`; use plain `WasapiSettings()`.
+- Windows meter capture now prefers `soundcard` loopback (default speaker), then falls back
+   to `sounddevice` capture paths for broader machine compatibility.
+- Manual volume slider changes are honored briefly before auto-reduce can run again,
+   which prevents the reducer from immediately undoing the user's adjustment.
+- Keep `status_label` updated during file load lifecycle (loading/playing/failed)
+   so previous transient messages (for example auto-reduce notices) do not linger.
 
 ### Adding a New UI Component
 

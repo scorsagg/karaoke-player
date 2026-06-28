@@ -122,6 +122,7 @@ then calls `handle_navigation_change(current_idx)` on exit to restore page-corre
 - Coordinate service interactions
 - Handle user input (buttons, sliders, keyboard)
 - Manage audio analyzer thread
+- Refresh sidebar status text on load start/success/failure events
 - Clean shutdown and resource cleanup
 
 **Key Methods:**
@@ -150,6 +151,8 @@ then calls `handle_navigation_change(current_idx)` on exit to restore page-corre
 
 **Responsibilities:**
 - Create and manage VLC instance
+- Bootstrap Windows VLC runtime discovery before importing `python-vlc`
+    (prepends VLC root to PATH, sets `VLC_PLUGIN_PATH`, and uses `os.add_dll_directory` when available)
 - Load media files
 - Play, pause, stop operations
 - Seek to timeline positions
@@ -196,13 +199,14 @@ download.download_video(url, callback)  # Download with progress
 
 **Responsibilities:**
 - Manage audio analyzer pause/resume state
+- Reconnect level-update callbacks when analyzer thread is recreated
 - Set audio meter display modes (dB vs SPL)
 - Provide clean shutdown for audio subsystem
 - Prevent signal conflicts during settings operations
 
 **Public Interface:**
 ```python
-audio_service = AudioService(analyzer, meter)
+audio_service = AudioService(analyzer, meter, level_update_handler=on_audio_level_updated)
 audio_service.pause_analyzer()           # Pause audio capture
 audio_service.resume_analyzer()          # Resume audio capture
 audio_service.set_display_mode(mode)     # Change meter display
@@ -211,7 +215,7 @@ audio_service.cleanup()                  # Cleanup on shutdown
 
 **Key Methods:**
 - `pause_analyzer()` - Pauses analysis, returns previous state
-- `resume_analyzer()` - Resumes analysis if previously playing
+- `resume_analyzer()` - Resumes analysis if previously playing and reconnects callbacks on new thread
 - `set_display_mode(mode)` - Sets meter display to 'dB Output (dBFS)' or 'SPL Estimate (Room)'
 - `cleanup()` - Safely stops analyzer thread on app exit
 
@@ -540,7 +544,13 @@ Audio pitch remains constant (VLC handles this)
 - Independent QThread instance
 - Captures audio continuously
 - Emits level_updated signals
+- On Windows, prefers WASAPI loopback capture from default output device
+- Tries compatible InputStream configs (2ch/1ch, 44.1k/48k) before failing
+- Scans WASAPI output-capable devices and host defaults to avoid machine-specific routing issues
 - Gracefully stops on closeEvent()
+- Uses `WasapiSettings()` without `loopback` kwarg for `sounddevice` 0.5.x compatibility
+- Uses `soundcard` loopback microphone as primary Windows playback source when available,
+  with `sounddevice` as fallback
 
 **Process Thread:**
 - Independent QThread for subprocess execution

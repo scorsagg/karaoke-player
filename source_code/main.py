@@ -76,7 +76,12 @@ class KaraokeApp(QWidget):
         self.audio_analyzer.start()
 
         # Initialize audio service for managing audio analyzer and meter
-        self.audio_service = AudioService(self.audio_analyzer, self.audio_level_meter)
+        self.audio_service = AudioService(
+            self.audio_analyzer,
+            self.audio_level_meter,
+            level_update_handler=self.on_audio_level_updated,
+            analyzer_replaced_handler=self.on_audio_analyzer_replaced,
+        )
 
         # Initialize file loading service for thread-safe file operations
         self.file_loading_service = FileLoadingService(self.audio_service, self.player)
@@ -103,7 +108,7 @@ class KaraokeApp(QWidget):
             "ffprobe_path": "ffprobe",
             "ytdlp_path": "yt-dlp",
             "measurement_mode": "dB Output (dBFS)",
-            "auto_reduce_threshold": 80
+            "auto_reduce_threshold": 90
         }
         if self.settings_file.exists():
             try:
@@ -427,6 +432,12 @@ class KaraokeApp(QWidget):
         self.player.set_volume(value); self.vol_label.setText(f"{value}%")
         self.mute_btn.setText("🔊" if value > 0 else "🔇")
 
+        # Manual volume changes should be honored briefly before auto-reduce can react again.
+        if not getattr(self, '_auto_adjusting_volume', False):
+            self._manual_volume_override_until = time.time() + 0.75
+            self._auto_reduce_cooldown_until = 0.0
+            self.high_db_counter = 0
+
     def toggle_mute(self):
         m = not self.player.get_mute(); self.player.set_mute(m)
         self.mute_btn.setText("🔇" if m else "🔊")
@@ -436,30 +447,46 @@ class KaraokeApp(QWidget):
 
         self.audio_level_meter.set_level(db_level)
 
-        # Convert dB to 0-100 scale (Assuming -80 to 0)
-        level_percent = ((db_level + 80.0) / 80.0) * 100.0
+        # Use the meter's approximate SPL so auto-reduce follows the configured SPL threshold.
+        approx_spl = self.audio_level_meter.get_approximate_spl()
 
-        # Get configurable auto-reduce threshold (default 90%)
-        threshold = self.settings.get("auto_reduce_threshold", 90)
+        # Default to 90 dB SPL, but keep the threshold user-adjustable.
+        threshold = int(self.settings.get("auto_reduce_threshold", 90))
+        manual_override_until = getattr(self, '_manual_volume_override_until', 0.0)
+        cooldown_until = getattr(self, '_auto_reduce_cooldown_until', 0.0)
+
+        if time.time() < manual_override_until:
+            return
+
+        if time.time() < cooldown_until:
+            return
         
-        # Auto-reduction logic with configurable threshold
-        if level_percent > threshold:
-            # Increment a counter instead of triggering immediately
+        # Auto-reduction only when sound goes beyond the configured SPL threshold.
+        if approx_spl > threshold:
             if not hasattr(self, 'high_db_counter'): self.high_db_counter = 0
             self.high_db_counter += 1
 
-            # If it stays loud for ~2 seconds (20 cycles at 100ms each), reduce volume
+            # If it stays loud for ~2 seconds (20 cycles at 100ms each), reduce volume once.
             if self.high_db_counter >= 20:
                 current_vol = self.vol_slider.value()
                 if current_vol > 20:
                     new_volume = max(20, current_vol - 5)
-                    self.vol_slider.setValue(new_volume)
-                    spl = 60 + (level_percent * 0.5)  # Approximate SPL
-                    self.status_label.setText(f"Auto-reduced volume to {new_volume}% (Level: {level_percent:.0f}%, ~{spl:.0f} SPL)")
-                    self.high_db_counter = 0  # Reset after action
+                    self._auto_adjusting_volume = True
+                    try:
+                        self.vol_slider.setValue(new_volume)
+                    finally:
+                        self._auto_adjusting_volume = False
+                    self.status_label.setText(
+                        f"Auto-reduced volume to {new_volume}% (Level: ~{approx_spl:.0f} dB SPL)")
+                    self._auto_reduce_cooldown_until = time.time() + 1.0
+                self.high_db_counter = 0
         else:
-            # Reset counter if volume drops below threshold
+            # Reset counter if volume drops below threshold.
             self.high_db_counter = 0
+
+    def on_audio_analyzer_replaced(self, new_thread):
+        """Keep main reference synced when AudioService recreates analyzer thread."""
+        self.audio_analyzer = new_thread
 
     def jump_time(self, ms):
         if self.player.is_active():
@@ -549,6 +576,7 @@ class KaraokeApp(QWidget):
         QApplication.processEvents()
         self._pending_video_path = file_path
         self.add_to_history(file_path)
+        self.status_label.setText(f"Status: Loading {os.path.basename(file_path)}...")
 
         try:
             # Core loading logic
@@ -597,11 +625,14 @@ class KaraokeApp(QWidget):
             self.finish_loading(loader, is_audio_only)
             print(f"[main.load_video] ✓ finish_loading() complete")
 
+            self.status_label.setText(f"Status: Playing {os.path.basename(self.video_path)}")
+
         except Exception as e:
             print(f"[main.load_video] ❌ Engine Fault: {e}")
             import traceback
             traceback.print_exc()
             loader.close()
+            self.status_label.setText("Status: Load failed")
         finally:
             # Ensure file loading service is notified of completion
             print(f"[main.load_video] 🔚 Calling file_loading_service.finish_loading(resume_audio={was_playing})...")

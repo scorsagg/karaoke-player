@@ -1,5 +1,207 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+## Change: Sidebar Status Refresh on New File Load (2026-06-28) - COMPLETE ✅
+
+**Status:** Implemented
+
+**File Changed:** `source_code/main.py`
+
+### Problem
+Sidebar status text could keep showing old auto-reduce messages after selecting a new file.
+
+### Fix
+- `load_video()` now updates `status_label` on:
+   - load start: `Status: Loading <file>...`
+   - load success: `Status: Playing <file>`
+   - load failure: `Status: Load failed`
+
+### Result
+- Status updates immediately for new media loads and no longer waits for the next auto-reduce event.
+
+## Change: Manual Volume Override Window for Auto-Reduce (2026-06-27) - COMPLETE ✅
+
+**Status:** Implemented
+
+**File Changed:** `source_code/main.py`
+
+### Problem
+After auto-reduce lowered the volume, manual slider increases could appear ineffective because
+auto-reduce could immediately re-engage during the same loudness burst.
+
+### Fix
+- When the user changes volume manually, the app now starts a short override window (~3 seconds)
+- During that window, auto-reduce is paused so the manual change can take effect
+- Auto-reduce state counters are reset on manual changes
+
+### Result
+- Users can raise volume after a reduction without the reducer immediately fighting the change
+- Auto-reduce still resumes afterward if the sound remains above threshold
+
+## Change: Device-Agnostic Windows Meter Capture via soundcard Loopback (2026-06-27) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_analyzer.py`, `documentation/requirements.txt`
+
+### Problem
+On newer laptop hardware, WASAPI loopback InputStream attempts failed with
+`Invalid number of channels`, while default-input capture opened but reflected microphone/input silence.
+
+### Fix
+- Added `soundcard` backend as primary Windows playback-capture path:
+   - Uses default speaker -> loopback microphone (`include_loopback=True`)
+   - Tries 48k/44.1k and 2ch/1ch combinations
+- Kept existing `sounddevice` adaptive capture path as fallback
+- Added shared buffer helpers to keep dB emission logic consistent
+- Added runtime dependency: `soundcard>=0.4.3`
+
+### Result
+- Meter capture is less hardware-route-specific across different Windows laptop audio stacks
+- Existing fallback behavior remains available if soundcard loopback fails
+
+## Change: Fix Startup Crash on sounddevice 0.5.x (WasapiSettings signature) (2026-06-27) - COMPLETE ✅
+
+**Status:** Implemented
+
+**File Changed:** `source_code/workers/audio_analyzer.py`
+
+### Problem
+App crashed on startup with:
+`TypeError: WasapiSettings.__init__() got an unexpected keyword argument 'loopback'`
+
+### Root Cause
+Installed `sounddevice` version (`0.5.5`) does not support `loopback=` in `WasapiSettings`.
+
+### Fix
+- Replaced `sd.WasapiSettings(loopback=True)` with `sd.WasapiSettings()`
+- Kept adaptive device discovery/fallback logic unchanged
+
+### Result
+- Startup no longer crashes on this machine
+- Analyzer initialization continues and app launches normally
+
+## Change: Audio Meter Uses WASAPI Loopback First on Windows (2026-06-27) - COMPLETE ✅
+
+**Status:** Implemented
+
+**File Changed:** `source_code/workers/audio_analyzer.py`
+
+### Problem
+Meter still remained at 0% even when stream opened and playback was active.
+
+### Root Cause
+Opening a default `InputStream` can capture microphone/input silence instead of actual
+speaker playback on Windows systems.
+
+### Fix
+- Added Windows-first capture strategy:
+   - Try `WASAPI loopback` on default output device first
+   - Then fall back to normal input stream configs
+- Kept channel/sample-rate fallbacks (2ch/1ch, 44.1k/48k)
+- Added clearer stream mode/device logging for diagnostics
+
+### Result
+- Meter can now reflect real playback output on typical Windows setups
+- If loopback is unavailable, fallback behavior remains intact
+
+### Enhancement
+- Updated loopback selection to be hardware-agnostic by scanning:
+   - WASAPI host default output device
+   - Global default output when WASAPI-backed
+   - All WASAPI output-capable devices
+- Each candidate is tried with device-aware channel/sample-rate fallbacks,
+   reducing machine-specific breakage on systems with different audio stacks.
+
+## Change: Audio Meter Stream Compatibility Fallbacks (2026-06-27) - COMPLETE ✅
+
+**Status:** Implemented
+
+**File Changed:** `source_code/workers/audio_analyzer.py`
+
+### Problem
+Audio meter remained at `0%` on some setups despite playback and analyzer state transitions.
+
+### Root Cause
+`AudioAnalyzerThread` tried a single hardcoded stream config (`channels=2`, `samplerate=44100`).
+If the default input device did not support that exact config (common on mono devices),
+the stream failed and level updates never reached the UI.
+
+### Fix
+- Added stream config fallback sequence in `AudioAnalyzerThread`:
+   - channels: 2 then 1 (based on device capability)
+   - samplerates: 44100 then 48000
+- Added startup logs for each attempted config and stream-open success/failure
+- Kept existing dB emission logic unchanged after stream opens
+
+### Result
+- Better meter compatibility across Windows input device setups
+- Console diagnostics now clearly indicate stream configuration issues
+
+## Change: Decibel Meter Reconnection After Analyzer Thread Recreate (2026-06-27) - COMPLETE ✅
+
+**Status:** Fully Implemented
+
+**Files Changed:** `source_code/services/audio_service.py`, `source_code/main.py`
+
+### Problem
+After file transitions that stop and recreate `AudioAnalyzerThread`, the dB meter could stop
+updating due to stale callback wiring.
+
+### Root Cause
+`main.py` initially wired `level_updated -> on_audio_level_updated`, but recreated analyzer threads
+were not guaranteed to reconnect through the same main callback path.
+
+### Fix
+- Added optional callback hooks to `AudioService`:
+   - `level_update_handler`
+   - `analyzer_replaced_handler`
+- During `resume_analyzer()`, new thread now reconnects to `level_update_handler` when available
+   (meter direct-connect remains fallback)
+- `main.py` now passes:
+   - `level_update_handler=self.on_audio_level_updated`
+   - `analyzer_replaced_handler=self.on_audio_analyzer_replaced`
+- Added `on_audio_analyzer_replaced()` to keep `self.audio_analyzer` synchronized with recreated threads
+
+### Result
+- dB meter update path remains consistent across repeated file loads
+- Auto-reduce logic in `on_audio_level_updated()` continues to receive updates after thread recreation
+
+## Change: Automatic Windows VLC Runtime Bootstrap for Source Runs (2026-06-27) - COMPLETE ✅
+
+**Status:** Fully Implemented & Verified
+
+**Files Changed:** `source_code/services/player_service.py`
+
+### Problem
+Running `python .\\source_code\\main.py` failed on systems where Python dependencies were installed,
+but VLC native runtime directories were not exported in the shell environment:
+
+- `FileNotFoundError: ... libvlc.dll ...`
+
+### Root Cause
+`python-vlc` loads native VLC DLLs at import time. During source runs, bundled files existed in
+`resources/` but were not guaranteed to be discoverable by the Windows DLL loader.
+
+### Fix
+Added an early bootstrap in `player_service.py` before `import vlc`:
+
+1. Detect candidate VLC roots in this order:
+   - `<repo>/resources`
+   - `Path(sys.executable).parent`
+   - `Path.cwd()`
+2. Choose the first root containing both `libvlc.dll` and `plugins/`
+3. Prepend chosen root to `PATH` if missing
+4. Set `VLC_PLUGIN_PATH` if not already set
+5. Call `os.add_dll_directory(root)` when supported (Python 3.8+)
+
+### Result
+Source runs no longer require manual shell setup like:
+`$env:PATH=...; $env:VLC_PLUGIN_PATH=...`
+
+### Verification
+- ✅ `import source_code.main` succeeds without manual environment variables
+- ✅ Existing bundled runtime layout in `resources/` is used automatically
+
 ## Change: Widen Video Fixes — Fullscreen + FFmpeg + Post-Completion (2026-06-23) - COMPLETE ✅
 
 **Status:** Fully Implemented & Verified
