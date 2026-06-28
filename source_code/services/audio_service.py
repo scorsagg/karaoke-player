@@ -5,14 +5,18 @@ import time
 class AudioService:
     """Service to manage audio analyzer and meter display modes"""
     
-    def __init__(self, audio_analyzer, audio_meter):
+    def __init__(self, audio_analyzer, audio_meter, level_update_handler=None, analyzer_replaced_handler=None):
         """
         Args:
             audio_analyzer: AudioAnalyzerThread instance
             audio_meter: AudioLevelMeter widget instance
+            level_update_handler: Optional callable for db level updates
+            analyzer_replaced_handler: Optional callable(new_thread) when analyzer is recreated
         """
         self.audio_analyzer = audio_analyzer
         self.audio_meter = audio_meter
+        self.level_update_handler = level_update_handler
+        self.analyzer_replaced_handler = analyzer_replaced_handler
     
     def pause_analyzer(self):
         """Pause the audio analyzer by stopping the thread and closing sounddevice stream"""
@@ -54,13 +58,19 @@ class AudioService:
                     new_thread = AudioAnalyzerThread()
                     
                     # Reconnect the level_updated signal to the meter
-                    if self.audio_meter and hasattr(self.audio_meter, 'update_level'):
+                    if callable(self.level_update_handler):
+                        print(f"[AudioService.resume_analyzer] Connecting new thread to main audio level handler...")
+                        new_thread.level_updated.connect(self.level_update_handler)
+                    elif self.audio_meter and hasattr(self.audio_meter, 'update_level'):
                         print(f"[AudioService.resume_analyzer] Connecting new thread to audio meter...")
                         new_thread.level_updated.connect(self.audio_meter.update_level)
                     
                     # Replace old thread with new one
                     old_thread = self.audio_analyzer
                     self.audio_analyzer = new_thread
+
+                    if callable(self.analyzer_replaced_handler):
+                        self.analyzer_replaced_handler(new_thread)
                     
                     # Start the new thread
                     print(f"[AudioService.resume_analyzer] Starting new thread...")

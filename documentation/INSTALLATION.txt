@@ -89,7 +89,7 @@ Click "Settings" button to configure:
 ├─ yt-dlp Path          - Location of yt-dlp (usually auto-detected)
 ├─ Download Directory   - Where to save downloaded videos
 ├─ Measurement Mode    - Switch between dB Output (dBFS) or SPL Estimate
-└─ Auto-Reduce Threshold - Set volume reduction trigger (0-100%, default 80%)
+└─ Auto-Reduce Threshold - Sound level trigger in dB SPL (default 90 dB SPL, adjustable)
 
 Most settings are auto-configured. Customize audio settings for your room!
 
@@ -110,9 +110,8 @@ HOW TO CALIBRATE:
 1. Open "Settings" → "🔊 Audio Settings"
 2. Select measurement mode that works for your room
 3. Set "Auto-Reduce Threshold" based on your preferred volume:
-   ├─ Lower value (0-50%)   = More sensitive, reduces volume sooner
-   ├─ Default (80%)         = Recommended starting point
-   └─ Higher value (90-100%) = Less sensitive, allows louder levels
+   ├─ Default (90 dB SPL)     = Recommended starting point
+   └─ Higher value (>90 dB SPL) = Less sensitive, allows louder levels
 
 4. Test with actual karaoke sessions and fine-tune as needed
 5. When threshold is reached, app automatically reduces volume by 5%

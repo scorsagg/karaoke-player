@@ -72,10 +72,27 @@
 - `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → AudioService in services/
 
 **CRITICAL SIGNAL CONNECTIONS:**
-- When audio analyzer thread is recreated (pause/resume), audio_service.py line 59 calls: `new_thread.level_updated.connect(self.audio_meter.update_level)`
+- When audio analyzer thread is recreated (pause/resume), `AudioService` reconnects
+  `new_thread.level_updated` to the main handler (`on_audio_level_updated`) when provided,
+  with meter direct-connect as fallback.
 - AudioLevelMeter widget MUST have BOTH methods:
   - `set_level(db_value)` - Called directly from main.py's on_audio_level_updated()
-  - `update_level(db_value)` - Called from audio_service when thread is recreated (alias to set_level)
+  - `update_level(db_value)` - Fallback path used by AudioService if no main handler is provided
+- Audio analyzer stream startup in `source_code/workers/audio_analyzer.py` now uses
+  channel/sample-rate fallbacks (2ch/1ch, 44.1k/48k) so meters work on mono/default devices too.
+- On Windows, analyzer now tries WASAPI loopback (default output device) first so
+  the meter reflects actual playback output, then falls back to default input capture.
+- WASAPI loopback selection is adaptive: it scans WASAPI host defaults and output-capable
+  devices, then tries candidates with device-aware sample-rate/channel fallbacks.
+- `sounddevice` 0.5.x compatibility: `WasapiSettings()` must be used without a `loopback` kwarg.
+- Windows capture backend order in `audio_analyzer.py`:
+  1. `soundcard` speaker loopback microphone (hardware-agnostic playback capture)
+  2. `sounddevice` adaptive WASAPI/default-input fallback configs
+- Auto-reduce threshold is user-adjustable in dB SPL; `90` is the default, not a hard minimum.
+- Manual volume slider changes temporarily suspend auto-reduce for a short override window
+  so the user can raise/lower volume without the reducer immediately fighting the change.
+- Sidebar status text should be refreshed in `load_video()` on load start/success/failure
+  to avoid stale auto-reduce messages persisting across file changes.
 
 ### 6. SETTINGS/CONFIG CHANGES
 **File:** `config/settings.json`
@@ -570,6 +587,13 @@ ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192
 3. Update imports in main.py
 4. Update FOLDER_ORGANIZATION_SUMMARY.txt with folder structure
 5. Update ARCHITECTURE.md with UI section
+
+### Windows VLC runtime loading (python-vlc bootstrap)
+1. Update `source_code/services/player_service.py` (runtime path/bootstrap logic)
+2. Verify runtime files exist: `resources/libvlc.dll`, `resources/libvlccore.dll`, `resources/plugins/`
+3. Update `documentation/ARCHITECTURE.md` (PlayerService responsibilities)
+4. Update `DEVELOPMENT.md` (dev run guidance)
+5. Update `documentation/IMPLEMENTATION_LOG.md` (record behavior change)
 
 ---
 

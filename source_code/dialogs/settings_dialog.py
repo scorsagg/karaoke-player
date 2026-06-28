@@ -58,7 +58,7 @@ class SettingsDialog(QDialog):
             ],
             "🔊 Audio Settings": [
                 {"key": "measurement_mode", "label": "Audio Measurement Display:", "type": "select", "options": ["dB Output (dBFS)", "SPL Estimate (Room)"], "desc": "dB Output (dBFS) = signal from player. SPL Estimate = approximate room sound pressure from speaker."},
-                {"key": "auto_reduce_threshold", "label": "Auto-Reduce Volume Threshold (%):", "type": "number", "desc": "Audio level percentage (0-100%) above which volume auto-reduces. Default 80% ≈ 84 SPL. Max 100% = 90 SPL. Lower % = more sensitive."}
+                {"key": "auto_reduce_threshold", "label": "Auto-Reduce Threshold (dB SPL):", "type": "number", "desc": "Auto-reduce only when estimated sound level exceeds this dB SPL value. Default: 90 dB SPL."}
             ]
         }
         

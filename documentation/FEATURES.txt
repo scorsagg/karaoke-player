@@ -1,0 +1,96 @@
+﻿Karaoke Studio Pro v3 — Feature List
+======================================
+
+
+PLAYBACK & NAVIGATION
+---------------------
+- Play / Pause / Seek — Full playback controls with a seek slider and live time display
+- Skip buttons — Jump back or forward 10 seconds
+- Volume control — Slider with mute toggle; volume percentage shown
+- Fullscreen mode — Dedicated fullscreen video view with auto-hiding controls
+
+
+LOADING MEDIA
+-------------
+- Open local files — Load any audio or video file via the file browser
+- Drag & drop — Drop a file directly onto the video area to load it instantly
+- YouTube / Stream download — Paste any YouTube or stream URL to download and load automatically
+- Recent files history — Sidebar history list; click any entry to reload it; one-click clear
+
+
+PITCH & SPEED  (Pitch & Speed page)
+------------------------------------
+- Pitch shifter — Adjust pitch from -12 to +12 semitones in 0.5-step increments with +/- buttons and a reset
+- Playback speed — Adjust tempo from 0.5x to 2.0x (5% steps) independently of pitch
+- Export rendered file — Export a new file with the selected pitch and speed applied permanently
+
+
+REAL-TIME AUDIO METER  (always visible in playback bar)
+--------------------------------------------------------
+- Live level display — Color-coded bar: green (safe) -> orange (moderate) -> red (clipping risk)
+- Two measurement modes — Switch between dB Output (dBFS) and SPL Estimate (Room dB)
+- Auto-reduce protection — Automatically lowers volume when the level exceeds a configurable threshold
+
+
+AUDIO TOOLS  (Extra Tools -> Audio Tools)
+-----------------------------------------
+
+  Audio Extraction
+  ----------------
+  - Extract the audio track from any video file
+  - Choose output format: WAV, MP3, or AAC
+  - Auto-detects video vs. audio-only files
+
+  Audio Trimming
+  --------------
+  - Trim the first X seconds from a file
+  - Trim the last X seconds from a file
+  - Keep a range (set Start and End time) to cut out a specific segment
+  - Combinations of the above can be applied together
+  - H : M : S time pickers for precise entry
+  - Export trimmed audio as MP3, WAV, AAC, or M4A
+
+  Format Conversion
+  -----------------
+  - Convert between MP3, WAV, M4A, AAC, MP4, MKV (auto-detects source format)
+  - Choose quality for lossy formats: High (320 kbps), Medium (192 kbps), Low (128 kbps)
+
+  Loudness Normalization
+  ----------------------
+  - Normalize audio to a consistent loudness target:
+      -14 LUFS — Streaming platforms (Spotify, Apple Music)
+      -16 LUFS — Broadcast standard (TV, Radio)
+      -18 LUFS — Louder output
+  - Uses industry-standard two-pass EBU R128 analysis via FFmpeg
+
+  DAT / WhatsApp File Converter
+  -----------------------------
+  - Convert .DAT files from WhatsApp voice messages or karaoke machines to standard audio formats
+
+
+VIDEO TOOLS  (Extra Tools -> Video Tools)
+-----------------------------------------
+
+  Video Trimming
+  --------------
+  - Trim the first X seconds, last X seconds, or keep a time range
+  - Export as MP4, MKV, WebM, or AVI
+  - H : M : S time pickers for precise entry
+
+  Playback Window
+  ---------------
+  - Set one or more Start / End time ranges to play only specific parts of a file
+  - Multiple ranges are played sequentially (useful for skipping intros/outros)
+  - Ranges are cleared automatically when a new song is loaded
+
+  Widen Video (Aspect-Ratio Pad)
+  -------------------------------
+  - Scale a non-widescreen video to a 16:9 canvas by adding padding — no cropping
+
+
+SETTINGS  (Settings button in sidebar)
+---------------------------------------
+- Paths & Storage — Set the base workspace folder and media download directory
+- System Binaries — Configure paths to FFmpeg, FFprobe, and yt-dlp executables
+- Audio Settings — Choose measurement display mode (dBFS vs SPL);
+                   set the auto-reduce volume threshold

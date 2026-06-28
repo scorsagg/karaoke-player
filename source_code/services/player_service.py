@@ -1,6 +1,65 @@
 from PySide6.QtCore import QObject, Signal, QTimer
-import vlc
+import os
 import sys
+from pathlib import Path
+
+
+def _configure_vlc_runtime_windows():
+    """Configure VLC DLL/plugin lookup paths before importing python-vlc."""
+    if sys.platform != "win32":
+        return
+
+    # Support both source runs (repo/resources) and bundled runs (exe folder).
+    candidate_roots = []
+
+    try:
+        source_resources = Path(__file__).resolve().parents[2] / "resources"
+        candidate_roots.append(source_resources)
+    except Exception:
+        pass
+
+    try:
+        candidate_roots.append(Path(sys.executable).resolve().parent)
+    except Exception:
+        pass
+
+    try:
+        candidate_roots.append(Path.cwd())
+    except Exception:
+        pass
+
+    chosen_root = None
+    for root in candidate_roots:
+        if (root / "libvlc.dll").exists() and (root / "plugins").exists():
+            chosen_root = root
+            break
+
+    if chosen_root is None:
+        return
+
+    root_str = str(chosen_root)
+    plugins_str = str(chosen_root / "plugins")
+
+    print(f"[VLC Bootstrap] Using runtime root: {root_str}")
+
+    path_entries = os.environ.get("PATH", "").split(os.pathsep) if os.environ.get("PATH") else []
+    if root_str not in path_entries:
+        os.environ["PATH"] = root_str + os.pathsep + os.environ.get("PATH", "")
+
+    os.environ.setdefault("VLC_PLUGIN_PATH", plugins_str)
+
+    # Python 3.8+ Windows loader API for native DLL resolution.
+    add_dll_dir = getattr(os, "add_dll_directory", None)
+    if callable(add_dll_dir):
+        try:
+            add_dll_dir(root_str)
+        except Exception:
+            pass
+
+
+_configure_vlc_runtime_windows()
+
+import vlc
 
 
 class PlayerService(QObject):

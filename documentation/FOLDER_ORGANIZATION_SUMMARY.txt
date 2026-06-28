@@ -145,6 +145,15 @@ Build Standalone Executable (v3):
    • Properly resumes analyzer after settings close
    • Improved audio service cleanup on application exit
    • No more UI hangs when switching audio modes
+   • Recreated audio analyzer threads now reconnect to main dB handler reliably
+   • Audio analyzer InputStream now uses compatibility fallbacks (2ch/1ch, 44.1k/48k)
+    • Windows meter capture now prefers WASAPI loopback of output device for real playback levels
+    • WASAPI output-device discovery is adaptive (host default + output-capable scan), reducing hardware-specific failures
+    • Startup fixed for sounddevice 0.5.x by removing unsupported WasapiSettings(loopback=...) usage
+    • Windows audio meter now uses soundcard loopback backend first (speaker capture), with sounddevice fallback
+    • Sidebar status now refreshes on file load start/success/failure (prevents stale auto-reduce text)
+   • PlayerService auto-configures Windows VLC runtime paths for source runs
+     (PATH + VLC_PLUGIN_PATH + add_dll_directory)
 
 ✅ Build System (v3):
    • Version bumped to 3 in build.py and spec file
