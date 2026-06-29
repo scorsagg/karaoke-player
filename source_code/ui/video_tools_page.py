@@ -3,7 +3,7 @@
 # Module-level hook that main can set to provide the current video length (seconds)
 video_length_getter = lambda: 0
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox,
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                                QComboBox, QTabWidget)
 from PySide6.QtGui import QFont
 from source_code.ui.extra_page import TimePickerWidget
@@ -15,7 +15,7 @@ def create_video_tools_page():
     outer_layout.setContentsMargins(10, 5, 10, 5)
 
     # Current file indicator (updated by handle_navigation_change)
-    video_current_file_label = QLabel("No video loaded - use the Downloader page to load a video")
+    video_current_file_label = QLabel("No video loaded - use the Media Loader page to load a video")
     video_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
     outer_layout.addWidget(video_current_file_label)
     outer_layout.addSpacing(4)
@@ -37,41 +37,84 @@ def create_video_tools_page():
     trim_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
     trim_layout.addWidget(trim_title)
 
-    trim_first_cb = QCheckBox("Trim First X seconds:")
-    trim_first_picker = TimePickerWidget()
-    for _sp in (trim_first_picker.hour_spin, trim_first_picker.min_spin, trim_first_picker.sec_spin):
-        _sp.valueChanged.connect(lambda _v, cb=trim_first_cb: cb.setChecked(True))
-    r = QHBoxLayout()
-    r.addWidget(trim_first_cb); r.addWidget(trim_first_picker); r.addStretch()
-    trim_layout.addLayout(r)
+    trim_desc = QLabel("Set one or more keep-ranges to export. Ranges are concatenated in order.")
+    trim_desc.setStyleSheet("color: #aaa; font-size: 9px; font-style: italic;")
+    trim_desc.setWordWrap(True)
+    trim_layout.addWidget(trim_desc)
+    trim_layout.addSpacing(6)
 
-    trim_last_cb = QCheckBox("Trim Last X seconds:")
-    trim_last_picker = TimePickerWidget()
-    for _sp in (trim_last_picker.hour_spin, trim_last_picker.min_spin, trim_last_picker.sec_spin):
-        _sp.valueChanged.connect(lambda _v, cb=trim_last_cb: cb.setChecked(True))
-    r = QHBoxLayout()
-    r.addWidget(trim_last_cb); r.addWidget(trim_last_picker); r.addStretch()
-    trim_layout.addLayout(r)
+    trim_ranges_container = QWidget()
+    trim_ranges_layout = QVBoxLayout(trim_ranges_container)
+    trim_ranges_layout.setContentsMargins(0, 0, 0, 0)
+    trim_ranges_layout.setSpacing(8)
 
-    keep_range_cb = QCheckBox("Keep Range (from A to B):")
-    keep_range_start_picker = TimePickerWidget()
-    keep_range_end_picker = TimePickerWidget()
-    for _sp in (keep_range_start_picker.hour_spin, keep_range_start_picker.min_spin, keep_range_start_picker.sec_spin,
-                keep_range_end_picker.hour_spin, keep_range_end_picker.min_spin, keep_range_end_picker.sec_spin):
-        _sp.valueChanged.connect(lambda _v, cb=keep_range_cb: cb.setChecked(True))
-    r = QHBoxLayout()
-    r.addWidget(keep_range_cb)
-    r.addWidget(QLabel("Start:")); r.addWidget(keep_range_start_picker)
-    r.addWidget(QLabel("End:")); r.addWidget(keep_range_end_picker)
-    r.addStretch()
-    trim_layout.addLayout(r)
+    def make_trim_range_row(default_start=None, default_end=None):
+        row_w = QWidget()
+        row_l = QHBoxLayout(row_w)
+        start_picker = TimePickerWidget()
+        end_picker = TimePickerWidget()
+
+        try:
+            if default_start is not None:
+                start_picker.set_total_seconds(int(default_start))
+            if default_end is not None:
+                end_picker.set_total_seconds(int(default_end))
+        except Exception:
+            pass
+
+        remove_btn = QPushButton("Remove")
+        remove_btn.setFixedWidth(80)
+        remove_btn.setStyleSheet("background-color: #b00020; color: white;")
+
+        row_l.addWidget(QLabel("Start:"))
+        row_l.addWidget(start_picker)
+        row_l.addSpacing(10)
+        row_l.addWidget(QLabel("End:"))
+        row_l.addWidget(end_picker)
+        row_l.addWidget(remove_btn)
+        row_l.addStretch()
+
+        def _remove():
+            for i in range(trim_ranges_layout.count()):
+                if trim_ranges_layout.itemAt(i).widget() is row_w:
+                    item = trim_ranges_layout.takeAt(i)
+                    w = item.widget()
+                    if w:
+                        w.deleteLater()
+                    break
+            try:
+                if trim_ranges_layout.count() == 0:
+                    add_trim_range_row(0, int(video_length_getter()))
+            except Exception:
+                pass
+
+        remove_btn.clicked.connect(_remove)
+        return row_w
+
+    def add_trim_range_row(start_seconds=None, end_seconds=None):
+        trim_ranges_layout.addWidget(make_trim_range_row(start_seconds, end_seconds))
+
+    add_trim_range_row(0, int(video_length_getter()))
+
+    trim_add_range_btn = QPushButton("Add Range")
+    trim_add_range_btn.setFixedWidth(120)
+    trim_add_range_btn.setStyleSheet("background-color: #0e639c; color: white;")
+
+    trim_layout.addWidget(QLabel("Trim Ranges (kept sequentially):"))
+    trim_layout.addWidget(trim_ranges_container)
+    trim_add_row = QHBoxLayout()
+    trim_add_row.addStretch(); trim_add_row.addWidget(trim_add_range_btn)
+    trim_layout.addLayout(trim_add_row)
 
     trim_format_combo = QComboBox()
     trim_format_combo.addItems(["MP4", "MKV", "WebM", "AVI"])
     trim_btn = QPushButton("Trim Video")
     trim_btn.setStyleSheet("background-color: #ff9800; height: 35px; font-weight: bold; color: white;")
+    trim_clear_btn = QPushButton("Clear")
+    trim_clear_btn.setStyleSheet("background-color: #555; color: white; height: 32px; min-width: 80px;")
+
     r = QHBoxLayout()
-    r.addWidget(QLabel("Format:")); r.addWidget(trim_format_combo); r.addStretch(); r.addWidget(trim_btn)
+    r.addWidget(QLabel("Format:")); r.addWidget(trim_format_combo); r.addStretch(); r.addWidget(trim_btn); r.addWidget(trim_clear_btn)
     trim_layout.addLayout(r)
 
     trim_status_label = QLabel("Ready to trim video")
@@ -205,7 +248,7 @@ def create_video_tools_page():
     widen_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
     widen_layout.addWidget(widen_title)
 
-    widen_current_file_label = QLabel("No video loaded - use the Downloader page to load a video")
+    widen_current_file_label = QLabel("No video loaded - use the Media Loader page to load a video")
     widen_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
     widen_layout.addWidget(widen_current_file_label)
     widen_layout.addSpacing(10)
@@ -225,15 +268,12 @@ def create_video_tools_page():
         "widen_current_file_label": widen_current_file_label,
         "widen_exec_btn": widen_exec_btn,
         # Trim tab
-        "trim_first_cb": trim_first_cb,
-        "trim_first_picker": trim_first_picker,
-        "trim_last_cb": trim_last_cb,
-        "trim_last_picker": trim_last_picker,
-        "keep_range_cb": keep_range_cb,
-        "keep_range_start_picker": keep_range_start_picker,
-        "keep_range_end_picker": keep_range_end_picker,
+        "trim_ranges_container": trim_ranges_container,
+        "trim_add_range_btn": trim_add_range_btn,
+        "trim_add_range": add_trim_range_row,
         "trim_format_combo": trim_format_combo,
         "trim_btn": trim_btn,
+        "trim_clear_btn": trim_clear_btn,
         "trim_status_label": trim_status_label,
         # Playback Window tab
         "pw_ranges_container": ranges_container,

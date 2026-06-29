@@ -1,12 +1,11 @@
-"""Download page UI component"""
+"""Media loader page UI component"""
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QLineEdit, QFrame
-from PySide6.QtCore import Qt
 
 
-def create_download_page():
-    """Create and return the download page UI
-    
+def create_media_loader_page():
+    """Create and return the media loader page UI.
+
     Returns:
         dict: Dictionary containing page widget and control references
     """
@@ -43,5 +42,10 @@ def create_download_page():
         "page": page,
         "load_btn": load_btn,
         "url_input": url_input,
-        "dl_btn": dl_btn
+        "dl_btn": dl_btn,
     }
+
+
+def create_download_page():
+    """Backward-compatible alias for older imports."""
+    return create_media_loader_page()

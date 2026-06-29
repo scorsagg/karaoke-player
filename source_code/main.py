@@ -38,7 +38,7 @@ class KaraokeApp(QWidget):
 
         self.init_settings_manager()
 
-        self.setWindowTitle("Karaoke Studio Pro v2.0")
+        self.setWindowTitle("Karaoke Studio Pro v3.0")
         self.resize(1150, 850)
         self.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: 'Segoe UI';")
 
@@ -46,7 +46,7 @@ class KaraokeApp(QWidget):
 
         self.setup_ui()
         self.nav_list.setCurrentRow(0)
-        self.handle_navigation_change(0)  # explicitly init video frame + stack for Downloader
+        self.handle_navigation_change(0)  # explicitly init video frame + stack for Media Loader
 
         self.timer = QTimer()
         self.timer.setInterval(200)
@@ -167,10 +167,10 @@ class KaraokeApp(QWidget):
         self.fullscreen_btn = playback_components["fullscreen_btn"]
         
         # Extract page components
-        download_page_components = components["download_page_components"]
-        self.load_btn = download_page_components["load_btn"]
-        self.url_input = download_page_components["url_input"]
-        dl_btn_download = download_page_components["dl_btn"]
+        media_loader_page_components = components.get("media_loader_page_components", components["download_page_components"])
+        self.load_btn = media_loader_page_components["load_btn"]
+        self.url_input = media_loader_page_components["url_input"]
+        media_loader_download_btn = media_loader_page_components["dl_btn"]
         
         pitch_page_components = components["pitch_page_components"]
         self.pitch_minus = pitch_page_components["pitch_minus"]
@@ -228,14 +228,11 @@ class KaraokeApp(QWidget):
         self.video_current_file_label = video_tools_page_components["video_current_file_label"]
         self.widen_current_file_label = video_tools_page_components["widen_current_file_label"]
         self.widen_exec_btn = video_tools_page_components["widen_exec_btn"]
-        self.video_trim_first_cb = video_tools_page_components["trim_first_cb"]
-        self.video_trim_first_picker = video_tools_page_components["trim_first_picker"]
-        self.video_trim_last_cb = video_tools_page_components["trim_last_cb"]
-        self.video_trim_last_picker = video_tools_page_components["trim_last_picker"]
-        self.video_trim_range_cb = video_tools_page_components["keep_range_cb"]
-        self.video_trim_range_start = video_tools_page_components["keep_range_start_picker"]
-        self.video_trim_range_end = video_tools_page_components["keep_range_end_picker"]
+        self.video_trim_ranges_container = video_tools_page_components["trim_ranges_container"]
+        self.video_trim_add_range_btn = video_tools_page_components["trim_add_range_btn"]
+        self.video_trim_add_range = video_tools_page_components.get("trim_add_range")
         self.video_trim_format_combo = video_tools_page_components["trim_format_combo"]
+        self.video_trim_clear_btn = video_tools_page_components["trim_clear_btn"]
         video_trim_btn = video_tools_page_components["trim_btn"]
         self.video_trim_status_label = video_tools_page_components["trim_status_label"]
         # Playback Window controls (ranges container)
@@ -272,7 +269,7 @@ class KaraokeApp(QWidget):
         self.clear_hist_btn.clicked.connect(self.clear_history)
         self.settings_btn.clicked.connect(self.open_settings)
         self.load_btn.clicked.connect(lambda: self.load_video())
-        dl_btn_download.clicked.connect(lambda: self.download_video())
+        media_loader_download_btn.clicked.connect(lambda: self.download_video())
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
         self.play_btn.clicked.connect(self.handle_play)
         self.pause_btn.clicked.connect(self.player.pause)
@@ -293,8 +290,13 @@ class KaraokeApp(QWidget):
         normalize_btn.clicked.connect(self.normalize_audio)
         # Feature 19: DAT file conversion
         self.dat_convert_btn.clicked.connect(self.convert_dat_file)
-        # Video Tools: Video Trimming (uses video loaded from Downloader page)
+        # Video Tools: Video Trimming (uses video loaded from Media Loader page)
         video_trim_btn.clicked.connect(self.trim_video)
+        self.video_trim_clear_btn.clicked.connect(self.clear_video_trim_ranges)
+        try:
+            self.video_trim_add_range_btn.clicked.connect(self._on_video_trim_add_range)
+        except Exception:
+            pass
         self.pw_apply_btn.clicked.connect(self.handle_play)
         self.pw_clear_btn.clicked.connect(self.clear_playback_window)
         # Connect Add Range button to a handler that computes sensible defaults
@@ -365,9 +367,9 @@ class KaraokeApp(QWidget):
                 self.widen_current_file_label.setText(f"✅ Working on: {fname}")
                 self.widen_current_file_label.setStyleSheet("color: #2ecc71; font-size: 10px; font-style: normal; padding: 2px 5px;")
             else:
-                self.video_current_file_label.setText("No video loaded — use the Downloader page to load a video")
+                self.video_current_file_label.setText("No video loaded — use the Media Loader page to load a video")
                 self.video_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
-                self.widen_current_file_label.setText("No video loaded — use the Downloader page to load a video")
+                self.widen_current_file_label.setText("No video loaded — use the Media Loader page to load a video")
                 self.widen_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
         else:
             self.video_frame.setMinimumHeight(420)
@@ -559,19 +561,26 @@ class KaraokeApp(QWidget):
             file_path = f
             print(f"[main.load_video] ✓ File selected: {file_path}")
 
+        # Create/show splash as early as possible so users can see progress during preparation.
+        if splash_screen is None:
+            loading_path = get_resource_path("Loading.png")
+            pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+            if not os.path.exists(loading_path):
+                pix.fill(QColor("#1e1e1e"))
+            loader = ModernSplashScreen(pix)
+            loader.show()
+        else:
+            loader = splash_screen
+
+        loader.set_progress(10, "Preparing Media Loader...")
+        QApplication.processEvents()
+
         # Prepare for loading using file loading service
         print(f"[main.load_video] Calling file_loading_service.prepare_for_loading()...")
         was_playing = self.file_loading_service.prepare_for_loading()
         print(f"[main.load_video] ✓ prepare_for_loading returned (was_playing={was_playing})")
 
-        if splash_screen is None:
-            loading_path = get_resource_path("Loading.png")
-            pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-            if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-            loader = ModernSplashScreen(pix)
-            loader.show()
-        else:
-            loader = splash_screen
+        loader.set_progress(25, "Preparing Playback Resources...")
 
         QApplication.processEvents()
         self._pending_video_path = file_path
@@ -789,7 +798,7 @@ class KaraokeApp(QWidget):
             QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
             return
 
-        self.status_label.setText("Status: Deploying Downloader Task Pipes...")
+        self.status_label.setText("Status: Deploying Media Loader Task Pipes...")
         loading_path = get_resource_path("Loading.png")
         pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
         if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
@@ -1152,7 +1161,7 @@ class KaraokeApp(QWidget):
                       if hasattr(self, 'audio_tools_file_path') and self.audio_tools_file_path
                       else self.video_path)
         if not video_path:
-            QMessageBox.warning(self, "No File", "Load a file in Audio Tools or load a video from the Downloader page first")
+            QMessageBox.warning(self, "No File", "Load a file in Audio Tools or load a video from the Media Loader page first")
             return
 
         base_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -1467,16 +1476,11 @@ class KaraokeApp(QWidget):
             return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", output_file]
 
     def trim_video(self):
-        """Trim video file with first, last, or range trimming (uses currently loaded video)"""
+        """Trim video using range rows from Video Tools tab (similar to Playback Window)."""
         if not self.video_path:
-            QMessageBox.warning(self, "No Video Loaded", "Load a video from the Downloader page first")
+            QMessageBox.warning(self, "No Video Loaded", "Load a video from the Media Loader page first")
             return
 
-        # Get trimming parameters
-        trim_first = self.video_trim_first_picker.get_total_seconds() if self.video_trim_first_cb.isChecked() else None
-        trim_last = self.video_trim_last_picker.get_total_seconds() if self.video_trim_last_cb.isChecked() else None
-        trim_range = (self.video_trim_range_start.get_total_seconds(), self.video_trim_range_end.get_total_seconds()) if self.video_trim_range_cb.isChecked() else None
-        
         # Extract target format
         target_fmt_text = self.video_trim_format_combo.currentText()
         if "MP4" in target_fmt_text:
@@ -1490,9 +1494,10 @@ class KaraokeApp(QWidget):
         else:
             target_fmt = "mp4"
 
-        # Validate that at least one trim option is selected
-        if trim_first is None and trim_last is None and trim_range is None:
-            QMessageBox.warning(self, "No Trim Options", "Select at least one trimming option (trim first, trim last, or keep range)")
+        duration = self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/"))
+        ranges_ms = self._collect_video_trim_ranges(duration)
+        if not ranges_ms:
+            QMessageBox.warning(self, "No Trim Ranges", "Add at least one valid trim range (End must be after Start).")
             return
 
         loading_path = get_resource_path("Loading.png")
@@ -1503,44 +1508,127 @@ class KaraokeApp(QWidget):
         self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("video_trim_task"))
         self.export_splash.show()
 
-        # Calculate trim points
-        duration = self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/"))
-        start_time = 0
-        end_time = duration
-
-        # Apply trim_first
-        if trim_first is not None:
-            start_time = trim_first
-
-        # Apply trim_last
-        if trim_last is not None:
-            end_time = duration - trim_last
-
-        # Apply trim_range (overrides other trims)
-        if trim_range is not None:
-            start_time = trim_range[0]
-            end_time = trim_range[1]
-
-        # Ensure valid range
-        if start_time >= end_time:
-            QMessageBox.warning(self, "Invalid Range", "Start time must be before end time")
-            if self.export_splash:
-                self.export_splash.close()
-                self.export_splash = None
-            return
-
         base_name = os.path.splitext(os.path.basename(self.video_path))[0]
         out = os.path.join(self.settings["download_directory"], f"{base_name}_trimmed.{target_fmt}")
 
         abs_in = os.path.abspath(self.video_path).replace("\\", "/")
         abs_out = os.path.abspath(out).replace("\\", "/")
 
-        # Build FFmpeg command for video trimming
-        cmd = self.build_video_trim_cmd(abs_in, abs_out, target_fmt, start_time, end_time)
+        if len(ranges_ms) == 1:
+            start_time = ranges_ms[0][0] / 1000.0
+            end_time = ranges_ms[0][1] / 1000.0
+            cmd = self.build_video_trim_cmd(abs_in, abs_out, target_fmt, start_time, end_time)
+        else:
+            cmd = self.build_video_multi_trim_cmd(abs_in, abs_out, target_fmt, ranges_ms)
 
-        trimmed_duration = end_time - start_time
+        trimmed_duration = sum((e - s) for s, e in ranges_ms) / 1000.0
         self.launch_async_task(cmd, abs_out, "video_trim_task", override_duration=trimmed_duration)
-        self.video_trim_status_label.setText(f"Trimming video ({trimmed_duration:.1f}s)...")
+        self.video_trim_status_label.setText(f"Trimming video ({len(ranges_ms)} range(s), {trimmed_duration:.1f}s total)...")
+
+    def _collect_video_trim_ranges(self, duration_seconds):
+        """Collect and normalize trim ranges from trim range rows (milliseconds)."""
+        ranges_ms = []
+        duration_ms = max(0, int(duration_seconds * 1000))
+
+        container = getattr(self, 'video_trim_ranges_container', None)
+        if container is None:
+            return []
+
+        layout = container.layout()
+        if layout is None:
+            return []
+
+        for i in range(layout.count()):
+            row = layout.itemAt(i).widget()
+            if not row:
+                continue
+            pickers = row.findChildren(TimePickerWidget)
+            if len(pickers) < 2:
+                continue
+
+            start_ms = int(max(0, pickers[0].get_total_seconds()) * 1000)
+            end_ms = int(max(0, pickers[1].get_total_seconds()) * 1000)
+
+            if duration_ms > 0:
+                start_ms = min(start_ms, duration_ms)
+                end_ms = min(end_ms, duration_ms)
+
+            if end_ms > start_ms:
+                ranges_ms.append((start_ms, end_ms))
+
+        ranges_ms.sort(key=lambda x: x[0])
+        if not ranges_ms:
+            return []
+
+        # Merge overlapping/touching ranges so output doesn't duplicate repeated segments.
+        merged = [ranges_ms[0]]
+        for start_ms, end_ms in ranges_ms[1:]:
+            last_start, last_end = merged[-1]
+            if start_ms <= last_end:
+                merged[-1] = (last_start, max(last_end, end_ms))
+            else:
+                merged.append((start_ms, end_ms))
+
+        return merged
+
+    def clear_video_trim_ranges(self):
+        """Reset video trim rows to a single default range (0 to full video length)."""
+        container = getattr(self, 'video_trim_ranges_container', None)
+        if container is None:
+            return
+
+        layout = container.layout()
+        if layout is None:
+            return
+
+        while layout.count() > 0:
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        total_s = self._get_current_video_duration_seconds()
+        if hasattr(self, 'video_trim_add_range') and callable(self.video_trim_add_range):
+            self.video_trim_add_range(0, total_s)
+        self.video_trim_status_label.setText("Ready to trim video")
+
+    def _on_video_trim_add_range(self):
+        """Add a new trim range row with sensible defaults based on previous row end."""
+        if not hasattr(self, 'video_trim_add_range') or not callable(self.video_trim_add_range):
+            return
+
+        total_s = self._get_current_video_duration_seconds()
+        prev_end_s = 0
+        container = getattr(self, 'video_trim_ranges_container', None)
+        if container is not None:
+            layout = container.layout()
+            if layout and layout.count() > 0:
+                last_row = layout.itemAt(layout.count() - 1).widget()
+                if last_row:
+                    pickers = last_row.findChildren(TimePickerWidget)
+                    if len(pickers) >= 2:
+                        prev_end_s = int(pickers[1].get_total_seconds())
+
+        if prev_end_s >= total_s and total_s > 0:
+            self.video_trim_status_label.setText("Cannot add range — already covers to video end")
+            return
+
+        new_start = max(0, prev_end_s + 1)
+        new_end = max(new_start, total_s)
+        self.video_trim_add_range(new_start, new_end)
+
+    def _get_current_video_duration_seconds(self):
+        """Return current video duration in seconds from player or ffprobe fallback."""
+        total_ms = max(0, int(self.player.get_length())) if self.player else 0
+        if total_ms > 0:
+            return total_ms // 1000
+
+        if self.video_path:
+            try:
+                return int(self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/")))
+            except Exception:
+                return 0
+        return 0
 
     def build_video_trim_cmd(self, input_file, output_file, target_fmt, start_time, end_time):
         """Build FFmpeg command for video trimming with format-specific codec selection"""
@@ -1571,6 +1659,36 @@ class KaraokeApp(QWidget):
             return [ffmpeg_path, "-y", "-ss", str(start_time), "-to", str(end_time),
                     "-i", input_file, "-c:v", "libx264", "-preset", "fast",
                     "-c:a", "aac", "-b:a", "192k", output_file]
+
+    def build_video_multi_trim_cmd(self, input_file, output_file, target_fmt, ranges_ms):
+        """Build FFmpeg command to keep multiple ranges and concatenate them."""
+        ffmpeg_path = self.settings["ffmpeg_path"]
+
+        parts = []
+        for i, (s_ms, e_ms) in enumerate(ranges_ms):
+            s = s_ms / 1000.0
+            e = e_ms / 1000.0
+            parts.append(f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS[v{i}]")
+            parts.append(f"[0:a]atrim=start={s}:end={e},asetpts=PTS-STARTPTS[a{i}]")
+
+        va_inputs = "".join([f"[v{i}][a{i}]" for i in range(len(ranges_ms))])
+        parts.append(f"{va_inputs}concat=n={len(ranges_ms)}:v=1:a=1[v][a]")
+        filter_complex = ";".join(parts)
+
+        cmd = [ffmpeg_path, "-y", "-i", input_file, "-filter_complex", filter_complex, "-map", "[v]", "-map", "[a]"]
+
+        if target_fmt == "mp4":
+            cmd += ["-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k", output_file]
+        elif target_fmt == "mkv":
+            cmd += ["-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k", output_file]
+        elif target_fmt == "webm":
+            cmd += ["-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "0", "-c:a", "libopus", "-b:a", "192k", output_file]
+        elif target_fmt == "avi":
+            cmd += ["-c:v", "mpeg4", "-q:v", "5", "-c:a", "libmp3lame", "-b:a", "192k", output_file]
+        else:
+            cmd += ["-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k", output_file]
+
+        return cmd
 
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
         self.kill_allocated_task(task_key)

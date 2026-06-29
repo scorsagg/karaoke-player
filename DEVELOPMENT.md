@@ -67,7 +67,7 @@ source_code/
 │   ├── main_layout.py        # Orchestrator assembling all UI
 │   ├── sidebar.py            # Navigation & settings
 │   ├── playback_bar.py       # Play/pause/volume/audio meter
-│   ├── download_page.py      # File & URL loading
+│   ├── media_loader_page.py  # Media Loader page (file & URL loading)
 │   ├── pitch_page.py         # Pitch & speed controls
 │   └── extra_page.py         # Video widening + Audio Tools (Trim/Convert)
 ├── services/
@@ -174,6 +174,18 @@ config/
 - Settings are cleared automatically on every new file load (`clear_playback_window()`)
 - Timer loop in `update_ui()` enforces the end-cutoff via `_pw_end_ms`
 
+### Feature: Video Tools - Trimming (Playback-Style Rows) ✅
+- Video Trimming now uses row-based Start/End controls (like Playback Window)
+- Add multiple keep-ranges and export them in one output
+- Single range: direct trim path
+- Multiple ranges: FFmpeg `filter_complex` trim/atrim + concat
+- Overlapping/touching ranges are auto-merged before export
+- Clear action resets ranges to one default full-duration row
+
+Implementation references:
+- UI: `source_code/ui/video_tools_page.py`
+- Runtime parsing/export: `source_code/main.py` (`trim_video`, `_collect_video_trim_ranges`, `build_video_multi_trim_cmd`)
+
 ### UI Architecture Notes (updated 2026-06-21)
 - **Scroll areas**: Audio Tools (idx 3) and Video Tools (idx 4) pages are wrapped in
   `QScrollArea` in `main_layout.py` — content scrolls when window is small
@@ -238,6 +250,8 @@ Audio analyzer note:
    which prevents the reducer from immediately undoing the user's adjustment.
 - Keep `status_label` updated during file load lifecycle (loading/playing/failed)
    so previous transient messages (for example auto-reduce notices) do not linger.
+- For visible splash progress, create/show splash before heavy preparation steps
+   (`prepare_for_loading`) and update progress in staged increments.
 
 ### Adding a New UI Component
 

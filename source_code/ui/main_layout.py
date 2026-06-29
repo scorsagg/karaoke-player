@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt
 from source_code.widgets.video_frame import VideoFrame
 from source_code.ui.sidebar import create_sidebar
 from source_code.ui.playback_bar import create_playback_bar
-from source_code.ui.download_page import create_download_page
+from source_code.ui.media_loader_page import create_media_loader_page
 from source_code.ui.pitch_page import create_pitch_page
 from source_code.ui.extra_page import create_audio_tools_page
 from source_code.ui.video_tools_page import create_video_tools_page
@@ -59,9 +59,10 @@ def create_main_layout(settings):
     # Content pages (stacked widget)
     stack = QStackedWidget()
     
-    download_page_components = create_download_page()
-    stack.addWidget(download_page_components["page"])
-    components["download_page_components"] = download_page_components
+    media_loader_page_components = create_media_loader_page()
+    stack.addWidget(media_loader_page_components["page"])
+    components["media_loader_page_components"] = media_loader_page_components
+    components["download_page_components"] = media_loader_page_components  # backward compatibility
     
     pitch_page_components = create_pitch_page()
     stack.addWidget(pitch_page_components["page"])
