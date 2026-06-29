@@ -31,7 +31,7 @@
 
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:
-- main_layout.py, sidebar.py, playback_bar.py, download_page.py, pitch_page.py, extra_page.py, video_tools_page.py
+- main_layout.py, sidebar.py, playback_bar.py, media_loader_page.py, pitch_page.py, extra_page.py, video_tools_page.py
 
 **Files to update when modifying UI:**
 - `build_system/KaraokeStudioPro.spec` → hiddenimports for new UI modules
@@ -40,7 +40,7 @@
 - `documentation/ARCHITECTURE.md` → UI architecture section
 
 **Page index map (CRITICAL — do not change):**
-- 0: Downloader | 1: Pitch & Speed | 2: Widen Video | 3: Audio Tools | 4: Video Tools
+- 0: Media Loader | 1: Pitch & Speed | 2: Widen Video | 3: Audio Tools | 4: Video Tools
 
 **Scroll Areas (added 2026-06-21):**
 - Pages 3 (Audio Tools) and 4 (Video Tools) are wrapped in `QScrollArea` in `main_layout.py`
@@ -93,6 +93,8 @@
   so the user can raise/lower volume without the reducer immediately fighting the change.
 - Sidebar status text should be refreshed in `load_video()` on load start/success/failure
   to avoid stale auto-reduce messages persisting across file changes.
+- Splash progress visibility depends on initializing/showing the splash before
+  `file_loading_service.prepare_for_loading()` in `load_video()`.
 
 ### 6. SETTINGS/CONFIG CHANGES
 **File:** `config/settings.json`
@@ -256,6 +258,32 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 **What changed:**
 - `widen_active_video_canvas()` → restored original working FFmpeg filter + added `-preset ultrafast`
   - Filter: `crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`
+
+### 13. VIDEO TOOLS - RANGE-ROW VIDEO TRIMMING (2026-06-29) ✅ COMPLETE
+**Files changed:** `source_code/ui/video_tools_page.py`, `source_code/main.py`
+
+**What changed:**
+- Video Trimming tab now follows Playback Window interaction style:
+  - Dynamic Start/End range rows with `Add Range` and per-row `Remove`
+  - `Clear` resets to one default range (0 -> full duration)
+- `trim_video()` now reads row-based ranges instead of old first/last/range checkboxes
+- Single range export uses existing trim flow; multiple ranges use FFmpeg `filter_complex`
+  concat pipeline to keep selected segments sequentially.
+
+**When modifying this feature, update together:**
+- `source_code/ui/video_tools_page.py` (row UI and row controls)
+- `source_code/main.py`:
+  - row collection/validation (`_collect_video_trim_ranges`)
+  - clear/add helpers (`clear_video_trim_ranges`, `_on_video_trim_add_range`)
+  - command builder (`build_video_multi_trim_cmd`)
+- `documentation/ARCHITECTURE.md` and `DEVELOPMENT.md` (behavior docs)
+
+**Behavior rules:**
+- A range is valid only when `end > start`
+- Ranges are clamped to video duration
+- Overlapping/touching ranges are merged before export
+- Empty/invalid range set blocks export with validation message
+- Multiple valid ranges are sorted by start time and concatenated in output order
   - Speed flag: `-preset ultrafast` (without `-c:v`, `-threads 0`, or `-pix_fmt` to avoid VLC h264 warnings)
 - `toggle_video_fullscreen()` → removes `video_frame` height cap on enter, restores on exit
 - `handle_task_completion()` → widen_task post-completion now updates status label, path, and navigates to page 2

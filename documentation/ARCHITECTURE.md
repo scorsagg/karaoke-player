@@ -93,11 +93,14 @@ Pages 3 and 4 in the QStackedWidget are wrapped in QScrollArea:
 
 ```
 QStackedWidget
-├── [0] download_page (QWidget)
+├── [0] media_loader_page (QWidget)
 ├── [1] pitch_page (QWidget)
 ├── [2] widen_page (QWidget)
 ├── [3] QScrollArea → audio_tools_page (QWidget)   ← scroll area wrapper
 └── [4] QScrollArea → video_tools_page (QWidget)   ← scroll area wrapper
+
+Module mapping:
+- `source_code/ui/media_loader_page.py` provides stack index 0.
 ```
 
 Video frame height is controlled per-page in `handle_navigation_change()`:
@@ -108,6 +111,25 @@ Video frame height is controlled per-page in `handle_navigation_change()`:
 
 **Fullscreen:** `toggle_video_fullscreen()` removes the height cap on enter (sets max=unlimited),
 then calls `handle_navigation_change(current_idx)` on exit to restore page-correct constraints.
+
+### Video Tools: Playback-Style Trimming (updated 2026-06-29)
+
+The Video Tools trimming tab now uses the same interaction style as Playback Window:
+- Dynamic Start/End range rows
+- Add/remove range controls
+- Clear resets to one default row (0 to full duration)
+
+Runtime handling in `main.py`:
+- `trim_video()` collects and validates rows via `_collect_video_trim_ranges()`
+- One valid range: uses direct trim command
+- Multiple valid ranges: uses `build_video_multi_trim_cmd()` with FFmpeg
+    `filter_complex` trim/atrim + concat pipeline
+
+Validation rules:
+- `end > start` required
+- Values are clamped to media duration
+- Overlapping/touching ranges are merged before command construction
+- Empty valid set blocks export
 
 ---
 
@@ -123,6 +145,7 @@ then calls `handle_navigation_change(current_idx)` on exit to restore page-corre
 - Handle user input (buttons, sliders, keyboard)
 - Manage audio analyzer thread
 - Refresh sidebar status text on load start/success/failure events
+- Drive splash progress updates through full load lifecycle, including preparation phase
 - Clean shutdown and resource cleanup
 
 **Key Methods:**

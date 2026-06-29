@@ -1,5 +1,74 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+## Change: Video Tools Trimming Refactor to Playback-Window Style (2026-06-29) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/video_tools_page.py`, `source_code/main.py`
+
+### Problem
+Video Trimming still used the older checkbox model (trim first / trim last / keep range),
+while Playback Window already used a clearer row-based Start/End workflow.
+
+### Fix
+- Replaced old trim checkbox controls with dynamic trim range rows:
+   - Add range
+   - Remove row
+   - Clear back to a single default full-length range
+- Updated `trim_video()` to parse row ranges and validate them
+- Added multi-range trim export path using FFmpeg `filter_complex` + `concat`
+   so selected keep-ranges are exported as one stitched output
+
+### Result
+- Video Trimming interaction is now consistent with Playback Window style
+- Users can keep multiple segments in one trim operation
+- Existing single-range trimming remains supported and simpler cases still work
+
+### Enhancement
+- Overlapping (or touching) trim ranges are now merged before export to avoid
+   duplicated/repeated content in stitched outputs.
+
+## Change: Internal Naming Alignment for Media Loader Page (2026-06-29) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/media_loader_page.py`, `source_code/ui/main_layout.py`, `source_code/ui/__init__.py`, `source_code/main.py`
+
+### Problem
+UI label had been renamed to "Media Loader" but some internal page/component symbols still used
+"download_*" naming, which could confuse future maintenance.
+
+### Fix
+- Added canonical factory name `create_media_loader_page()`
+- Updated main layout/component wiring to `media_loader_page_components`
+- Updated main.py local references to `media_loader_*` naming
+- Kept backward-compatible aliases/keys (`create_download_page`, `download_page_components`)
+   to avoid breaking existing imports during transition
+
+### Result
+- Internal naming better matches visible UI terminology
+- Existing code paths remain stable via compatibility aliases
+
+## Change: Splash Progress Bar Visibility During File Load (2026-06-29) - COMPLETE ✅
+
+**Status:** Implemented
+
+**File Changed:** `source_code/main.py`
+
+### Problem
+Splash progress appeared static because the splash was shown only after the heavy
+`prepare_for_loading()` step had already completed.
+
+### Fix
+- Moved splash creation/show earlier in `load_video()`
+- Added staged progress updates before and after preparation:
+   - 10%: preparing media loader
+   - 25%: preparing playback resources
+
+### Result
+- Progress bar updates are visible during the actual waiting period and no longer
+   appear frozen at startup of file loading.
+
 ## Change: Sidebar Status Refresh on New File Load (2026-06-28) - COMPLETE ✅
 
 **Status:** Implemented

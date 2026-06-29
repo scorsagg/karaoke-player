@@ -32,7 +32,7 @@ def create_sidebar(parent):
         QListWidget::item { height: 50px; padding-left: 15px; }
         QListWidget::item:selected { background-color: #37373d; color: white; border-left: 4px solid #2ecc71; }
     """)
-    nav_list.addItems(["📥 Downloader", "🎬 Pitch & Speed"])
+    nav_list.addItems(["📥 Media Loader", "🎬 Pitch & Speed"])
     side_layout.addWidget(nav_list)
 
     extra_tools_toggle_btn = QPushButton("▶ 🛠 Extra Tools")

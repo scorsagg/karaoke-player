@@ -30,13 +30,13 @@
 │  │  ├─ main_layout.py           (Orchestrator combining all UI)
 │  │  ├─ sidebar.py               (Navigation & settings sidebar)
 │  │  ├─ playback_bar.py          (Play/pause/seek/volume/audio meter)
-│  │  ├─ download_page.py         (File loading & URL streaming)
+│  │  ├─ media_loader_page.py     (Media Loader page: file loading & URL streaming)
 │  │  ├─ pitch_page.py            (Pitch shift & speed controls)
 │  │  ├─ extra_page.py            (Tabbed interface: Aspect ratio widening + Audio tools)
 │  │  │                           ├─ Tab 1: Video Widening (Feature - convert 9:16 to 16:9)
 │  │  │                           ├─ Tab 2-5: Audio Tools (Extraction, Trimming, Conversion, Normalization, DAT)
-  └─ video_tools_page.py      (Video Tools page - two tabs)
-│                              ├─ Tab 1: Video Trimming (trim first/last/range, H/M/S pickers, MP4/MKV/WebM/AVI)
+   └─ video_tools_page.py      (Video Tools page - two tabs)
+│                              ├─ Tab 1: Video Trimming (row-based start/end ranges with add/remove/clear, MP4/MKV/WebM/AVI)
 │                              └─ Tab 2: Playback Window (skip-to, stop-before-end, play-range A→B + Apply&Play button)
 │  │
 │  ├─ 📁 widgets/
@@ -152,6 +152,7 @@ Build Standalone Executable (v3):
     • Startup fixed for sounddevice 0.5.x by removing unsupported WasapiSettings(loopback=...) usage
     • Windows audio meter now uses soundcard loopback backend first (speaker capture), with sounddevice fallback
     • Sidebar status now refreshes on file load start/success/failure (prevents stale auto-reduce text)
+    • Splash progress bar now updates visibly during file preparation and loading stages
    • PlayerService auto-configures Windows VLC runtime paths for source runs
      (PATH + VLC_PLUGIN_PATH + add_dll_directory)
 
@@ -186,6 +187,12 @@ Build Standalone Executable (v3):
    • Can be added in future versions if needed
 
 ✅ ROADMAP COMPLETE - NO ADDITIONAL FEATURES IN CURRENT SCOPE
+
+✅ Video Trimming UX Alignment (2026-06-29):
+   • Video Tools trimming now mirrors Playback Window interaction style
+   • Dynamic start/end range rows with Add Range, Remove row, and Clear actions
+   • Multi-range trims are concatenated into a single output export
+   • Overlapping/touching ranges are merged automatically before export
 
 ✅ Audio Processing (2026-06-20 - Features 6 & 7):
    • Audio Trimming (Feature 6): Trim first X, last X, range, or any combination
