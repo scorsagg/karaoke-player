@@ -38,7 +38,7 @@ class KaraokeApp(QWidget):
 
         self.init_settings_manager()
 
-        self.setWindowTitle("Karaoke Studio Pro v2.0")
+        self.setWindowTitle("Karaoke Studio Pro v3.0")
         self.resize(1150, 850)
         self.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: 'Segoe UI';")
 

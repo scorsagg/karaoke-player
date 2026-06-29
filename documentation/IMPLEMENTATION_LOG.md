@@ -1,5 +1,20 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+## Change: Main Window Title Version Label Corrected (2026-06-29) - COMPLETE ✅
+
+**Status:** Implemented
+
+**File Changed:** `source_code/main.py`
+
+### Problem
+App version had been bumped to v3, but the window title still displayed `v2.0`.
+
+### Fix
+- Updated `KaraokeApp.__init__()` window title string from `Karaoke Studio Pro v2.0` to `Karaoke Studio Pro v3.0`.
+
+### Result
+- UI now shows the correct major version in the title bar.
+
 ## Change: Video Tools Trimming Refactor to Playback-Window Style (2026-06-29) - COMPLETE ✅
 
 **Status:** Implemented
