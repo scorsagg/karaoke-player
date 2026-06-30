@@ -558,6 +558,28 @@ ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192
 - ✅ Auto-loads trimmed video into player after completion
 - ✅ Status feedback during trimming
 
+### 16. PLAYBACK STOP / DETACH CONTROL ✅ COMPLETE
+**Status:** Implemented as a stop action that freezes the current frame and detaches VLC output
+
+**Related files:**
+- `source_code/ui/playback_bar.py` → Stop button added next to Play/Pause
+- `source_code/main.py` → `handle_stop()` updates status and stops audio monitoring
+- `source_code/services/player_service.py` → stop/detach logic and re-attach-on-play handling
+- `documentation/ARCHITECTURE.md` → Playback control architecture note
+- `documentation/IMPLEMENTATION_LOG.md` → Stop/detach implementation entry
+
+**Behavior:**
+- Stop pauses playback, rewinds to the beginning, detaches the video widget from VLC, and leaves the player ready to restart from time zero
+- The player is marked inactive so the UI loop stops treating it as a live playback session
+- Pressing Play again re-attaches the saved video widget before playback resumes
+
+**When modifying this feature, update together:**
+- `source_code/ui/playback_bar.py`
+- `source_code/main.py`
+- `source_code/services/player_service.py`
+- `documentation/ARCHITECTURE.md`
+- `documentation/IMPLEMENTATION_LOG.md`
+
 ### 16. DEPRECATED/DELETED FILES
 **Current deprecated / removed files:**
 - karaoke_app.py (REMOVED - consolidated into `source_code/main.py`)

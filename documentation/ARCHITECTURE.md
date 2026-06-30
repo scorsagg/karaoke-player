@@ -24,7 +24,7 @@ Karaoke Studio Pro v3 is a feature-rich cross-platform karaoke application built
 │      ├─ MenuBar                             │
 │      ├─ VideoFrame (Video Display)          │
 │      ├─ AudioLevelMeter (Audio Visualization)
-│      ├─ Playback Controls (Play/Pause/Seek) │
+│      ├─ Playback Controls (Play/Pause/Stop/Seek) │
 │      ├─ Speed Control                       │
 │      └─ Settings Button                     │
 └─────────────────────────────────────────────┘
@@ -83,7 +83,7 @@ source_code/
 │   ├── video_tools_page.py        # Video tools + extraction + widen + playback window
 │   ├── convert_export_page.py     # Format conversion + normalization + amplify/export
 │   ├── sidebar.py                 # Navigation list
-│   ├── playback_bar.py            # Playback action bar
+│   ├── playback_bar.py            # Playback action bar (play/pause/stop/seek/volume/audio meter)
 │   └── main_layout.py             # Stack construction/wiring
 │
 ├── widgets/
@@ -198,6 +198,7 @@ Convert & Export owns export-time amplification instead of the studio pages:
     (prepends VLC root to PATH, sets `VLC_PLUGIN_PATH`, and uses `os.add_dll_directory` when available)
 - Load media files
 - Play, pause, stop operations
+- Detach and re-attach the video widget so Stop can freeze the last visible frame without clearing media
 - Seek to timeline positions
 - Adjust volume and playback speed
 - Monitor playback state changes
@@ -214,6 +215,8 @@ player.set_time(milliseconds)   # Seek to position
 player.set_speed(factor)        # Set playback speed (0.5 to 2.0)
 player.set_volume(0-100)        # Set volume level
 ```
+
+When Stop is invoked, the player pauses, rewinds to the beginning, detaches from the video frame, and marks playback inactive so the UI stops treating it as live playback until Play is pressed again.
 
 ---
 

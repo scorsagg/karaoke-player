@@ -77,6 +77,9 @@ class PlayerService(QObject):
         self._instance = vlc.Instance(vlc_args)
         self._player = self._instance.media_player_new()
         self._media = None # Currently loaded media
+        self._video_widget_id = None
+        self._video_widget_detached = False
+        self._stopped = False
 
         # Setup VLC event manager
         self._event_manager = self._player.event_manager()
@@ -119,6 +122,7 @@ class PlayerService(QObject):
         print(f"[PlayerService.set_media] Creating new media...")
         self._media = self._instance.media_new(media_path)
         print(f"[PlayerService.set_media] ✓ Media object created")
+        self._stopped = False
         
         print(f"[PlayerService.set_media] Setting media to player...")
         self._player.set_media(self._media)
@@ -130,6 +134,9 @@ class PlayerService(QObject):
 
     def play(self):
         print(f"[PlayerService.play] ▶️  ENTRY")
+        if self._video_widget_detached and self._video_widget_id:
+            self._attach_video_widget()
+        self._stopped = False
         result = self._player.play()
         if result == -1:
             print(f"[PlayerService.play] ❌ Error playing media.")
@@ -144,6 +151,32 @@ class PlayerService(QObject):
             self._player.pause()
             print(f"[PlayerService.pause] ✓ Pause command sent")
         print(f"[PlayerService.pause] ✓ EXIT")
+
+    def _attach_video_widget(self):
+        if not self._video_widget_id:
+            return
+        if sys.platform.startswith('linux'):
+            self._player.set_xwindow(self._video_widget_id)
+        elif sys.platform == 'win32':
+            self._player.set_hwnd(self._video_widget_id)
+        elif sys.platform == 'darwin':
+            self._player.set_nsobject(self._video_widget_id)
+        self._video_widget_detached = False
+
+    def detach_video_widget(self):
+        """Detach the VLC video output from the Qt widget without clearing media."""
+        if not self._video_widget_id:
+            return
+        try:
+            if sys.platform.startswith('linux'):
+                self._player.set_xwindow(0)
+            elif sys.platform == 'win32':
+                self._player.set_hwnd(0)
+            elif sys.platform == 'darwin':
+                self._player.set_nsobject(0)
+        except Exception as e:
+            print(f"[PlayerService.detach_video_widget] ⚠️  Error detaching video widget: {e}")
+        self._video_widget_detached = True
     
     def clear_media(self):
         """Clear the current media - stops playback and releases resources"""
@@ -162,30 +195,73 @@ class PlayerService(QObject):
                 print(f"[PlayerService.clear_media] ✓ Media object released")
             except Exception as e:
                 print(f"[PlayerService.clear_media] ⚠️  Error releasing media: {e}")
+        self._stopped = False
         
         print(f"[PlayerService.clear_media] ✓ EXIT")
 
     def stop(self):
-        """Stop playback - use pause-based cleanup to prevent VLC decoder thread hang"""
+        """Stop playback, rewind to the beginning, and detach the video surface."""
         import time
         print(f"[PlayerService.stop] 🛑 ENTRY")
         try:
             if self._player:
-                # Don't call stop() directly - it hangs with active decoder threads
-                # Instead use pause and let VLC auto-cleanup
+                was_muted = False
+                try:
+                    was_muted = bool(self._player.audio_get_mute())
+                except Exception:
+                    was_muted = False
+
                 self._player.pause()
-                print(f"[PlayerService.stop] ⏸️  Paused instead of stop to prevent hang")
-                
-                # Wait for decoder threads to reach safe state
-                time.sleep(1.0)
-                
-                # Clear media reference to allow VLC cleanup
-                if self._media is not None:
+                print(f"[PlayerService.stop] ⏸️  Paused playback")
+
+                try:
+                    self._player.set_time(0)
+                    self._player.set_position(0.0)
+                    print(f"[PlayerService.stop] ⏮️  Rewound to start")
+                except Exception as e:
+                    print(f"[PlayerService.stop] ⚠️  Error rewinding to start: {e}")
+
+                try:
+                    self._player.audio_set_mute(True)
+                except Exception:
+                    pass
+
+                try:
+                    stderr_fd = 2
+                    saved_stderr_fd = os.dup(stderr_fd)
+                    devnull_fd = os.open(os.devnull, os.O_WRONLY)
                     try:
-                        self._media = None
-                        print(f"[PlayerService.stop] ✓ Media released")
-                    except:
-                        pass
+                        os.dup2(devnull_fd, stderr_fd)
+                        self._player.play()
+                    finally:
+                        try:
+                            os.dup2(saved_stderr_fd, stderr_fd)
+                        finally:
+                            os.close(devnull_fd)
+                            os.close(saved_stderr_fd)
+                    print(f"[PlayerService.stop] ▶️  Nudged playback to render first frame")
+                except Exception as e:
+                    print(f"[PlayerService.stop] ⚠️  Error nudging playback: {e}")
+                
+                # Give VLC a moment to render the first frame before freezing it.
+                time.sleep(0.15)
+
+                try:
+                    self._player.pause()
+                    self._player.set_time(0)
+                    self._player.set_position(0.0)
+                except Exception:
+                    pass
+
+                self.detach_video_widget()
+                print(f"[PlayerService.stop] 🔌 Video widget detached")
+
+                try:
+                    self._player.audio_set_mute(was_muted)
+                except Exception:
+                    pass
+                
+                self._stopped = True
         except Exception as e:
             print(f"[PlayerService.stop] ⚠️  Error during stop: {e}")
         print(f"[PlayerService.stop] ✓ EXIT")
@@ -216,6 +292,8 @@ class PlayerService(QObject):
         return self._player.audio_get_volume()
 
     def set_video_widget(self, video_widget_id):
+        self._video_widget_id = video_widget_id
+        self._video_widget_detached = False
         if sys.platform.startswith('linux'): # for X11
             self._player.set_xwindow(video_widget_id)
         elif sys.platform == 'win32': # for Windows
@@ -239,6 +317,8 @@ class PlayerService(QObject):
 
     def is_active(self):
         """Returns True if player is playing or paused (not stopped/idle)."""
+        if self._stopped:
+            return False
         state = self._player.get_state()
         return state in [vlc.State.Playing, vlc.State.Paused]
 

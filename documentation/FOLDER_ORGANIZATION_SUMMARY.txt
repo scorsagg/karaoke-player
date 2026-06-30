@@ -29,7 +29,7 @@
 │  │  ├─ __init__.py              (UI package exports)
 │  │  ├─ main_layout.py           (Orchestrator combining all UI)
 │  │  ├─ sidebar.py               (Navigation & settings sidebar)
-│  │  ├─ playback_bar.py          (Play/pause/seek/volume/audio meter)
+│  │  ├─ playback_bar.py          (Play/pause/stop/seek/volume/audio meter)
 │  │  ├─ media_loader_page.py     (Media Loader page: file loading & URL streaming)
 │  │  ├─ pitch_page.py            (Playback controls page)
 │  │  ├─ audio_studio_page.py     (Audio Studio: audio-only trimming + playback window)
@@ -125,6 +125,10 @@ Build Standalone Executable (v3):
    • Moved page creation (download, pitch, extra) to individual modules
    • Created ui/main_layout.py as orchestrator
    • main.py now only handles event connections and app logic
+
+✅ Playback Controls:
+   • Added a dedicated Stop button next to Play/Pause
+   • Stop freezes the current frame, detaches VLC output, and keeps the image visible on screen
 
 ✅ Settings & Configuration:
    • Added "🔊 Audio Settings" section to settings dialog

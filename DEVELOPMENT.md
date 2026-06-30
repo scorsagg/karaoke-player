@@ -66,7 +66,7 @@ source_code/
 ├── ui/                        # Modularized UI components
 │   ├── main_layout.py        # Orchestrator assembling all UI
 │   ├── sidebar.py            # Navigation & settings
-│   ├── playback_bar.py       # Play/pause/volume/audio meter
+│   ├── playback_bar.py       # Play/pause/stop/volume/audio meter
 │   ├── media_loader_page.py  # Media Loader page (file & URL loading)
 │   ├── pitch_page.py         # Playback page
 │   ├── audio_studio_page.py  # Audio Studio (audio-only tools)
@@ -176,6 +176,11 @@ config/
 - **"Clear"** button — resets all controls to zero (signal-blocked to prevent auto-check)
 - Settings are cleared automatically on every new file load (`clear_playback_window()`)
 - Timer loop in `update_ui()` enforces the end-cutoff via `_pw_end_ms`
+
+### Feature: Playback Stop / Detach ✅
+- The playback bar includes a dedicated Stop button next to Play and Pause
+- Stop rewinds playback to time zero, detaches VLC from the widget, and marks playback inactive
+- Pressing Play re-attaches the saved video widget before playback resumes
 
 ### Feature: Amplify & Export ✅
 - **Convert & Export**: Amplify now uses export-time FFmpeg volume gain instead of live studio playback gain

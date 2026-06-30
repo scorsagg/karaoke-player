@@ -1,5 +1,24 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Playback Stop / Detach Control (2026-06-30) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/playback_bar.py`, `source_code/main.py`, `source_code/services/player_service.py`
+
+### Problem
+Users wanted a true Stop control alongside Play and Pause, but the existing stop path only paused playback and did not detach the video surface.
+
+### Fix
+- Added a dedicated Stop button to the playback bar.
+- Updated `PlayerService.stop()` to pause playback, rewind to time zero, detach the VLC video widget, and keep the player ready for a fresh restart.
+- Tracked the saved video widget ID so Play can re-attach output before resuming playback.
+- Updated the main window stop handler to stop audio monitoring, reset the seek UI, and show a stopped status message.
+
+### Result
+- Stop now returns playback to the beginning instead of leaving it at the current timestamp.
+- The player is inactive after Stop, so the UI stops treating it as live playback until Play is pressed again.
+
 # Change: Export-Based Amplify Mode Selector + Studio Tab Cleanup (2026-06-30) - COMPLETE ✅
 
 **Status:** Implemented
