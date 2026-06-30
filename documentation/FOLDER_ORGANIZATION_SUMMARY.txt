@@ -1,4 +1,4 @@
-✅ KARAOKE STUDIO PRO v3 - FOLDER ORGANIZATION (UPDATED)
+✅ KARAOKE STUDIO PRO v3 - FOLDER ORGANIZATION (UPcontainerED)
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -31,13 +31,10 @@
 │  │  ├─ sidebar.py               (Navigation & settings sidebar)
 │  │  ├─ playback_bar.py          (Play/pause/seek/volume/audio meter)
 │  │  ├─ media_loader_page.py     (Media Loader page: file loading & URL streaming)
-│  │  ├─ pitch_page.py            (Pitch shift & speed controls)
-│  │  ├─ extra_page.py            (Tabbed interface: Aspect ratio widening + Audio tools)
-│  │  │                           ├─ Tab 1: Video Widening (Feature - convert 9:16 to 16:9)
-│  │  │                           ├─ Tab 2-5: Audio Tools (Extraction, Trimming, Conversion, Normalization, DAT)
-   └─ video_tools_page.py      (Video Tools page - two tabs)
-│                              ├─ Tab 1: Video Trimming (row-based start/end ranges with add/remove/clear, MP4/MKV/WebM/AVI)
-│                              └─ Tab 2: Playback Window (skip-to, stop-before-end, play-range A→B + Apply&Play button)
+│  │  ├─ pitch_page.py            (Playback controls page)
+│  │  ├─ audio_studio_page.py     (Audio Studio: audio-only trimming + playback window)
+│  │  ├─ video_tools_page.py      (Video Studio: trimming, playback window, extraction, widen)
+│  │  └─ convert_export_page.py   (Convert & Export: format conversion + normalization + amplify/export)
 │  │
 │  ├─ 📁 widgets/
 │  │  ├─ __init__.py
@@ -169,7 +166,7 @@ Build Standalone Executable (v3):
    2. Feature 7 - Format Conversion (MP3, WAV, M4A, AAC, MP4, MKV, AVI, WebM)
    3. Feature 8 - Audio Loudness Normalization (LUFS presets)
    4. Feature 15 - Audio Stream Extraction from videos
-   5. Feature 19 - DAT/WhatsApp File Conversion
+   5. Feature 19 - container/legacy media conversion support in Convert & Export
    6. Feature 21 - YouTube video downloads
    7. Feature 32 - Playback with start/end time controls
    8. Feature 33 - Stop/unload video functionality
@@ -194,17 +191,19 @@ Build Standalone Executable (v3):
    • Multi-range trims are concatenated into a single output export
    • Overlapping/touching ranges are merged automatically before export
 
-✅ Audio Processing (2026-06-20 - Features 6 & 7):
-   • Audio Trimming (Feature 6): Trim first X, last X, range, or any combination
-     - Supports flexible checkbox-based options
-     - Fast processing using -acodec copy (no re-encoding)
-     - Output format selector (MP3, WAV, AAC, M4A)
-   • Format Conversion (Feature 7): Convert between audio/video formats
-     - Source formats: MP3, WAV, M4A, AAC, DAT, MP4, MKV, AVI, WebM
-     - Target formats: MP3, WAV, M4A, AAC, MP4, MKV
-     - Quality selector: High (320k), Medium (192k), Low (128k)
-     - Intelligent FFmpeg command builder for any format pair
-   • UI Location: Extra Tools → Audio Tools tab (alongside Video Widening)
+✅ Audio/Conversion Processing (2026-06-30):
+    • Audio Trimming (Feature 6): row-based keep-ranges with add/remove/clear
+       - Supports one or multiple ranges; multi-range output is concatenated
+    • Format Conversion (Feature 7): Convert between audio/video formats
+       - Source formats: MP3, WAV, M4A, AAC, container, MP4, MKV, AVI, WebM
+       - Target formats are media-aware based on loaded source
+       - Quality selector: High (320k), Medium (192k), Low (128k)
+    • Loudness Normalization (Feature 8): available for audio and video sources
+    • Amplify & Export: Convert & Export page owns export-time ffmpeg gain
+       - Signed mode buttons: Amplification + / Reduce amplification -
+       - Positive-only amount spinner with 0.25-step increments
+       - Auto-loads exported result and resets to 1.00x baseline
+    • UI Location: Audio Studio + Video Studio + Convert & Export
    • Auto-reload: Both features automatically load results into player
    • Integrated with ProcessThread for progress updates and cancellation
    • Validates all prerequisites before building

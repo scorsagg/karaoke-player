@@ -192,7 +192,7 @@ ffmpeg -i input.mp4 -filter:a "loudnorm=I=-14:LRA=11:tp=-1.5" -c:v copy output.m
 
 **Better Approaches:**
 - Two-pass analysis for better accuracy: `loudnorm=print_format=json` (first pass), then apply normalization (second pass)
-- For WhatsApp compliance: Use `I=-16:LRA=11:tp=-1.5`
+- For messaging app compliance: Use `I=-16:LRA=11:tp=-1.5`
 
 ---
 
@@ -296,8 +296,8 @@ ffmpeg -i input.wav -acodec libmp3lame -b:a 320k output.mp3
 # MP3 to WAV
 ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 output.wav
 
-# DAT to MP3
-ffmpeg -i input.dat -vn -acodec libmp3lame -b:a 192k output.mp3
+# Container to MP3
+ffmpeg -i input.media -vn -acodec libmp3lame -b:a 192k output.mp3
 
 # MP4 to M4A (extract audio)
 ffmpeg -i input.mp4 -vn -acodec aac -b:a 192k output.m4a
@@ -320,7 +320,7 @@ ffmpeg -i video.mp4 -vn -acodec libmp3lame -b:a 320k output.mp3
 | AAC | WebM |
 | OGG | |
 | FLAC | |
-| DAT | |
+| container | |
 | OPUS | |
 | WMA | |
 
@@ -455,8 +455,8 @@ Real Examples:
 
 Example 1: Meet Na Mila Re Mann Ka
 - Video file: 244.622222 seconds (faster)
-- DAT file:   295.291396 seconds (slower)
-- Ratio: 244.622222 / 295.291396 = 0.829 (need to slow DAT)
+- container file:   295.291396 seconds (slower)
+- Ratio: 244.622222 / 295.291396 = 0.829 (need to slow container)
 
 Example 2: Babu Samjho Ishare
 - Org file:     290.017234 seconds (faster)
@@ -662,14 +662,14 @@ overlay=(W-w)/2:(H-h)/2  # Center
 
 ---
 
-### Feature 18: Platform Codec Optimization (WhatsApp)
+### Feature 18: Platform Codec Optimization (messaging app)
 **Priority:** MEDIUM  
 **Difficulty:** Low  
 **Status:** Ready to implement
 
 **Purpose:** Convert video codecs for specific platforms
 
-**WhatsApp Optimization:**
+**messaging app Optimization:**
 ```bash
 ffmpeg -i input.mp4 \
   -r 30 -ar 48000 \
@@ -679,7 +679,7 @@ ffmpeg -i input.mp4 \
 ```
 
 **Parameters:**
-- `-r 30`: Frame rate 30 fps (WhatsApp max)
+- `-r 30`: Frame rate 30 fps (messaging app max)
 - `-ar 48000`: Audio sample rate 48 kHz
 - `-c:v libx264`: Video codec H.264
 - `-preset fast`: Encoding speed (ultrafast, superfast, fast, medium, slow, slower)
@@ -691,16 +691,16 @@ ffmpeg -i input.mp4 \
 
 ## File Format Conversion
 
-### Feature 19: DAT File Conversion
+### Feature 19: Container File Conversion
 **Priority:** MEDIUM  
 **Difficulty:** Low  
 **Status:** Ready to implement
 
-**Purpose:** Convert .dat files (common in karaoke machines, WhatsApp backups) to standard formats
+**Purpose:** Convert .media files (common in karaoke machines, messaging app backups) to standard formats
 
 **Step 1: Detect Codec First (Optional but Recommended)**
 ```bash
-ffprobe input.dat
+ffprobe input.media
 ```
 Look for output like:
 - `Audio: opus` → Rename to .opus first
@@ -708,24 +708,24 @@ Look for output like:
 - `Audio: amr-nb` → Rename to .amr first
 - `Video: h264` → Video file, rename to .mp4
 
-**Audio DAT to MP3:**
+**Audio Container to MP3:**
 ```bash
-ffmpeg -i input.dat -acodec libmp3lame -b:a 192k output.mp3
+ffmpeg -i input.media -acodec libmp3lame -b:a 192k output.mp3
 ```
 
-**Audio DAT to WAV:**
+**Audio Container to WAV:**
 ```bash
-ffmpeg -i input.dat -vn -ar 44100 -ac 2 output.wav
+ffmpeg -i input.media -vn -ar 44100 -ac 2 output.wav
 ```
 
-**Video DAT to MP4 (Fast - No Re-encoding):**
+**Video Container to MP4 (Fast - No Re-encoding):**
 ```bash
-ffmpeg -i input.dat -c:v copy -c:a copy output.mp4
+ffmpeg -i input.media -c:v copy -c:a copy output.mp4
 ```
 
-**Video DAT to MP4 (Full Re-encode if needed):**
+**Video Container to MP4 (Full Re-encode if needed):**
 ```bash
-ffmpeg -i input.dat -c:v libx264 -c:a aac output.mp4
+ffmpeg -i input.media -c:v libx264 -c:a aac output.mp4
 ```
 
 **Parameters:**
@@ -737,20 +737,20 @@ ffmpeg -i input.dat -c:v libx264 -c:a aac output.mp4
 - `-c:v copy`: Copy video codec without re-encoding (fast)
 - `-c:a copy`: Copy audio codec without re-encoding (fast)
 
-**Batch Convert ALL .dat Files in a Folder (Windows):**
+**Batch Convert ALL .media Files in a Folder (Windows):**
 
-Create file: `convert_dat.bat`
+Create file: `convert_media.bat`
 ```batch
-for %%a in (*.dat) do ffmpeg -i "%%a" -acodec libmp3lame -b:a 192k "%%~na.mp3"
+for %%a in (*.media) do ffmpeg -i "%%a" -acodec libmp3lame -b:a 192k "%%~na.mp3"
 ```
-Run it → converts all .dat to .mp3
+Run it → converts all .media to .mp3
 
 **Real World Example (Batch Video Conversion):**
 ```batch
-for %%a in (*.dat) do ffmpeg -i "%%a" -c:v copy -c:a copy "%%~na.mp4"
+for %%a in (*.media) do ffmpeg -i "%%a" -c:v copy -c:a copy "%%~na.mp4"
 ```
 
-**Note:** Most WhatsApp `.dat` files are actually H.264 + AAC video, so video conversion method works best
+**Note:** Most messaging app `.media` files are actually H.264 + AAC video, so video conversion method works best
 
 ---
 
@@ -870,7 +870,7 @@ Priority 2 (Week 1):
 Priority 3 (Week 1-2):
 9. Volume Control (Feature 5)
 10. Format Conversion (Feature 7)
-11. DAT Conversion (Feature 19)
+11. Container Conversion (Feature 19)
 12. File Merging (Feature 16)
 ```
 
@@ -923,7 +923,7 @@ pip install spleeter  # or voice-separator
 | Tempo | atempo alone | librubberband tempo | Quality vs accuracy |
 | Normalization | loudnorm | Two-pass loudnorm | Speed vs precision |
 | Speed Match | Manual calc | ffprobe + verify | Accuracy vs automation |
-| DAT Conversion | Basic ffmpeg | With codec detection | Reliability |
+| Container Conversion | Basic ffmpeg | With codec detection | Reliability |
 
 ### Real-World Examples from Project
 
@@ -957,10 +957,10 @@ ffmpeg -i "Baadi Hoda Balli Inda-org.mp4" \
   -map "[v]" -map "[a]" "Baadi Hoda Balli Inda.mp4"
 ```
 
-**Batch DAT Conversion (Windows):**
-Create file: `convert_dat.bat`
+**Batch Container Conversion (Windows):**
+Create file: `convert_media.bat`
 ```batch
-for %%a in (*.dat) do ffmpeg -i "%%a" -acodec libmp3lame -b:a 192k "%%~na.mp3"
+for %%a in (*.media) do ffmpeg -i "%%a" -acodec libmp3lame -b:a 192k "%%~na.mp3"
 ```
 
 ### Real User Semitone Chart
@@ -1072,13 +1072,13 @@ ffmpeg -i "original_vocal.mp4" \
   -map 0:v -map "[a]" "transposed_-2st.mp4"
 ```
 
-### Workflow 4: Convert WhatsApp .dat Files to MP4
-**Goal:** Batch convert all downloaded WhatsApp videos
+### Workflow 4: Convert messaging app .media Files to MP4
+**Goal:** Batch convert all downloaded messaging app videos
 
 **Create convert_videos.bat:**
 ```batch
 @echo off
-for %%a in (*.dat) do (
+for %%a in (*.media) do (
   echo Converting %%a...
   ffmpeg -i "%%a" -c:v copy -c:a copy "%%~na.mp4"
 )
@@ -1086,7 +1086,7 @@ echo All files converted!
 pause
 ```
 
-**Run it in the folder with .dat files**
+**Run it in the folder with .media files**
 
 ### Workflow 5: Normalize Loudness Across Multiple Tracks
 **Goal:** All karaoke tracks play at same volume level
@@ -1155,7 +1155,7 @@ Pitch shift (rubberband)         | 4.5 MB    | 5-10 minutes
 Video codec copy (karaoke mix)   | 700 MB    | 5-10 minutes
 Loudness normalize               | 4.5 MB    | 2-3 minutes
 Subtitle burn-in                 | 700 MB    | 15-30 minutes
-DAT batch conversion (10 files)  | 50 MB avg | 1-2 minutes per file
+container batch conversion (10 files)  | 50 MB avg | 1-2 minutes per file
 ```
 
 ---

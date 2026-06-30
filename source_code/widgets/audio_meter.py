@@ -10,6 +10,7 @@ class AudioLevelMeter(QWidget):
         self.db_level = -80.0
         self.level_percent = 0.0  # 0-100%
         self.measurement_mode = "dB Output (dBFS)"  # or "SPL Estimate (Room)"
+        self.auto_reduce_threshold_spl = 90
         self.setFixedHeight(30)
         self.setMinimumWidth(150)
         self.setMaximumWidth(200)
@@ -37,6 +38,14 @@ class AudioLevelMeter(QWidget):
     def set_measurement_mode(self, mode):
         """Set whether to display dB output or SPL estimate. Mode: 'dB Output (dBFS)' or 'SPL Estimate (Room)'"""
         self.measurement_mode = mode
+        self.update()
+
+    def set_auto_reduce_threshold(self, threshold_spl):
+        """Set auto-reduce threshold marker in SPL (typically 80-90)."""
+        try:
+            self.auto_reduce_threshold_spl = int(threshold_spl)
+        except Exception:
+            self.auto_reduce_threshold_spl = 90
         self.update()
 
     def paintEvent(self, event):
@@ -74,12 +83,13 @@ class AudioLevelMeter(QWidget):
                 
             painter.fillRect(meter_x, meter_y, fill_width, meter_height, color)
         
-        # Draw threshold lines at 50% and 85%
-        painter.setPen(QPen(QColor("#666"), 1))
-        line_50_x = meter_x + (meter_width * 0.5)
-        line_85_x = meter_x + (meter_width * 0.85)
-        painter.drawLine(int(line_50_x), meter_y - 2, int(line_50_x), meter_y + meter_height + 2)
-        painter.drawLine(int(line_85_x), meter_y - 2, int(line_85_x), meter_y + meter_height + 2)
+        # Draw marker for configured auto-reduce threshold.
+        # SPL mapping in this widget: 60 dB -> 0%, 90 dB -> 100%.
+        threshold_percent = (float(self.auto_reduce_threshold_spl) - 60.0) / 0.3
+        threshold_percent = max(0.0, min(100.0, threshold_percent))
+        line_x = meter_x + (meter_width * (threshold_percent / 100.0))
+        painter.setPen(QPen(QColor("#66ccff"), 2))
+        painter.drawLine(int(line_x), meter_y - 2, int(line_x), meter_y + meter_height + 2)
         
         # Draw text - always show SPL value, but label varies by mode
         painter.setPen(QColor("#ffffff"))

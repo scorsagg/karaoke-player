@@ -1,5 +1,159 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Export-Based Amplify Mode Selector + Studio Tab Cleanup (2026-06-30) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`, `source_code/ui/audio_studio_page.py`, `source_code/ui/video_tools_page.py`
+
+### Problem
+The previous live studio amplify tabs were removed, and users wanted a clearer export workflow that separates amplification from reduction while keeping the amount input positive.
+
+### Fix
+- Converted the Convert & Export amplify UI into a signed mode selector:
+   - `Amplification + ▲`
+   - `Reduce amplification - ▼`
+- Kept the amount input positive-only with 0.25-step increments.
+- Preserved FFmpeg export-time amplification in `main.py` using `volume=<factor>`.
+- Reset the export controls to `1.00x` after successful load so the newly exported file becomes the baseline.
+- Removed the live amplify tabs from Audio Studio and Video Studio.
+
+### Result
+- The app now has one clear amplification workflow in Convert & Export.
+- Reduce/amplify behavior is explicit, and the selected mode is visibly highlighted.
+- Audio Studio and Video Studio stay focused on their core trim/playback/extraction tasks.
+
+## Change: Centered Numbered Amplification Scale + Reset Enable Fix (2026-06-30) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/audio_studio_page.py`, `source_code/ui/video_tools_page.py`, `source_code/main.py`
+
+### Problem
+Users needed clearer loudness scale marks, center-normal behavior, direct number selection, and reliable reset button enablement when amplification is active.
+
+### Fix
+- Reworked both studio amplify sliders to centered discrete range `-10..0..+10`.
+- Added visible numbered markers (`-10` to `+10`) as direct-click buttons under slider.
+- Wired marker clicks to set amplification step immediately across both studios.
+- Updated runtime mapping: `0` => `x1.00`, `+1` => `x2`, `+2` => `x3`, negatives attenuate.
+- Added explicit reset-button state handling so Reset is enabled only when step is non-zero.
+
+### Result
+- Amplification scale is clearer and faster to use.
+- Normal loudness sits at the exact center.
+- Reset behaves predictably whenever loudness is not normal.
+
+## Change: Intuitive Live Amplification Slider UX (2026-06-30) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/audio_studio_page.py`, `source_code/ui/video_tools_page.py`, `source_code/main.py`
+
+### Problem
+Live amplification controls were functional but not intuitive due to an Apply-based interaction model.
+
+### Fix
+- Replaced gain spinbox + Apply button with an immediate horizontal slider in both studios.
+- Added directional labels (`Softer` and `Louder`) around slider for clearer behavior.
+- Updated `main.py` to consume `amp_gain_slider` controls and apply amplification on `valueChanged`.
+- Kept Reset behavior and cross-studio control synchronization.
+- Updated status text to loudness-oriented messaging (`Softer`, `Normal`, `Louder`).
+
+### Result
+- Amplification now feels immediate and predictable.
+- Users can hear changes while dragging the slider, without extra clicks.
+
+## Change: Live Amplify Tabs Added to Audio/Video Studios (2026-06-29) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/audio_studio_page.py`, `source_code/ui/video_tools_page.py`, `source_code/main.py`
+
+### Problem
+Users needed in-session sound amplification in both Audio Studio and Video Studio without forcing an export workflow.
+
+### Fix
+- Added `Amplify (Live)` tabs in both Audio Studio and Video Studio.
+- Added fine-grained gain control from `-100%` to `+200%` (1% step) with Apply and Reset controls.
+- Implemented shared runtime amplification in `main.py`:
+   - Uses current volume slider as base
+   - Applies a live multiplier and clamps effective output volume safely
+   - Keeps both studio amplify controls in sync
+   - Amplification now changes output loudness directly (no loudness-preserving compensation)
+   - Reset restores the pre-amplify base slider volume when available
+
+### Result
+- Real-time playback amplification is available in both studios.
+- Export is not required for quick loudness boost during playback.
+
+## Change: Playback Window Added to Audio Studio (2026-06-29) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/audio_studio_page.py`, `source_code/main.py`
+
+### Problem
+Playback Window controls were available only in Video Studio, while Audio Studio used range-based trimming but had no equivalent range-based playback tab.
+
+### Fix
+- Added a Playback Window tab to Audio Studio with the same controls:
+   - Add Range / Remove row
+   - Apply & Play
+   - Clear
+- Updated runtime wiring in `main.py` so playback-window actions target the active page's controls (Audio Studio or Video Studio) without duplicating logic.
+- Initialized first playback range row defaults for both studios after media load.
+
+### Result
+- Users can apply playback ranges in both Audio Studio and Video Studio.
+- Playback Window behavior stays consistent across audio-only and video workflows.
+
+## Change: Page Revamp + Routing Rules + Audio Trim Range Refactor (2026-06-29) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:**
+- `source_code/main.py`
+- `source_code/ui/main_layout.py`
+- `source_code/ui/sidebar.py`
+- `source_code/ui/audio_studio_page.py`
+- `source_code/ui/convert_export_page.py`
+- `source_code/ui/video_tools_page.py`
+- `source_code/services/download_service.py`
+- `source_code/workers/process_thread.py`
+
+### Problem
+Navigation and feature ownership had drifted, causing ambiguous workflows:
+- Audio Studio accepted video files in some flows
+- Extraction and conversion responsibilities overlapped across pages
+- container was modeled as a separate converter flow
+- Audio trim UI was inconsistent with row-based trim UX used elsewhere
+
+### Fix
+- Introduced explicit page structure and constants:
+   - 0 Media Loader, 1 Playback, 2 Audio Studio, 3 Video Studio, 4 Convert & Export
+- Enforced routing and policy:
+   - Audio Studio accepts audio-only loads
+   - Media Loader remains the broad entry point for any media type and URL input
+   - Audio extraction moved to Video Studio
+- Unified conversion model:
+   - container handled as a regular source format inside Convert & Export
+   - Target list is media-aware (audio-only or mixed outputs based on source)
+- Refactored audio trim UX and backend:
+   - Added row-based start/end range controls with add/remove/clear
+   - Added multi-range trim command path with concat stitching
+
+### Download/Progress UX Follow-ups
+- Improved progress parsing using raw subprocess line handling
+- Added cleaner unsupported-link mapping for yt-dlp failures
+- Prevented duplicate unsupported error dialogs via one-shot error guard
+
+### Result
+- Page responsibilities are now clear and consistent
+- Audio-only and video-specific workflows are enforced at runtime
+- Conversion behavior is simpler for users (container is just another source type)
+- Audio trim interactions now match the playback-style range workflow
+
 ## Change: Main Window Title Version Label Corrected (2026-06-29) - COMPLETE ✅
 
 **Status:** Implemented
@@ -507,7 +661,7 @@ ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k
 - Feature 7: Format Conversion ✅
 - Feature 8: Audio Loudness Normalization ✅
 - Feature 15: Audio Stream Extraction ✅
-- Feature 19: DAT/WhatsApp Conversion ✅
+- Feature 19: container/legacy media Conversion ✅
 - Feature 21: YouTube Downloads ✅
 - Feature 32: Playback Time Controls ✅
 - Feature 33: Stop/Unload Video ✅
@@ -520,7 +674,7 @@ ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k
 
 ---
 
-## Change: Helper Functions & DAT Conversion (Features 5, 20, 12, 9, 19) (2026-06-20) - COMPLETE ✅
+## Change: Helper Functions & Container Conversion (Features 5, 20, 12, 9, 19) (2026-06-20) - COMPLETE ✅
 
 ### Helper Functions Implemented
 
@@ -549,23 +703,23 @@ ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k
 - Video speed changes but audio stays at 1x tempo
 - Example: 1.5x video speed = video plays faster, audio normal
 
-### Feature 19 - DAT/WhatsApp File Conversion
+### Feature 19 - container/legacy media File Conversion
 
 **Status:** ✅ COMPLETE & FULLY FUNCTIONAL
 
 **What Changed:**
 
 1. **UI Addition to extra_page.py:**
-   - New Tab 5: "📱 DAT Converter" in Audio Tools section
-   - Source format selector (Auto-detect, .dat, .opus, .amr, .aac, .m4a)
+   - New Tab 5: "📱 Container Converter" in Audio Tools section
+   - Source format selector (Auto-detect, .media, .opus, .amr, .aac, .m4a)
    - Target format selector (WAV, MP3, M4A, MP4)
    - Quality dropdown (High/Medium/Low) for lossy formats
    - Auto-detect codec checkbox
    - Status label for feedback
 
 2. **Implementation in main.py:**
-   - `convert_dat_file()` method - Main handler
-   - `build_dat_conversion_cmd()` method - FFmpeg command builder
+   - `convert_media_file()` method - Main handler
+   - `build_media_conversion_cmd()` method - FFmpeg command builder
    - Integration with file loading dialog
    - Auto-loads converted file into player
    - Seamless navigation to Audio Tools tab
@@ -581,8 +735,8 @@ ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k
 
 | Format | Description | Common Source |
 |--------|-------------|----------------|
-| `.dat` | Generic container | WhatsApp media, karaoke machines, VCD/SVCD |
-| `.opus` | Opus audio codec | WhatsApp voice messages |
+| `.media` | Generic container | messaging app media, karaoke machines, VCD/SVCD |
+| `.opus` | Opus audio codec | messaging app voice messages |
 | `.amr` | Narrow-band audio | Older mobile recordings |
 | `.aac` | AAC audio codec | Apple devices, iTunes |
 | `.m4a` | MPEG-4 audio | iTunes, Apple Music |
@@ -615,28 +769,28 @@ ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k
    - Integrated into existing service
 
 3. **source_code/ui/extra_page.py** - ENHANCED
-   - Added new Tab 5 "📱 DAT Converter"
+   - Added new Tab 5 "📱 Container Converter"
    - ~150 lines of UI code
    - All controls added to return dictionary
    - Consistent styling with other tabs
 
 4. **source_code/main.py** - ENHANCED
-   - Wired up 5 new DAT controls in setup_ui()
-   - Added `convert_dat_file()` method (~70 lines)
-   - Added `build_dat_conversion_cmd()` method (~20 lines)
-   - Updated `handle_task_completion()` to support "dat_task"
+   - Wired up 5 new container controls in setup_ui()
+   - Added `convert_media_file()` method (~70 lines)
+   - Added `build_media_conversion_cmd()` method (~20 lines)
+   - Updated `handle_task_completion()` to support container conversion task routing
    - Total: ~100 lines of new code
 
-5. **documentation/FILE_DEPENDENCIES.md** - UPDATED
+5. **documentation/FILE_DEPENDENCIES.md** - UPcontainerED
    - Added Section 13: Helper Functions for Features 5, 20, 12, 9
-   - Added Section 14: DAT/WhatsApp File Conversion (Feature 19)
+   - Added Section 14: container/legacy media File Conversion (Feature 19)
    - Detailed implementation and usage documentation
 
 ### Workflow Examples
 
-**Converting WhatsApp Voice Message:**
+**Converting messaging app Voice Message:**
 ```
-1. Click "🚀 Convert DAT File" → Select .opus file
+1. Click "🚀 Convert Media File" → Select .opus file
 2. Source Format: Auto-detect (Recommended)
 3. Target Format: MP3
 4. Quality: High (320kbps)
@@ -646,8 +800,8 @@ ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k
 
 **Converting Old Karaoke Machine File:**
 ```
-1. Load .dat file from karaoke device
-2. Source Format: .dat (Generic)
+1. Load .media file from karaoke device
+2. Source Format: .media (Generic)
 3. Target Format: WAV
 4. Quality: (N/A for WAV)
 5. Click button → FFmpeg extracts audio
@@ -657,10 +811,10 @@ ffmpeg -y -ss 30 -to 90 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192k
 ### Testing Validation
 
 ✅ Syntax check: All files pass Python syntax validation (exit code 0)
-✅ UI rendering: New DAT Converter tab displays correctly with all controls
+✅ UI rendering: New Container Converter tab displays correctly with all controls
 ✅ File dialog: Opens when no file loaded, uses file path when loaded
 ✅ FFmpeg commands: Generated correctly for all format combinations
-✅ Task integration: DAT conversion tasks handled like other audio tasks
+✅ Task integration: container conversion tasks handled like other audio tasks
 ✅ Auto-load: Converted file loads into player automatically
 ✅ Navigation: Auto-navigates to Audio Tools tab after conversion
 ✅ Status display: Status label updates with conversion progress
@@ -686,9 +840,9 @@ cmd = self.audio_service.get_speed_adjustment_command(
 ```
 
 **To use Feature 19:**
-- DAT conversion is fully operational through UI
-- Users can access via Extra Tools → Audio Tools → DAT Converter tab
-- All conversion logic is in convert_dat_file() and build_dat_conversion_cmd()
+- container conversion is fully operational through UI
+- Users can access via Extra Tools → Audio Tools → Container Converter tab
+- All conversion logic is in conversion handlers and command builders
 - Auto-loads results and provides user feedback
 
 **Next Steps for Feature Enhancement:**
@@ -978,7 +1132,7 @@ class TimeSpinBox(QDoubleSpinBox):
 
 **Feature 7: Format Conversion**
 - Convert between audio/video formats:
-  - Audio formats: MP3, WAV, M4A, AAC, DAT
+  - Audio formats: MP3, WAV, M4A, AAC, container
   - Video formats: MP4, MKV, AVI, WebM
   - Can convert video→audio, audio→video, or audio→audio
 - Quality selector for lossy formats (High 320k, Medium 192k, Low 128k)
@@ -1082,7 +1236,7 @@ if keep_range:  # Overrides other trims
   - MP3: Uses `libmp3lame` encoder (best quality)
   - WAV: Uses `pcm_s16le` codec (lossless, CD quality)
   - M4A: AAC codec in MP4 container
-  - DAT: Auto-detects and converts appropriately
+  - container: Auto-detects and converts appropriately
 
 ### Testing Checklist
 
@@ -1097,7 +1251,7 @@ if keep_range:  # Overrides other trims
 
 ✅ Format Conversions:
 - [ ] MP3 ↔ WAV
-- [ ] DAT → MP3
+- [ ] container → MP3
 - [ ] Video → Audio extraction
 - [ ] Quality selector affects output
 

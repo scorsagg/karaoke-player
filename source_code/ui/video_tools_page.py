@@ -5,6 +5,7 @@ video_length_getter = lambda: 0
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                                QComboBox, QTabWidget)
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from source_code.ui.extra_page import TimePickerWidget
 
@@ -23,8 +24,22 @@ def create_video_tools_page():
     tabs = QTabWidget()
     tabs.setStyleSheet("""
         QTabWidget::pane { border: 1px solid #3a3a3a; }
-        QTabBar::tab { background-color: #2a2a2a; color: #fff; padding: 8px 20px; }
-        QTabBar::tab:selected { background-color: #0e639c; }
+        QTabBar::tab {
+            background-color: #2a2a2a;
+            color: #fff;
+            padding: 8px 20px;
+            border: 1px solid #3a3a3a;
+            margin-right: 1px;
+        }
+        QTabBar::tab:hover { background-color: #145a86; }
+        QTabBar::tab:selected {
+            background-color: #0e639c;
+            font-weight: bold;
+            border-bottom: 2px solid #2ecc71;
+        }
+        QTabBar::tab:focus {
+            border: 1px solid #2ecc71;
+        }
     """)
     outer_layout.addWidget(tabs)
 
@@ -108,7 +123,7 @@ def create_video_tools_page():
 
     trim_format_combo = QComboBox()
     trim_format_combo.addItems(["MP4", "MKV", "WebM", "AVI"])
-    trim_btn = QPushButton("Trim Video")
+    trim_btn = QPushButton("Export Trimmed Video")
     trim_btn.setStyleSheet("background-color: #ff9800; height: 35px; font-weight: bold; color: white;")
     trim_clear_btn = QPushButton("Clear")
     trim_clear_btn.setStyleSheet("background-color: #555; color: white; height: 32px; min-width: 80px;")
@@ -239,7 +254,37 @@ def create_video_tools_page():
 
     tabs.addTab(pw_tab, "⏱ Playback Window")
 
-    # ── TAB 3: WIDEN VIDEO ────────────────────────────────────────────────
+    # ── TAB 4: AUDIO EXTRACTION ─────────────────────────────────────────────
+    extract_tab = QWidget()
+    extract_layout = QVBoxLayout(extract_tab)
+    extract_layout.setContentsMargins(6, 8, 6, 6)
+
+    extract_title = QLabel("<b>AUDIO EXTRACTION</b>")
+    extract_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
+    extract_layout.addWidget(extract_title)
+
+    extract_status_label = QLabel("Load a video from the Media Loader page to extract audio")
+    extract_status_label.setStyleSheet("color: #e67e22; font-size: 10px; font-style: italic; padding: 2px 4px;")
+    extract_layout.addWidget(extract_status_label)
+    extract_layout.addSpacing(8)
+
+    extract_format_row = QHBoxLayout()
+    extract_format_row.addWidget(QLabel("Format:"))
+    extract_format_combo = QComboBox()
+    extract_format_combo.addItems(["WAV", "MP3", "AAC"])
+    extract_format_combo.setMaximumWidth(140)
+    extract_format_row.addWidget(extract_format_combo)
+    extract_format_row.addStretch()
+    extract_layout.addLayout(extract_format_row)
+
+    extract_btn = QPushButton("Extract & Load Audio")
+    extract_btn.setStyleSheet("background-color: #2ecc71; height: 35px; font-weight: bold; color: white;")
+    extract_layout.addWidget(extract_btn)
+    extract_layout.addStretch()
+
+    tabs.addTab(extract_tab, "🎬 Audio Extraction")
+
+    # ── TAB 5: WIDEN VIDEO ────────────────────────────────────────────────
     widen_tab = QWidget()
     widen_layout = QVBoxLayout(widen_tab)
     widen_layout.setContentsMargins(6, 8, 6, 6)
@@ -282,4 +327,8 @@ def create_video_tools_page():
         "pw_apply_btn": pw_apply_btn,
         "pw_clear_btn": pw_clear_btn,
         "pw_status_label": pw_status_label,
+        # Extraction tab
+        "extract_status_label": extract_status_label,
+        "extract_format_combo": extract_format_combo,
+        "extract_btn": extract_btn,
     }

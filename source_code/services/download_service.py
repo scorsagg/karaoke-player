@@ -16,6 +16,8 @@ class DownloadService(QObject):
         self.download_thread = None
         self.download_url = None
         self.current_download_filename = None
+        self.last_download_error = None
+        self.error_emitted = False
 
     def _download_progress_hook(self, d):
         if d['status'] == 'downloading':
@@ -50,6 +52,8 @@ class DownloadService(QObject):
 
     def download_video(self, url, download_dir, preferred_format='bv[vcodec^=avc1]+ba[acodec^=mp4a]/b'):
         self.download_url = url
+        self.last_download_error = None
+        self.error_emitted = False
         ytdlp_path = self.settings_manager.get("ytdlp_path", "yt-dlp")
 
         target_dir = Path(download_dir)
@@ -60,6 +64,7 @@ class DownloadService(QObject):
             "-f", preferred_format,
             "-o", str(target_dir / '%(title)s.%(ext)s'),
             "--no-playlist",
+            "--newline",
             "--merge-output-format", "mp4",
             "--force-overwrites",
             "--no-warnings",
@@ -67,49 +72,68 @@ class DownloadService(QObject):
         ]
 
         self.download_thread = self.process_thread_factory(cmd=command, duration=0)
-        self.download_thread.status_update.connect(self._parse_download_status)
+        self.download_thread.line_output.connect(self._parse_download_status)
         self.download_thread.finished.connect(self._download_process_finished)
         self.download_thread.start()
 
     def _parse_download_status(self, status_line):
+        line = status_line.strip()
+
         # Use character classes for literal square brackets to avoid SyntaxWarning
         # Changed \s to [ ] to avoid SyntaxWarning with raw strings
-        progress_match = re.search(r'[[]download[]][ ]+([0-9]+\.?[0-9]*)%[ ]+of[ ]+.*[ ]+at[ ]+(.*)[ ]+ETA[ ]+(.*)', status_line)
+        progress_match = re.search(r'[[]download[]].*?([0-9]+\.?[0-9]*)%', line)
         if progress_match:
             percent = int(float(progress_match.group(1)))
-            speed = progress_match.group(2)
-            eta = progress_match.group(3)
-            message = f"Downloading: {percent}% at {speed} ETA {eta}"
+            message = f"Downloading: {percent}%"
             self.download_progress.emit(percent, message)
             return
 
         # Handle post-processing messages (merging, converting)
         # These are simple string checks, no complex regex escape needed
-        if '[ffmpeg] Merging formats' in status_line or '[ExtractAudio]' in status_line:
+        if '[ffmpeg] Merging formats' in line or '[ExtractAudio]' in line:
             self.download_progress.emit(95, "Post-processing: Merging audio/video...")
             return
 
         # Final file name when download is finished
         # yt-dlp prints the final file path like: '[download] Destination: /path/to/file.mp4'
-        destination_match = re.search(r'[[]download[]] Destination:[ ]+(.*)', status_line)
+        destination_match = re.search(r'[[]download[]] Destination:[ ]+(.*)', line)
         if destination_match:
             self.current_download_filename = destination_match.group(1).strip()
             self.download_progress.emit(100, "Download complete.")
             return
 
+        # Handle final path lines for post-processed outputs
+        final_file_match = re.search(r'[[]Merger[]] Merging formats into "(.*)"', line)
+        if final_file_match:
+            self.current_download_filename = final_file_match.group(1).strip()
+            self.download_progress.emit(100, "Download complete.")
+            return
+
+        extracted_audio_match = re.search(r'[[]ExtractAudio[]] Destination:[ ]+(.*)', line)
+        if extracted_audio_match:
+            self.current_download_filename = extracted_audio_match.group(1).strip()
+            self.download_progress.emit(100, "Download complete.")
+            return
+
         # Handle errors reported via stdout
-        if 'ERROR:' in status_line:
-            self.download_error.emit(status_line)
+        if 'ERROR:' in line:
+            self.last_download_error = line
+            if not self.error_emitted:
+                self.error_emitted = True
+                self.download_error.emit(line)
 
     def _download_process_finished(self, success):
         if success:
             self.download_finished.emit(self.current_download_filename or "")
-        elif not self.download_thread.is_killed:
-            self.download_error.emit("Download process failed unexpectedly.")
+        elif not self.download_thread.is_killed and not self.error_emitted:
+            self.download_error.emit(self.last_download_error or "Download process failed unexpectedly.")
+            self.error_emitted = True
 
         self.download_thread = None
         self.download_url = None
         self.current_download_filename = None
+        self.last_download_error = None
+        self.error_emitted = False
 
     def stop_download(self):
         if self.download_thread and self.download_thread.isRunning():
@@ -120,3 +144,5 @@ class DownloadService(QObject):
             self.download_thread = None
             self.download_url = None
             self.current_download_filename = None
+            self.last_download_error = None
+            self.error_emitted = False

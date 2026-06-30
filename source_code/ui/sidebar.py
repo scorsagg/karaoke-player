@@ -32,10 +32,10 @@ def create_sidebar(parent):
         QListWidget::item { height: 50px; padding-left: 15px; }
         QListWidget::item:selected { background-color: #37373d; color: white; border-left: 4px solid #2ecc71; }
     """)
-    nav_list.addItems(["📥 Media Loader", "🎬 Pitch & Speed"])
+    nav_list.addItems(["📥 Media Loader", "▶ Playback"])
     side_layout.addWidget(nav_list)
 
-    extra_tools_toggle_btn = QPushButton("▶ 🛠 Extra Tools")
+    extra_tools_toggle_btn = QPushButton("▶ 🧭 Studios")
     extra_tools_toggle_btn.setStyleSheet("background-color: #37373d; color: #ccc; padding: 10px; border: 1px solid #444; border-radius: 3px; text-align: left;")
     side_layout.addWidget(extra_tools_toggle_btn)
 
@@ -44,13 +44,17 @@ def create_sidebar(parent):
     extra_tools_container_layout = QVBoxLayout(extra_tools_container)
     extra_tools_container_layout.setContentsMargins(0, 5, 0, 0)
 
-    video_tools_btn = QPushButton("🎬 Video Tools")
+    video_tools_btn = QPushButton("🎬 Video Studio")
     video_tools_btn.setStyleSheet("background-color: #2d2d2d; color: #aaa; padding: 8px 15px; border: none; text-align: left; margin-left: 15px; margin-right: 10px;")
     extra_tools_container_layout.addWidget(video_tools_btn)
 
-    audio_tools_btn = QPushButton("🎵 Audio Tools")
+    audio_tools_btn = QPushButton("🎵 Audio Studio")
     audio_tools_btn.setStyleSheet("background-color: #2d2d2d; color: #aaa; padding: 8px 15px; border: none; text-align: left; margin-left: 15px; margin-right: 10px;")
     extra_tools_container_layout.addWidget(audio_tools_btn)
+
+    convert_export_btn = QPushButton("🔄 Convert & Export")
+    convert_export_btn.setStyleSheet("background-color: #2d2d2d; color: #aaa; padding: 8px 15px; border: none; text-align: left; margin-left: 15px; margin-right: 10px;")
+    extra_tools_container_layout.addWidget(convert_export_btn)
     side_layout.addWidget(extra_tools_container)
 
     line = QFrame()
@@ -110,6 +114,7 @@ def create_sidebar(parent):
         "extra_tools_container": extra_tools_container,
         "video_tools_btn": video_tools_btn,
         "audio_tools_btn": audio_tools_btn,
+        "convert_export_btn": convert_export_btn,
         "history_toggle_btn": history_toggle_btn,
         "history_container": history_container,
         "clear_hist_btn": clear_hist_btn,
