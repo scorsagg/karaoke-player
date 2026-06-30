@@ -184,6 +184,7 @@ class KaraokeApp(QWidget):
         self.back_btn = playback_components["back_btn"]
         self.play_btn = playback_components["play_btn"]
         self.pause_btn = playback_components["pause_btn"]
+        self.stop_btn = playback_components["stop_btn"]
         self.fwd_btn = playback_components["fwd_btn"]
         self.mute_btn = playback_components["mute_btn"]
         self.vol_slider = playback_components["vol_slider"]
@@ -318,6 +319,7 @@ class KaraokeApp(QWidget):
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
         self.play_btn.clicked.connect(self.handle_play)
         self.pause_btn.clicked.connect(self.player.pause)
+        self.stop_btn.clicked.connect(self.handle_stop)
         self.back_btn.clicked.connect(lambda: self.jump_time(-10000))
         self.fwd_btn.clicked.connect(lambda: self.jump_time(10000))
         self.mute_btn.clicked.connect(self.toggle_mute)
@@ -2346,6 +2348,18 @@ class KaraokeApp(QWidget):
         """Play button handler — applies Playback Window settings then plays."""
         self.apply_playback_window()
         self.player.play()
+
+    def handle_stop(self):
+        """Stop button handler — rewinds to the start and detaches VLC output."""
+        self.player.stop()
+        self.audio_service.stop_audio_monitoring()
+        self._player_was_active = False
+        self.seek_slider.setValue(0)
+        self.time_label.setText("00:00")
+        if self.video_path:
+            self.status_label.setText(f"Status: Stopped {os.path.basename(self.video_path)}")
+        else:
+            self.status_label.setText("Status: Stopped")
 
     def apply_playback_window(self):
         """Apply active Playback Window settings: collect ranges, seek to first start, register first end cutoff."""

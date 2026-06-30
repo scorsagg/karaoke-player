@@ -33,6 +33,7 @@ def create_playback_bar(settings):
     back_btn = QPushButton("⏪ -10s")
     play_btn = QPushButton("▶ Play")
     pause_btn = QPushButton("⏸ Pause")
+    stop_btn = QPushButton("⏹ Stop")
     fwd_btn = QPushButton("+10s ⏩")
 
     mute_btn = QPushButton("🔊")
@@ -51,7 +52,7 @@ def create_playback_bar(settings):
     audio_level_label = QLabel("Audio:")
     audio_level_label.setStyleSheet("color: #ccc; font-size: 10px;")
 
-    for w in [back_btn, play_btn, pause_btn, fwd_btn]:
+    for w in [back_btn, play_btn, pause_btn, stop_btn, fwd_btn]:
         ctrl_row.addWidget(w)
     ctrl_row.addStretch()
 
@@ -84,6 +85,7 @@ def create_playback_bar(settings):
         "back_btn": back_btn,
         "play_btn": play_btn,
         "pause_btn": pause_btn,
+        "stop_btn": stop_btn,
         "fwd_btn": fwd_btn,
         "mute_btn": mute_btn,
         "vol_slider": vol_slider,

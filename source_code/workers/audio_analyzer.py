@@ -2,11 +2,14 @@ from PySide6.QtCore import QThread, Signal
 import sounddevice as sd
 import numpy as np
 import sys
+import warnings
 
 try:
     import soundcard as sc
 except Exception:
     sc = None
+
+warnings.filterwarnings("ignore", message="data discontinuity in recording")
 
 
 class AudioAnalyzerThread(QThread):
