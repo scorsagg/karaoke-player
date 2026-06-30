@@ -63,13 +63,15 @@ python build_system\build.py
 ```
 source_code/
 ├── main.py                    # App orchestrator & event handler
-├── ui/                        # Modularized UI components (6 modules)
+├── ui/                        # Modularized UI components
 │   ├── main_layout.py        # Orchestrator assembling all UI
 │   ├── sidebar.py            # Navigation & settings
 │   ├── playback_bar.py       # Play/pause/volume/audio meter
 │   ├── media_loader_page.py  # Media Loader page (file & URL loading)
-│   ├── pitch_page.py         # Pitch & speed controls
-│   └── extra_page.py         # Video widening + Audio Tools (Trim/Convert)
+│   ├── pitch_page.py         # Playback page
+│   ├── audio_studio_page.py  # Audio Studio (audio-only tools)
+│   ├── video_tools_page.py   # Video Studio (trim/playback/extract/widen)
+│   └── convert_export_page.py # Convert & Export (conversion/normalization)
 ├── services/
 │   ├── audio_service.py      # Audio analyzer coordination
 │   ├── player_service.py     # VLC player abstraction
@@ -163,8 +165,9 @@ config/
 - Appears when loading from browser, history, extraction, or conversion
 - Visual confirmation that audio is active in player
 
-### Feature: Video Tools - Playback Window ✅
-- **Tab 2** of the Video Tools page (stack idx 4)
+### Feature: Playback Window (Audio Studio + Video Studio) ✅
+- **Audio Studio**: Playback Window tab for audio-only workflows
+- **Video Studio**: Playback Window tab for video workflows
 - Three modes (can be combined):
   - **Skip to position**: seeks to specified H:M:S when Play is pressed
   - **Stop N seconds before end**: auto-stops N seconds before track ends
@@ -173,6 +176,14 @@ config/
 - **"Clear"** button — resets all controls to zero (signal-blocked to prevent auto-check)
 - Settings are cleared automatically on every new file load (`clear_playback_window()`)
 - Timer loop in `update_ui()` enforces the end-cutoff via `_pw_end_ms`
+
+### Feature: Amplify & Export ✅
+- **Convert & Export**: Amplify now uses export-time FFmpeg volume gain instead of live studio playback gain
+- **Mode selection**: `Amplification + ▲` exports with the entered positive amount; `Reduce amplification - ▼` exports with the reciprocal factor
+- **Amount input**: positive-only spinner with 0.25 steps, supporting values from 0.25x to 10.00x
+- **Workflow**: export file is auto-loaded after processing, then the amplify control resets to `1.00x`
+- **Naming**: output files use readable suffixes like `amp_up_5_times` and `amp_down_5_times`
+- **Studio pages**: Audio Studio and Video Studio no longer expose live amplify tabs
 
 ### Feature: Video Tools - Trimming (Playback-Style Rows) ✅
 - Video Trimming now uses row-based Start/End controls (like Playback Window)
@@ -186,17 +197,18 @@ Implementation references:
 - UI: `source_code/ui/video_tools_page.py`
 - Runtime parsing/export: `source_code/main.py` (`trim_video`, `_collect_video_trim_ranges`, `build_video_multi_trim_cmd`)
 
-### UI Architecture Notes (updated 2026-06-21)
-- **Scroll areas**: Audio Tools (idx 3) and Video Tools (idx 4) pages are wrapped in
+### UI Architecture Notes (updated 2026-06-29)
+- **Scroll areas**: Audio Studio (idx 2), Video Studio (idx 3), and Convert & Export (idx 4) pages are wrapped in
   `QScrollArea` in `main_layout.py` — content scrolls when window is small
 - **Navigation signal**: `nav_list.itemClicked` (not `currentRowChanged`) prevents
   spurious page changes when Qt internally updates selection
 - **Video frame heights**: set per-page in `handle_navigation_change()`
-  — Downloader gets 420px minimum for comfortable viewing
+   — Media Loader/Playback keep large default frame; tool pages use compact heights
 
 ### Navigation Improvements ✅
-- Stays on Audio Tools page after trim/convert/extract operations
-- Auto-navigates back to Audio Tools after processing
+- Audio Studio remains audio-only by policy
+- Extraction workflow is owned by Video Studio
+- Convert & Export owns format conversion and normalization
 
 ### Modularized UI
 - All UI components in separate files (`source_code/ui/`)
@@ -361,7 +373,7 @@ This pattern applies to any FFmpeg-based audio/video processing (trimming, conve
 
 ### How It Works
 
-1. **UI Layer** - Collect options from user (via tabbed extra_page)
+1. **UI Layer** - Collect options from user (Audio Studio / Video Studio / Convert & Export)
 2. **Validation Layer** - Ensure at least one option selected + valid ranges
 3. **Command Builder** - Construct FFmpeg command based on options
 4. **Execution Layer** - Run via ProcessThread with progress updates
@@ -370,18 +382,18 @@ This pattern applies to any FFmpeg-based audio/video processing (trimming, conve
 ### Implementation Pattern
 
 ```python
-# In extra_page.py - UI component
-def create_audio_tools_tab():
-    # Create checkboxes, spinners, dropdowns
+# In audio_studio_page.py or convert_export_page.py - UI component
+def create_audio_studio_page():
+   # Create range rows, dropdowns, action buttons
     return {
-        "trim_first_cb": trim_first_cb,
-        "trim_first_spin": trim_first_spin,
+      "audio_trim_ranges_layout": audio_trim_ranges_layout,
+      "add_audio_trim_range_btn": add_audio_trim_range_btn,
         # ... more controls ...
     }
 
 # In main.py - Handler method
 def trim_audio(self):
-    # 1. VALIDATE
+    # 1. VALIcontainerE
     if not self.video_path:
         QMessageBox.warning(...)
         return
@@ -435,7 +447,7 @@ def build_format_conversion_cmd(input_file, output_file, target_fmt, bitrate):
 
 To add another processing feature (e.g., normalization, effects):
 
-1. **Add UI** to extra_page.py Audio Tools tab:
+1. **Add UI** to `convert_export_page.py` (or the appropriate studio page):
    ```python
    norm_checkbox = QCheckBox("Normalize Loudness")
    norm_spinner = QDoubleSpinBox()  # Target LUFS

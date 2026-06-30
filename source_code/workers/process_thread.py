@@ -8,6 +8,7 @@ class ProcessThread(QThread):
     progress = Signal(int)
     finished = Signal(bool)
     status_update = Signal(str)
+    line_output = Signal(str)
 
     def __init__(self, cmd, duration=0):
         super().__init__()
@@ -49,6 +50,9 @@ class ProcessThread(QThread):
                     line = buffer.strip()
                     buffer = ""
                     if not line: continue
+
+                    # Emit raw process output so callers can do their own parsing.
+                    self.line_output.emit(line)
                     
                     if "[download]" in line and "%" in line:
                         match = re.search(r"\[download\]\s+([0-9.]+)%", line)
@@ -57,8 +61,14 @@ class ProcessThread(QThread):
                             self.progress.emit(min(percent, 100))
                             self.status_update.emit(f"Downloading Assets... {percent}%")
                     
+                    elif "duration:" in line.lower() and self.duration <= 0:
+                        duration_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", line, re.IGNORECASE)
+                        if duration_match:
+                            h, m, s = duration_match.groups()
+                            self.duration = int(h) * 3600 + int(m) * 60 + float(s)
+
                     elif "time=" in line and self.duration > 0:
-                        time_match = re.search(r"time=(\d+):(\d+):(\d+\.\d+)", line)
+                        time_match = re.search(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)", line)
                         if time_match:
                             h, m, s = time_match.groups()
                             current_sec = int(h) * 3600 + int(m) * 60 + float(s)

@@ -7,7 +7,8 @@ from source_code.ui.sidebar import create_sidebar
 from source_code.ui.playback_bar import create_playback_bar
 from source_code.ui.media_loader_page import create_media_loader_page
 from source_code.ui.pitch_page import create_pitch_page
-from source_code.ui.extra_page import create_audio_tools_page
+from source_code.ui.audio_studio_page import create_audio_studio_page
+from source_code.ui.convert_export_page import create_convert_export_page
 from source_code.ui.video_tools_page import create_video_tools_page
 from PySide6.QtWidgets import QLabel, QWidget
 from PySide6.QtGui import QFont
@@ -68,8 +69,8 @@ def create_main_layout(settings):
     stack.addWidget(pitch_page_components["page"])
     components["pitch_page_components"] = pitch_page_components
     
-    # Index 2: Audio Tools page (wrapped in scroll area so controls are reachable)
-    audio_tools_page_components = create_audio_tools_page()
+    # Index 2: Audio Studio page
+    audio_tools_page_components = create_audio_studio_page()
     audio_scroll = QScrollArea()
     audio_scroll.setWidget(audio_tools_page_components["page"])
     audio_scroll.setWidgetResizable(True)
@@ -89,6 +90,17 @@ def create_main_layout(settings):
     video_tools_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
     stack.addWidget(video_tools_scroll)
     components["video_tools_page_components"] = video_tools_page_components
+
+    # Index 4: Convert & Export page
+    convert_export_page_components = create_convert_export_page()
+    convert_export_scroll = QScrollArea()
+    convert_export_scroll.setWidget(convert_export_page_components["page"])
+    convert_export_scroll.setWidgetResizable(True)
+    convert_export_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    convert_export_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    convert_export_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+    stack.addWidget(convert_export_scroll)
+    components["convert_export_page_components"] = convert_export_page_components
     
     # Audio Tools components exposed directly; widen controls are inside video_tools_page_components
     extra_page_components = {**audio_tools_page_components}

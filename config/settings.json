@@ -1,9 +1,9 @@
 {
   "base_directory": "D:/Entertainment/youtube-downloads/Srikanth",
   "download_directory": "D:/Entertainment/youtube-downloads/Srikanth/Downloads",
-  "ffmpeg_path": "ffmpeg",
+  "ffmpeg_path": "D:\\Srikanth\\Academics\\Python\\karaoke-player\\resources\\ffmpeg.exe",
   "ffprobe_path": "ffprobe",
-  "ytdlp_path": "yt-dlp",
+  "ytdlp_path": "D:\\Srikanth\\Academics\\Python\\karaoke-player\\resources\\yt-dlp.exe",
   "measurement_mode": "dB Output (dBFS)",
-  "auto_reduce_threshold": 85
+  "auto_reduce_threshold": 90
 }

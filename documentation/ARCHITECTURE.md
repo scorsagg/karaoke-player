@@ -71,10 +71,20 @@ source_code/
 ├── services/
 │   ├── __init__.py
 │   ├── player_service.py          # VLC playback abstraction
-│   └── download_service.py        # YouTube/stream download service
+│   ├── download_service.py        # YouTube/stream download service
+│   ├── file_loading_service.py    # Safe load lifecycle + cleanup coordination
+│   └── audio_service.py           # Audio analysis integration + helper commands
 │
 ├── ui/
-│   └── __init__.py                # UI utilities (placeholder)
+│   ├── __init__.py
+│   ├── media_loader_page.py       # Media loader controls
+│   ├── pitch_page.py              # Playback controls page
+│   ├── audio_studio_page.py       # Audio-only tools (trim ranges + playback window)
+│   ├── video_tools_page.py        # Video tools + extraction + widen + playback window
+│   ├── convert_export_page.py     # Format conversion + normalization + amplify/export
+│   ├── sidebar.py                 # Navigation list
+│   ├── playback_bar.py            # Playback action bar
+│   └── main_layout.py             # Stack construction/wiring
 │
 ├── widgets/
 │   ├── __init__.py
@@ -87,17 +97,17 @@ source_code/
     └── process_thread.py          # Generic subprocess executor
 ```
 
-### Page Layout & Scroll Architecture (updated 2026-06-21)
+### Page Layout & Scroll Architecture (updated 2026-06-29)
 
-Pages 3 and 4 in the QStackedWidget are wrapped in QScrollArea:
+Pages 2, 3, and 4 in the QStackedWidget are wrapped in QScrollArea:
 
 ```
 QStackedWidget
 ├── [0] media_loader_page (QWidget)
-├── [1] pitch_page (QWidget)
-├── [2] widen_page (QWidget)
-├── [3] QScrollArea → audio_tools_page (QWidget)   ← scroll area wrapper
-└── [4] QScrollArea → video_tools_page (QWidget)   ← scroll area wrapper
+├── [1] pitch_page (QWidget)                         # Playback page
+├── [2] QScrollArea → audio_studio_page (QWidget)
+├── [3] QScrollArea → video_tools_page (QWidget)
+└── [4] QScrollArea → convert_export_page (QWidget)
 
 Module mapping:
 - `source_code/ui/media_loader_page.py` provides stack index 0.
@@ -105,9 +115,9 @@ Module mapping:
 
 Video frame height is controlled per-page in `handle_navigation_change()`:
 - Pages 0/1: min=420px, no max — large video area
-- Page 2: min=80px, max=350px
-- Page 3: min=80px, max=100px (audio-only) / 220px (video)
-- Page 4: min=80px, max=220px
+- Page 2 (Audio Studio): min=80px, max=100px (audio-only) / 220px (video)
+- Page 3 (Video Studio): min=80px, max=220px, and max=350px on Widen tab
+- Page 4 (Convert & Export): min=80px, max=220px
 
 **Fullscreen:** `toggle_video_fullscreen()` removes the height cap on enter (sets max=unlimited),
 then calls `handle_navigation_change(current_idx)` on exit to restore page-correct constraints.
@@ -130,6 +140,16 @@ Validation rules:
 - Values are clamped to media duration
 - Overlapping/touching ranges are merged before command construction
 - Empty valid set blocks export
+
+### Convert & Export: Amplify & Export (updated 2026-06-30)
+
+Convert & Export owns export-time amplification instead of the studio pages:
+- Signed mode buttons select the export direction:
+    - `Amplification + ▲` applies the entered positive amount directly
+    - `Reduce amplification - ▼` applies the reciprocal factor
+- The amount spinner stays positive-only and uses 0.25-step increments
+- `main.py` builds FFmpeg commands with `volume=<factor>` and auto-loads the exported result
+- After load, the control resets to the neutral `1.00x` baseline so the new file becomes the reference point
 
 ---
 
@@ -302,36 +322,47 @@ else:
 
 ---
 
-### Audio Processing (Features 6 & 7) ✅ NEW
+### Audio/Conversion Processing (Features 6, 7, 8, 15, 19) ✅ ACTIVE
 
-**Audio Trimming (Feature 6) & Format Conversion (Feature 7)**
+**Audio Trimming (Feature 6), Format Conversion (Feature 7), and Normalization (Feature 8)**
 
 **Purpose:** Advanced audio/video processing via FFmpeg with intelligent command building
 
 **Responsibilities:**
-- Trim audio with flexible options (first X, last X, range, combinations)
+- Trim audio with row-based start/end ranges (single or multiple segments)
 - Convert between audio/video formats intelligently
+- Normalize loudness for audio or video using LUFS presets
+- Handle container as a regular source format (not a standalone converter page)
 - Calculate trim points from duration data
 - Build format-specific FFmpeg commands
 - Execute via ProcessThread with progress updates
 - Auto-reload processed files
 
-**UI Location:** Extra Tools → Audio Tools tab (two sub-sections)
+**UI Location:**
+- Audio Studio page: trimming ranges + Playback Window
+- Convert & Export page: format conversion + normalization + amplify/export
+- Video Studio page: trimming + Playback Window + audio extraction from video
+
+**Amplify & Export UX:**
+- Uses `Amplification + ▲` and `Reduce amplification - ▼` mode buttons
+- Amount input stays positive-only and uses 0.25-step increments
+- Selected mode is highlighted immediately and preview text shows the resulting FFmpeg `volume=<factor>` value
+- Exported result auto-loads, then the control resets to the neutral `1.00x` baseline
 
 **Feature 6: Audio Trimming Methods:**
 ```python
-trim_audio() - Orchestrates trimming based on checkboxes:
-├─ trim_first: Skip first N seconds
-├─ trim_last: Skip last N seconds  
-├─ trim_range: Keep seconds A to B (overrides other trims)
-└─ Supports all combinations (first+last, first+range, last+range, all three)
+trim_audio() - Orchestrates trimming based on range rows:
+├─ _collect_audio_trim_ranges(): validate and collect start/end rows
+├─ build_audio_multi_trim_cmd(): single-range copy or multi-range concat
+├─ add/remove/clear row helpers drive dynamic UI
+└─ Supports keeping one or multiple selected ranges in output order
 ```
 
 **Feature 7: Format Conversion Methods:**
 ```python
 convert_audio_format() - Converts based on dropdown selections:
-├─ Source format: Auto-detect or specific (MP3, WAV, M4A, AAC, DAT, MP4, MKV, AVI, WebM)
-├─ Target format: MP3, WAV, M4A, AAC, MP4, MKV
+├─ Source format: Auto-detect or specific (MP3, WAV, M4A, AAC, container, MP4, MKV, AVI, WebM)
+├─ Target format: stream-aware (audio-only targets for audio sources; mixed targets for video)
 └─ Quality selector: High (320k), Medium (192k), Low (128k)
 
 build_format_conversion_cmd() - Builds FFmpeg command:
@@ -345,17 +376,27 @@ build_format_conversion_cmd() - Builds FFmpeg command:
 - `trim_audio()` - Check trim options, calculate times, execute
 - `convert_audio_format()` - Get format selections, build command, execute
 - `build_format_conversion_cmd()` - Intelligent command builder for any format pair
+- `refresh_conversion_targets()` - updates target list using current media type
+- `normalize_audio()` - applies `loudnorm` using selected preset level
 
 **FFmpeg Command Examples:**
 ```bash
-# Trimming (fast, no re-encode)
-ffmpeg -ss {start} -to {end} -i input -acodec copy output
+# Single-range trimming (fast, stream copy where possible)
+ffmpeg -ss {start} -to {end} -i input -c copy output
+
+# Multi-range audio trim (concat workflow)
+ffmpeg -i input -ss {s1} -to {e1} -c copy part1
+ffmpeg -i input -ss {s2} -to {e2} -c copy part2
+ffmpeg -f concat -safe 0 -i list.txt -c copy output
 
 # Format conversions
 ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 output.wav
 ffmpeg -i input.wav -acodec libmp3lame -b:a 192k output.mp3
-ffmpeg -i input.dat -vn -acodec libmp3lame -b:a 192k output.mp3
+ffmpeg -i input.media -vn -acodec libmp3lame -b:a 192k output.mp3
 ffmpeg -i input.mp4 -vn -acodec aac -b:a 192k output.m4a
+
+# Loudness normalization
+ffmpeg -i input -af loudnorm=I=-14:TP=-1.5:LRA=11 -ar 44100 output.wav
 ```
 
 **Data Flow:**

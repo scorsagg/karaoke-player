@@ -4,7 +4,7 @@
 
 ## When Making Changes to These Areas, Update These Files:
 
-### 1. VERSION UPDATES (Currently: v3)
+### 1. VERSION UPcontainerES (Currently: v3)
 **Files to update:**
 - `build_system/build.py` → `VERSION = "3"`
 - `build_system/KaraokeStudioPro.spec` → Comment at top mentions v3
@@ -31,7 +31,7 @@
 
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:
-- main_layout.py, sidebar.py, playback_bar.py, media_loader_page.py, pitch_page.py, extra_page.py, video_tools_page.py
+- main_layout.py, sidebar.py, playback_bar.py, media_loader_page.py, pitch_page.py, audio_studio_page.py, video_tools_page.py, convert_export_page.py
 
 **Files to update when modifying UI:**
 - `build_system/KaraokeStudioPro.spec` → hiddenimports for new UI modules
@@ -39,20 +39,20 @@
 - `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → UI folder structure
 - `documentation/ARCHITECTURE.md` → UI architecture section
 
-**Page index map (CRITICAL — do not change):**
-- 0: Media Loader | 1: Pitch & Speed | 2: Widen Video | 3: Audio Tools | 4: Video Tools
+**Page index map (CRITICAL — keep in sync with `main.py` constants):**
+- 0: Media Loader | 1: Playback | 2: Audio Studio | 3: Video Studio | 4: Convert & Export
 
-**Scroll Areas (added 2026-06-21):**
-- Pages 3 (Audio Tools) and 4 (Video Tools) are wrapped in `QScrollArea` in `main_layout.py`
-- This means `stack.widget(3)` is a `QScrollArea`, not the page widget directly
+**Scroll Areas:**
+- Pages 2 (Audio Studio), 3 (Video Studio), and 4 (Convert & Export) are wrapped in `QScrollArea` in `main_layout.py`
+- This means `stack.widget(2/3/4)` is a `QScrollArea`, not the page widget directly
 - The actual page widget is accessed via `scroll_area.widget()`
 - `QScrollArea` and `Qt` must be imported in main_layout.py
 
 **Video Frame Height Rules (handle_navigation_change in main.py):**
-- idx 0/1 (Downloader, Pitch & Speed): min=420, max=unlimited
-- idx 2 (Widen Video): min=80, max=350
-- idx 3 (Audio Tools): min=80, max=100 (audio-only) or max=220 (video)
-- idx 4 (Video Tools): min=80, max=220
+- idx 0/1 (Media Loader, Playback): min=420, max=unlimited
+- idx 2 (Audio Studio): min=80, max=100 (audio-only) or max=220
+- idx 3 (Video Studio): min=80, max=220 (Widen tab uses max=350)
+- idx 4 (Convert & Export): min=80, max=220
 
 **Navigation Signal (IMPORTANT):**
 - Use `nav_list.itemClicked` NOT `nav_list.currentRowChanged`
@@ -144,36 +144,30 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 4. Download & Queue button completion
 5. Convert to 16:9 button completion
 
-### 9. AUDIO PROCESSING FEATURES (Features 6 & 7) ✅ COMPLETE
+### 9. AUDIO PROCESSING FEATURES (Features 6, 7, 8, 15) ✅ COMPLETE
 **Status:** Fully Implemented & Enhanced in v3
 
 **Related files:**
-- `source_code/ui/extra_page.py` → UI with tabbed interface + TimePickerWidget class
+- `source_code/ui/audio_studio_page.py` → Audio Studio trimming UI with row-based ranges
+- `source_code/ui/convert_export_page.py` → Convert & Export (format conversion and normalization)
 - `source_code/main.py` → trim_audio(), convert_audio_format(), build_format_conversion_cmd() methods, audio overlay, history loading
 - `documentation/ARCHITECTURE.md` → Audio Processing section
 - `documentation/IMPLEMENTATION_LOG.md` → Features 6 & 7 + UX improvements entry
 
 **Feature 6: Audio Trimming ✅ COMPLETE**
-- Trim first X seconds, last X seconds, keep range, or combinations
+- Row-based start/end keep ranges in Audio Studio
+- Supports one or multiple ranges; multiple segments are concatenated
 - Supports all audio formats (MP3, WAV, AAC, M4A)
-- FFmpeg command: `-ss {start} -to {end} -acodec copy`
-- **UI Component:** `TimePickerWidget` class with three spinboxes
-  - Separate Hour/Minute/Second controls (0-59 range each)
-  - Total time calculated as: hours * 3600 + minutes * 60 + seconds
-  - Display format: HH:MM:SS
-  - Each unit increments independently
-- **UI Location:** Extra Tools → Audio Tools tab → Trimming section
-- **Checkbox Controls:**
-  - ☑ Trim First X seconds (with H/M/S picker)
-  - ☑ Trim Last X seconds (with H/M/S picker)
-  - ☑ Keep Range (from A to B) with Start and End H/M/S pickers
-  - Output format selector (MP3, WAV, AAC, M4A)
+- FFmpeg path: single-range direct trim, multi-range concat workflow
+- **UI Location:** Audio Studio page (Audio Trimming tab)
+- **Controls:** Add range, Remove row, Clear, Output format selector
+- **Related playback UX:** Audio Studio also includes a Playback Window tab with shared range-based playback behavior
 
 **Feature 7: Format Conversion ✅ COMPLETE**
-- Convert between audio/video formats: MP3, WAV, M4A, AAC, DAT, MP4, MKV, AVI, WebM
+- Convert between audio/video formats: MP3, WAV, M4A, AAC, container, MP4, MKV, AVI, WebM
 - Quality selector for lossy formats (High 320kbps, Medium 192kbps, Low 128kbps)
 - Intelligent FFmpeg command builder handles all format combinations
-- **UI Location:** Extra Tools → Audio Tools tab → Converter section
+- **UI Location:** Convert & Export page → Format Conversion tab
 - **Controls:**
   - Source format dropdown (Auto-detect + specific formats)
   - Target format dropdown
@@ -188,8 +182,17 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 **Format Conversion Examples:**
 - MP3 → WAV: `ffmpeg -i input.mp3 -acodec pcm_s16le -ar 44100 output.wav`
 - WAV → MP3: `ffmpeg -i input.wav -acodec libmp3lame -b:a 192k output.mp3`
-- DAT → MP3: `ffmpeg -i input.dat -vn -acodec libmp3lame -b:a 192k output.mp3`
+- container → MP3: `ffmpeg -i input.media -vn -acodec libmp3lame -b:a 192k output.mp3`
 - MP4 → M4A: `ffmpeg -i input.mp4 -vn -acodec aac -b:a 192k output.m4a`
+
+**Amplify & Export (Export-Time ffmpeg Gain) ✅ COMPLETE**
+- Uses the Convert & Export page, not the studio pages
+- Signed mode selector:
+  - `Amplification + ▲` exports with the entered positive amount directly
+  - `Reduce amplification - ▼` exports with the reciprocal factor
+- Amount spinner stays positive-only and uses 0.25 steps
+- Exported result auto-loads after processing, then resets the control back to the neutral baseline (`1.00x`)
+- Output naming uses readable suffixes such as `amp_up_5_times` and `amp_down_5_times`
 
 **UX Improvements ✅ COMPLETE**
 - **Audio Visualization Overlay:** Green glowing widget shows "🎵 Audio File Loaded" for audio-only files
@@ -296,14 +299,15 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 **Status:** Fully Implemented - Normalizes audio to consistent LUFS level
 
 **Related files:**
-- `source_code/ui/extra_page.py` → Normalization tab with controls
+- `source_code/ui/convert_export_page.py` → Normalization tab with controls
 - `source_code/main.py` → `normalize_audio()` method with FFmpeg loudnorm filter
 - `documentation/IMPLEMENTATION_LOG.md` → Feature 8 implementation entry
 
 **Feature 8: Audio Loudness Normalization ✅ COMPLETE**
 - Normalizes audio files to consistent loudness levels using FFmpeg `loudnorm` filter
 - Three preset LUFS targets for different use cases
-- **UI Location:** Extra Tools → Audio Tools tab → Normalization section (Tab 4)
+- Supports both audio and video sources (audio normalization workflow)
+- **UI Location:** Convert & Export page → Normalization tab
 - **Controls:**
   - ☑ Normalize Loudness (checkbox, checked by default)
   - Target LUFS dropdown with three presets:
@@ -361,6 +365,7 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - Builds FFmpeg command for amplitude adjustment in dB
 - Optional audio limiter to prevent clipping
 - Usage: Adjust audio volume before export/streaming
+- Export-time amplification is handled in Convert & Export; Audio Studio and Video Studio no longer expose live amplify tabs
 
 **Feature 20 - Duration Analysis (Helper):**
 - Method: `AudioService.get_file_duration(ffprobe_path, file_path)`
@@ -382,25 +387,25 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - Useful for playback speed control without audio pitch shift
 - Usage: Speed up/slow down video while keeping audio normal
 
-### 14. DAT/WHATSAPP FILE CONVERSION (Feature 19) ✅ COMPLETE
+### 14. CONTAINER FILE CONVERSION (Feature 19) ✅ COMPLETE
 **Status:** Fully Implemented with UI and full FFmpeg support
 
 **Related files:**
-- `source_code/ui/extra_page.py` → New Tab 5 "📱 DAT Converter"
-- `source_code/main.py` → `convert_dat_file()` and `build_dat_conversion_cmd()` methods
+- `source_code/ui/convert_export_page.py` → container included in source format selection
+- `source_code/main.py` → conversion routing and media-aware target filtering
 - `build_system/KaraokeStudioPro.spec` → No new imports needed (uses existing ffmpeg)
 - `documentation/IMPLEMENTATION_LOG.md` → Feature 19 entry
 
-**Feature 19: DAT/WhatsApp File Conversion ✅ COMPLETE**
-- Converts DAT files and other WhatsApp formats to standard formats
-- Supports: WAV, MP3, M4A, MP4
-- Auto-detect codec or manual format selection
+**Feature 19: container/legacy media File Conversion ✅ COMPLETE**
+- container and messaging app-style sources are handled as regular conversion inputs
+- Supports: WAV, MP3, M4A, MP4 and other standard conversion targets
+- Stream-aware target filtering based on loaded media type
 - Quality control for lossy formats (High 320kbps, Medium 192kbps, Low 128kbps)
-- **UI Location:** Extra Tools → Audio Tools → Tab 5 "📱 DAT Converter"
+- **UI Location:** Convert & Export page → Format Conversion tab
 
 **Supported Input Formats:**
-- `.dat` - Generic DAT container (WhatsApp media, karaoke machines)
-- `.opus` - Opus audio codec (WhatsApp voice messages)
+- `.media` - Generic container container (messaging app media, karaoke machines)
+- `.opus` - Opus audio codec (messaging app voice messages)
 - `.amr` - Narrow-band AMR (older audio format)
 - `.aac` - AAC audio codec
 - `.m4a` - MPEG-4 audio files
@@ -414,7 +419,7 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 **UI Controls:**
 - **Source Format Dropdown:**
   - Auto-detect (Recommended) - Analyzes file automatically
-  - .dat (Generic)
+  - .media (Generic)
   - .opus (Audio Codec)
   - .amr (Narrow-band)
   - .aac (Audio Codec)
@@ -437,37 +442,37 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 
 **FFmpeg Commands Generated:**
 ```bash
-# DAT to WAV (lossless)
-ffmpeg -y -i input.dat -vn -acodec pcm_s16le -ar 44100 output.wav
+# Container to WAV (lossless)
+ffmpeg -y -i input.media -vn -acodec pcm_s16le -ar 44100 output.wav
 
-# DAT to MP3 (high quality)
-ffmpeg -y -i input.dat -vn -acodec libmp3lame -b:a 320k output.mp3
+# Container to MP3 (high quality)
+ffmpeg -y -i input.media -vn -acodec libmp3lame -b:a 320k output.mp3
 
-# DAT to M4A (AAC)
-ffmpeg -y -i input.dat -vn -acodec aac -b:a 192k output.m4a
+# Container to M4A (AAC)
+ffmpeg -y -i input.media -vn -acodec aac -b:a 192k output.m4a
 
-# DAT to MP4 (with video if present)
-ffmpeg -y -i input.dat -c:v libx264 -preset fast -acodec aac -b:a 192k output.mp4
+# Container to MP4 (with video if present)
+ffmpeg -y -i input.media -c:v libx264 -preset fast -acodec aac -b:a 192k output.mp4
 ```
 
 **Workflow:**
-1. No file loaded: Click "Convert DAT File" → File dialog opens
+1. No file loaded: Click "Convert Media File" → File dialog opens
 2. File loaded: Select source format (or use Auto-detect)
 3. Select target format (WAV, MP3, M4A, or MP4)
 4. For lossy formats, choose quality (High/Medium/Low)
-5. Click "🚀 Convert DAT File"
+5. Click "🚀 Convert Media File"
 6. FFmpeg analyzes and converts file
 7. Output auto-loads into player
 8. Status shows: "✅ Conversion complete: {filename}"
 
 **Common Use Cases:**
-- Convert WhatsApp `.dat` voice messages to MP3 playable format
-- Convert karaoke machine `.dat` files to standard audio
+- Convert messaging app `.media` voice messages to MP3 playable format
+- Convert karaoke machine `.media` files to standard audio
 - Extract audio from `.opus` files for use in other apps
 - Batch convert old audio formats to modern MP3/WAV
 
 **File Output Naming:**
-- Input: `recording.dat`
+- Input: `recording.media`
 - Output: `recording_converted.wav` (or .mp3/.m4a/.mp4)
 - Location: Download directory (configurable in settings)
 
@@ -481,21 +486,20 @@ ffmpeg -y -i input.dat -c:v libx264 -preset fast -acodec aac -b:a 192k output.mp
 
 **Related files:**
 - `source_code/ui/video_tools_page.py` → New UI page for video tools
-- `source_code/ui/sidebar.py` → New "Video Tools" button in Extra Tools
+- `source_code/ui/sidebar.py` → Video Studio navigation button
 - `source_code/ui/main_layout.py` → Added video_tools_page to stacked widget (Index 3)
 - `source_code/main.py` → `trim_video()` and `build_video_trim_cmd()` methods
 - `build_system/KaraokeStudioPro.spec` → Added source_code.ui.video_tools_page to hiddenimports
 - `documentation/IMPLEMENTATION_LOG.md` → Video Tools entry
 
 **Feature: Video Trimming ✅ COMPLETE**
-- Trim first X seconds, last X seconds, keep range, or combinations
+- Row-based start/end keep-ranges with add/remove/clear
 - Supports multiple output formats: MP4, MKV, WebM, AVI
 - Format-specific codec optimization (H.264 for MP4, VP9 for WebM, etc.)
-- **UI Location:** Extra Tools → Video Tools (new sidebar button)
+- **UI Location:** Video Studio page → Video Trimming tab
 - **Controls:**
-  - ☑ Trim First X seconds (with H/M/S picker using TimePickerWidget)
-  - ☑ Trim Last X seconds (with H/M/S picker)
-  - ☑ Keep Range (from A to B) with Start and End H/M/S pickers
+  - Start/end range rows
+  - Add Range, Remove row, Clear
   - Output format selector (MP4, MKV, WebM, AVI)
   - "✂️ Trim Video" button (orange)
 
@@ -632,7 +636,7 @@ ffmpeg -y -ss 30 -to 120 -i input.mp4 -c:v mpeg4 -q:v 5 -c:a libmp3lame -b:a 192
 - **Feature 7**: Format Conversion (MP3, WAV, M4A, AAC, MP4, MKV, AVI, WebM)
 - **Feature 8**: Audio Loudness Normalization (LUFS presets)
 - **Feature 15**: Audio Stream Extraction from videos
-- **Feature 19**: DAT/WhatsApp File Conversion
+- **Feature 19**: container/legacy media handling in Convert & Export source detection (no standalone container tab)
 - **Feature 21**: YouTube video downloads (already in app)
 - **Feature 32**: Playback with start/end time controls
 - **Feature 33**: Stop/unload video functionality
