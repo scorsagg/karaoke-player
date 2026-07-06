@@ -182,6 +182,12 @@ config/
 - Stop rewinds playback to time zero, detaches VLC from the widget, and marks playback inactive
 - Pressing Play re-attaches the saved video widget before playback resumes
 
+### Feature: Real-Time Pitch Display ✅
+- The Pitch page now hosts the live musical note readout for playback audio
+- The analyzer emits frequency + note updates from the existing audio capture thread
+- Main window converts the detected frequency into note labels like `A4` or `C#3`
+- The same UI path can later be switched to microphone input without changing the display surface
+
 ### Feature: Amplify & Export ✅
 - **Convert & Export**: Amplify now uses export-time FFmpeg volume gain instead of live studio playback gain
 - **Mode selection**: `Amplification + ▲` exports with the entered positive amount; `Reduce amplification - ▼` exports with the reciprocal factor

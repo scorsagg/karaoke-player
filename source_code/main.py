@@ -81,6 +81,7 @@ class KaraokeApp(QWidget):
         # Initialize and start audio analyzer thread
         self.audio_analyzer = AudioAnalyzerThread()
         self.audio_analyzer.level_updated.connect(self.on_audio_level_updated)
+        self.audio_analyzer.pitch_updated.connect(self.on_pitch_detected)
         self.audio_analyzer.start()
 
         # Initialize audio service for managing audio analyzer and meter
@@ -206,6 +207,14 @@ class KaraokeApp(QWidget):
         self.pitch_input = pitch_page_components["pitch_input"]
         self.pitch_plus = pitch_page_components["pitch_plus"]
         self.pitch_reset = pitch_page_components["pitch_reset"]
+        self.pitch_note_label = pitch_page_components["pitch_note_label"]
+        self.pitch_frequency_label = pitch_page_components["pitch_frequency_label"]
+        self.pitch_lock_label = pitch_page_components["pitch_lock_label"]
+        self.pitch_source_label = pitch_page_components["pitch_source_label"]
+        self.sa_label = pitch_page_components["sa_label"]
+        self.pa_label = pitch_page_components["pa_label"]
+        self.hsa_label = pitch_page_components["hsa_label"]
+        self.key_status_label = pitch_page_components["key_status_label"]
         self.speed_minus = pitch_page_components["speed_minus"]
         self.speed_input = pitch_page_components["speed_input"]
         self.speed_plus = pitch_page_components["speed_plus"]
@@ -386,6 +395,13 @@ class KaraokeApp(QWidget):
         self._update_amplify_step_button_styles(0)
 
         self._current_export_media_kind = "unknown"
+        self._smoothed_pitch_hz = None
+        self._last_pitch_confidence = 0.0
+        # Tonic detection accumulator
+        self._tonic_note_counts = {}   # note_class (0-11) -> count
+        self._tonic_frames_collected = 0
+        self._tonic_locked = False
+        self._tonic_note_class = None  # 0-11 once locked
         
         # Initialize state flags
         self.extra_tools_is_expanded = False
@@ -727,6 +743,259 @@ class KaraokeApp(QWidget):
     def on_audio_analyzer_replaced(self, new_thread):
         """Keep main reference synced when AudioService recreates analyzer thread."""
         self.audio_analyzer = new_thread
+        try:
+            self.audio_analyzer.level_updated.connect(self.on_audio_level_updated)
+        except Exception:
+            pass
+        try:
+            self.audio_analyzer.pitch_updated.connect(self.on_pitch_detected)
+        except Exception:
+            pass
+
+    # ── NOTE NAMES for tonic derivation ─────────────────────────────────────
+    _NOTE_NAMES_SHARP = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    _MAJOR_PROFILE = (6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88)
+    _MINOR_PROFILE = (6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17)
+
+    @staticmethod
+    def _note_class_to_name(note_class):
+        return KaraokeApp._NOTE_NAMES_SHARP[int(note_class) % 12]
+
+    def _select_tonic_note_class(self, note_counts):
+        """Choose tonic by matching against shifted Sa-Pa templates and key profiles."""
+        if not note_counts:
+            return None
+
+        total = float(sum(note_counts.values()))
+        if total <= 0:
+            return int(max(note_counts, key=note_counts.get))
+
+        histogram = [float(note_counts.get(i, 0)) / total for i in range(12)]
+
+        def _cosine_similarity(a, b):
+            dot = sum(x * y for x, y in zip(a, b))
+            na = sum(x * x for x in a) ** 0.5
+            nb = sum(x * x for x in b) ** 0.5
+            if na <= 1e-12 or nb <= 1e-12:
+                return 0.0
+            return dot / (na * nb)
+
+        # Relative profile representing Sa-Pa-Sa support plus nearby svara presence.
+        # 0:Sa, 7:Pa, 5:Ma, 2:Ri, 9:Dha, 4:Ga, 11:Ni
+        sa_pa_template_rel = {
+            0: 1.00,
+            7: 0.88,
+            5: 0.32,
+            2: 0.24,
+            9: 0.22,
+            4: 0.16,
+            11: 0.14,
+        }
+
+        def _build_template(tonic):
+            template = [0.0] * 12
+            for rel, w in sa_pa_template_rel.items():
+                template[(tonic + rel) % 12] = float(w)
+            return template
+
+        def _score_tonic(tonic):
+            template_score = _cosine_similarity(histogram, _build_template(tonic))
+
+            major_score = 0.0
+            minor_score = 0.0
+            for pitch_class in range(12):
+                rel = (pitch_class - tonic) % 12
+                weight = histogram[pitch_class]
+                major_score += weight * self._MAJOR_PROFILE[rel]
+                minor_score += weight * self._MINOR_PROFILE[rel]
+
+            profile_score = max(major_score, minor_score)
+
+            sa_weight = histogram[tonic]
+            pa_weight = histogram[(tonic + 7) % 12]
+            # Favor candidates where tonic itself is present, and penalize cases
+            # where the fifth overwhelms the tonic (common false-C outcome).
+            pa_excess = max(0.0, pa_weight - sa_weight)
+            tonic_prominence = sa_weight - (0.80 * pa_excess)
+
+            # Blend template similarity with profile score.
+            return (2.20 * template_score) + profile_score + (2.40 * tonic_prominence)
+
+        candidate_scores = [(tonic, _score_tonic(tonic)) for tonic in range(12)]
+        candidate_scores.sort(key=lambda item: item[1], reverse=True)
+        best_tonic, best_score = candidate_scores[0]
+
+        # If ranking is ambiguous, fall back to dominant post-intro note class.
+        raw_ranked = sorted(note_counts.items(), key=lambda kv: kv[1], reverse=True)
+        raw_top_tonic, raw_top_count = int(raw_ranked[0][0]), int(raw_ranked[0][1])
+        raw_second_count = int(raw_ranked[1][1]) if len(raw_ranked) > 1 else 0
+        profile_margin = best_score - candidate_scores[1][1] if len(candidate_scores) > 1 else best_score
+        raw_margin_ratio = (float(raw_top_count) / max(1.0, float(raw_second_count)))
+
+        if profile_margin <= 0.08 and raw_margin_ratio >= 1.20:
+            best_tonic = raw_top_tonic
+
+        return int(best_tonic)
+
+    def _update_key_display(self):
+        """Derive Pa and upper Sa from the locked tonic and update the singer's key panel."""
+        nc = self._tonic_note_class
+        if nc is None:
+            for lbl in (self.sa_label, self.pa_label, self.hsa_label):
+                lbl.setText("—")
+            self.key_status_label.setText("Detecting song key…")
+            self.key_status_label.setStyleSheet("color: #e67e22; font-size: 9px; font-style: italic;")
+            return
+        sa_name  = self._note_class_to_name(nc)
+        pa_name  = self._note_class_to_name(nc + 7)
+        hsa_name = self._note_class_to_name(nc)       # same name, octave higher
+        self.sa_label.setText(sa_name)
+        self.pa_label.setText(pa_name)
+        self.hsa_label.setText(hsa_name + "'")
+        self.key_status_label.setText(f"Key: {sa_name}  (locked after ~40 s main section)")
+        self.key_status_label.setStyleSheet("color: #2ecc71; font-size: 9px; font-style: italic;")
+
+    def _reset_pitch_display(self):
+        self._smoothed_pitch_hz = None
+        self._last_pitch_confidence = 0.0
+        self._stable_note_name = ""
+        self._candidate_note_name = ""
+        self._candidate_note_hits = 0
+        self._no_pitch_frames = 0
+        # reset tonic accumulator for new song
+        self._tonic_note_counts = {}
+        self._tonic_frames_collected = 0
+        self._tonic_locked = False
+        self._tonic_note_class = None
+        self._tonic_detection_start_ts = time.time()
+        if hasattr(self, 'pitch_note_label') and self.pitch_note_label is not None:
+            self.pitch_note_label.setText("—")
+        if hasattr(self, 'pitch_frequency_label') and self.pitch_frequency_label is not None:
+            self.pitch_frequency_label.setText("Waiting for audio…")
+        if hasattr(self, 'pitch_lock_label') and self.pitch_lock_label is not None:
+            self.pitch_lock_label.setText("Lock: searching")
+            self.pitch_lock_label.setStyleSheet("color: #e67e22; font-size: 9px; font-weight: bold;")
+        if hasattr(self, 'pitch_source_label') and self.pitch_source_label is not None:
+            self.pitch_source_label.setText("Playback loopback")
+        if hasattr(self, 'sa_label'):
+            self._update_key_display()
+
+    def on_pitch_detected(self, frequency_hz, note_name, confidence):
+        if not hasattr(self, 'pitch_note_label') or self.pitch_note_label is None:
+            return
+
+        target_detection_seconds = 40
+        intro_skip_seconds = 40
+        min_votes_required = 280
+        start_ts = getattr(self, '_tonic_detection_start_ts', None)
+        if start_ts is None:
+            start_ts = time.time()
+            self._tonic_detection_start_ts = start_ts
+
+        # Prefer real playback time so detection progress matches seek-bar timing.
+        try:
+            player_ms = int(self.player.get_time()) if hasattr(self, 'player') and self.player else -1
+        except Exception:
+            player_ms = -1
+
+        if player_ms is not None and player_ms >= 0:
+            elapsed_seconds = int(player_ms // 1000)
+        else:
+            elapsed_seconds = int(max(0, time.time() - start_ts))
+
+        main_section_seconds = max(0, elapsed_seconds - intro_skip_seconds)
+
+        # Keep status aligned with real elapsed playback time.
+        if not self._tonic_locked:
+            if elapsed_seconds < intro_skip_seconds:
+                self.key_status_label.setText(
+                    f"Listening to intro… ({elapsed_seconds} s / {intro_skip_seconds} s)"
+                )
+            elif main_section_seconds >= target_detection_seconds and self._tonic_note_counts and self._tonic_frames_collected >= min_votes_required:
+                best_nc = self._select_tonic_note_class(self._tonic_note_counts)
+                self._tonic_note_class = best_nc
+                self._tonic_locked = True
+                self._update_key_display()
+            else:
+                shown = min(main_section_seconds, target_detection_seconds)
+                self.key_status_label.setText(
+                    f"Detecting main section… ({shown} s / {target_detection_seconds} s, votes: {self._tonic_frames_collected})"
+                )
+
+        # ── Ignore weak frames ────────────────────────────────────────────────
+        if frequency_hz <= 0 or confidence < 0.40:
+            self._no_pitch_frames = getattr(self, '_no_pitch_frames', 0) + 1
+            if self._no_pitch_frames >= 10:
+                if not getattr(self, '_stable_note_name', ''):
+                    self.pitch_note_label.setText("—")
+                self.pitch_frequency_label.setText("Waiting for a stable pitch…")
+                if hasattr(self, 'pitch_lock_label') and self.pitch_lock_label is not None:
+                    self.pitch_lock_label.setText("Lock: searching")
+                    self.pitch_lock_label.setStyleSheet("color: #e67e22; font-size: 9px; font-weight: bold;")
+            return
+
+        self._no_pitch_frames = 0
+
+        # ── Smooth Hz ─────────────────────────────────────────────────────────
+        if self._smoothed_pitch_hz is None:
+            self._smoothed_pitch_hz = float(frequency_hz)
+        else:
+            self._smoothed_pitch_hz = 0.12 * float(frequency_hz) + 0.88 * self._smoothed_pitch_hz
+
+        self._last_pitch_confidence = float(confidence)
+
+        # ── Stable live note (hysteresis) ────────────────────────────────────
+        stable_note    = getattr(self, '_stable_note_name', '')
+        candidate_note = getattr(self, '_candidate_note_name', '')
+        candidate_hits = getattr(self, '_candidate_note_hits', 0)
+
+        if not stable_note:
+            stable_note = candidate_note = note_name
+            candidate_hits = 0
+        elif note_name == stable_note:
+            candidate_note = note_name
+            candidate_hits = 0
+        else:
+            if note_name == candidate_note:
+                candidate_hits += 1
+            else:
+                candidate_note = note_name
+                candidate_hits = 1
+            if candidate_hits >= 3:
+                stable_note = candidate_note
+                candidate_hits = 0
+
+        self._stable_note_name  = stable_note
+        self._candidate_note_name = candidate_note
+        self._candidate_note_hits = candidate_hits
+
+        # ── Tonic accumulation (votes from confident frames during elapsed window) ─
+        if not self._tonic_locked and elapsed_seconds >= intro_skip_seconds and confidence >= 0.50:
+            from source_code.workers.audio_analyzer import frequency_to_midi_note
+            midi = frequency_to_midi_note(frequency_hz)
+            if midi is not None:
+                nc = int(midi) % 12
+                self._tonic_note_counts[nc] = self._tonic_note_counts.get(nc, 0) + 1
+                self._tonic_frames_collected += 1
+                if main_section_seconds >= target_detection_seconds and self._tonic_frames_collected >= min_votes_required:
+                    best_nc = self._select_tonic_note_class(self._tonic_note_counts)
+                    self._tonic_note_class = best_nc
+                    self._tonic_locked = True
+                    self._update_key_display()
+
+        # ── Update technical side-panel ───────────────────────────────────────
+        self.pitch_note_label.setText(stable_note if stable_note else note_name)
+        self.pitch_frequency_label.setText(
+            f"{self._smoothed_pitch_hz:.1f} Hz  •  live {frequency_hz:.1f} Hz  •  conf {self._last_pitch_confidence:.2f}"
+        )
+        if hasattr(self, 'pitch_lock_label') and self.pitch_lock_label is not None:
+            if self._last_pitch_confidence >= 0.65:
+                self.pitch_lock_label.setText("Lock: yes ✓")
+                self.pitch_lock_label.setStyleSheet("color: #2ecc71; font-size: 9px; font-weight: bold;")
+            else:
+                self.pitch_lock_label.setText("Lock: stabilizing…")
+                self.pitch_lock_label.setStyleSheet("color: #f1c40f; font-size: 9px; font-weight: bold;")
+        self.pitch_source_label.setText("Source: Playback audio analysis (smoothed)")
 
     def jump_time(self, ms):
         if self.player.is_active():
@@ -824,6 +1093,7 @@ class KaraokeApp(QWidget):
         self._pending_video_path = file_path
         self.add_to_history(file_path)
         self.status_label.setText(f"Status: Loading {os.path.basename(file_path)}...")
+        self._reset_pitch_display()
 
         try:
             # Core loading logic
@@ -890,6 +1160,7 @@ class KaraokeApp(QWidget):
     def finish_loading(self, loader, is_audio_only=False):
         self.pitch_input.setValue(0.0)
         self.speed_input.setValue(1.0)
+        self._reset_pitch_display()
         # Reset playback window on every new file load
         self.clear_playback_window()
         if self.video_path: self.filename_label.setText(f"Playing: {os.path.basename(self.video_path)}")
