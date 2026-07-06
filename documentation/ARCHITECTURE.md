@@ -157,7 +157,19 @@ Convert & Export owns export-time amplification instead of the studio pages:
     - `Reduce amplification - ▼` applies the reciprocal factor
 - The amount spinner stays positive-only and uses 0.25-step increments
 - `main.py` builds FFmpeg commands with `volume=<factor>` and auto-loads the exported result
+- For boost factors above `1.0x`, the export pipeline appends `alimiter` after gain to reduce peak clipping distortion while preserving louder output
+- The audio meter dB Output mode displays true `dBFS` with approximate SPL context for clearer verification of gain changes
 - After load, the control resets to the neutral `1.00x` baseline so the new file becomes the reference point
+
+### Video Studio: Fullscreen Access (updated 2026-07-06)
+
+- The fullscreen/full-video button is available across all Video Studio tabs.
+- This keeps video inspection consistent while trimming, setting playback windows, extracting audio, or widening.
+
+### UI Visibility Modes (updated 2026-07-06)
+
+- Pitch page live analyzer panel can be hidden without removing underlying widgets.
+- Convert & Export can hide the Amplify tab while preserving backend control references for compatibility.
 
 ---
 

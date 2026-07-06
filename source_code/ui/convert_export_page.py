@@ -167,7 +167,7 @@ def create_convert_export_page():
     amp_row.addStretch()
     amp_layout.addLayout(amp_row)
 
-    amp_note = QLabel("Examples: Amplification + 5.00x -> volume=5.0, Reduce amplification - 5.00x -> volume=0.2. FFmpeg uses volume=<factor>.")
+    amp_note = QLabel("Examples: Amplification + 5.00x -> volume=5.0 with peak limiter, Reduce amplification - 5.00x -> volume=0.2. FFmpeg uses volume=<factor>.")
     amp_note.setStyleSheet("color: #888; font-size: 10px;")
     amp_layout.addWidget(amp_note)
 
@@ -200,7 +200,9 @@ def create_convert_export_page():
     amp_layout.addWidget(amp_status_label)
     amp_layout.addStretch()
 
-    tabs.addTab(amp_tab, "🔊 Amplify & Export")
+    # Keep Amplify controls alive for existing wiring, but hide tab from the UI.
+    amp_tab_index = tabs.addTab(amp_tab, "🔊 Amplify & Export")
+    tabs.setTabVisible(amp_tab_index, False)
 
     return {
         "page": page,

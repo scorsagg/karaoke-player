@@ -91,14 +91,14 @@ class AudioLevelMeter(QWidget):
         painter.setPen(QPen(QColor("#66ccff"), 2))
         painter.drawLine(int(line_x), meter_y - 2, int(line_x), meter_y + meter_height + 2)
         
-        # Draw text - always show SPL value, but label varies by mode
+        # Draw text with both dBFS and SPL context.
         painter.setPen(QColor("#ffffff"))
         painter.setFont(QFont("Segoe UI", 7, QFont.Bold))
         
         spl = self.get_approximate_spl()
         if self.measurement_mode == "dB Output (dBFS)":
-            text = f"{spl:.0f} dB ({self.level_percent:.0f}%)"
+            text = f"{self.db_level:.1f} dBFS (~{spl:.0f} dB SPL)"
         else:  # SPL Estimate (Room)
-            text = f"{spl:.0f} dB SPL ({self.level_percent:.0f}%)"
+            text = f"{spl:.0f} dB SPL ({self.db_level:.1f} dBFS)"
         
         painter.drawText(self.rect(), Qt.AlignCenter, text)

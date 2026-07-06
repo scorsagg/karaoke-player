@@ -122,6 +122,8 @@ def create_pitch_page():
     cols.addWidget(tech_frame, stretch=2)
 
     pitch_display_outer.addLayout(cols)
+    # Keep analyzer widgets instantiated for signal/update compatibility, but hide the panel in UI.
+    pitch_display_frame.setVisible(False)
     layout.addWidget(pitch_display_frame)
     layout.addSpacing(8)
     
