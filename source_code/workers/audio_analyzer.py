@@ -3,6 +3,7 @@ import sounddevice as sd
 import numpy as np
 import sys
 import warnings
+import threading
 
 try:
     import soundcard as sc
@@ -11,10 +12,94 @@ except Exception:
 
 warnings.filterwarnings("ignore", message="data discontinuity in recording")
 
+NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+
+def frequency_to_midi_note(frequency_hz):
+    """Convert a frequency in Hz to the nearest MIDI note number."""
+    if frequency_hz is None or frequency_hz <= 0:
+        return None
+    return int(round(69 + (12 * np.log2(float(frequency_hz) / 440.0))))
+
+
+def midi_note_to_name(midi_note):
+    """Convert a MIDI note number to a note name like C#4."""
+    if midi_note is None:
+        return ""
+    octave = (int(midi_note) // 12) - 1
+    note_name = NOTE_NAMES[int(midi_note) % 12]
+    return f"{note_name}{octave}"
+
+
+def detect_pitch_from_audio(audio_data, sample_rate, min_frequency=55.0, max_frequency=1100.0):
+    """Detect the strongest fundamental frequency in a mono audio buffer."""
+    if audio_data is None:
+        return None
+
+    samples = np.asarray(audio_data, dtype=np.float32).flatten()
+    if samples.size < 2048 or sample_rate is None or sample_rate <= 0:
+        return None
+
+    # Keep the analysis window small enough for responsive UI updates.
+    window_size = min(4096, samples.size)
+    window = samples[-window_size:]
+    window = window - np.mean(window)
+
+    rms = float(np.sqrt(np.mean(window ** 2)))
+    if rms < 0.01:
+        return None
+
+    window = window * np.hanning(window.size)
+    window = np.append(window[0], window[1:] - 0.97 * window[:-1])
+
+    autocorr = np.correlate(window, window, mode="full")[window.size - 1:]
+    if autocorr.size < 3 or autocorr[0] <= 0:
+        return None
+
+    min_lag = max(1, int(sample_rate / max_frequency))
+    max_lag = min(autocorr.size - 1, int(sample_rate / min_frequency))
+    if max_lag <= min_lag:
+        return None
+
+    search_slice = autocorr[min_lag:max_lag]
+    if search_slice.size == 0:
+        return None
+
+    peak_lag = int(np.argmax(search_slice)) + min_lag
+    peak_value = float(autocorr[peak_lag] / (autocorr[0] + 1e-12))
+    if peak_value < 0.35:
+        return None
+
+    # Refine the lag slightly using parabolic interpolation for a steadier note readout.
+    refined_lag = float(peak_lag)
+    if 1 <= peak_lag < autocorr.size - 1:
+        left = float(autocorr[peak_lag - 1])
+        center = float(autocorr[peak_lag])
+        right = float(autocorr[peak_lag + 1])
+        denominator = (2.0 * center) - left - right
+        if abs(denominator) > 1e-12:
+            refined_lag += 0.5 * (left - right) / denominator
+
+    frequency_hz = float(sample_rate / refined_lag)
+    if frequency_hz < min_frequency or frequency_hz > max_frequency:
+        return None
+
+    midi_note = frequency_to_midi_note(frequency_hz)
+    if midi_note is None:
+        return None
+
+    return {
+        "frequency_hz": frequency_hz,
+        "midi_note": midi_note,
+        "note_name": midi_note_to_name(midi_note),
+        "confidence": peak_value,
+    }
+
 
 class AudioAnalyzerThread(QThread):
     """Thread to capture and analyze real-time audio output levels"""
     level_updated = Signal(float)  # Emit dB value
+    pitch_updated = Signal(float, str, float)  # Emit frequency_hz, note_name, confidence
     clip_warning = Signal()  # Emit when level exceeds 90%
     
     def __init__(self):
@@ -24,19 +109,52 @@ class AudioAnalyzerThread(QThread):
         self.audio_buffer = np.array([], dtype=np.float32)
         self.buffer_size = 4410 
         self.high_level_counter = 0 # Track how long it's been loud
+        self.current_samplerate = 44100
+        self._buffer_lock = threading.Lock()
+        self._last_pitch_note = ""
+        self._last_pitch_frequency = 0.0
 
     def _emit_level_from_buffer(self):
-        if len(self.audio_buffer) >= self.buffer_size // 2:
-            recent_audio = self.audio_buffer[-self.buffer_size:]
+        with self._buffer_lock:
+            if len(self.audio_buffer) < self.buffer_size // 2:
+                return
+            recent_audio = np.array(self.audio_buffer[-self.buffer_size:], copy=True)
+
+        if len(recent_audio) >= self.buffer_size // 2:
             rms = np.sqrt(np.mean(recent_audio ** 2))
             db_level = 20 * np.log10(rms + 1e-10)
             db_level = max(-80.0, min(0.0, db_level))
             self.level_updated.emit(db_level)
 
+    def _emit_pitch_from_buffer(self):
+        with self._buffer_lock:
+            if len(self.audio_buffer) < self.buffer_size:
+                return
+            recent_audio = np.array(self.audio_buffer[-self.buffer_size:], copy=True)
+
+        pitch = detect_pitch_from_audio(recent_audio, self.current_samplerate)
+        if not pitch:
+            if self._last_pitch_note:
+                self._last_pitch_note = ""
+                self._last_pitch_frequency = 0.0
+                self.pitch_updated.emit(0.0, "", 0.0)
+            return
+
+        note_name = pitch["note_name"]
+        frequency_hz = float(pitch["frequency_hz"])
+        confidence = float(pitch["confidence"])
+
+        # Avoid churn by only emitting when the detected note changes or the pitch moves meaningfully.
+        if note_name != self._last_pitch_note or abs(frequency_hz - self._last_pitch_frequency) >= 0.75:
+            self._last_pitch_note = note_name
+            self._last_pitch_frequency = frequency_hz
+            self.pitch_updated.emit(frequency_hz, note_name, confidence)
+
     def _append_audio_data(self, audio_data):
-        self.audio_buffer = np.append(self.audio_buffer, audio_data)
-        if len(self.audio_buffer) > self.buffer_size * 2:
-            self.audio_buffer = self.audio_buffer[-self.buffer_size:]
+        with self._buffer_lock:
+            self.audio_buffer = np.append(self.audio_buffer, audio_data)
+            if len(self.audio_buffer) > self.buffer_size * 2:
+                self.audio_buffer = self.audio_buffer[-self.buffer_size:]
 
     def _run_soundcard_loopback(self):
         """Use Windows speaker loopback capture via soundcard when available."""
@@ -59,6 +177,7 @@ class AudioAnalyzerThread(QThread):
         channel_options = [2, 1]
 
         for samplerate in sample_rates:
+            self.current_samplerate = samplerate
             for channels in channel_options:
                 if not self.running:
                     return True
@@ -84,6 +203,7 @@ class AudioAnalyzerThread(QThread):
 
                             self._append_audio_data(audio_data)
                             self._emit_level_from_buffer()
+                            self._emit_pitch_from_buffer()
                         return True
                 except Exception as e:
                     print(f"[AudioAnalyzerThread] ❌ soundcard loopback failed: {e}")
@@ -282,11 +402,13 @@ class AudioAnalyzerThread(QThread):
                     blocksize=cfg["blocksize"],
                     extra_settings=cfg.get("extra_settings"),
                 ):
+                    self.current_samplerate = int(cfg["samplerate"])
                     stream_opened = True
                     print("[AudioAnalyzerThread] ✓ InputStream opened")
                     while self.running:
                         if self.is_playing:
                             self._emit_level_from_buffer()
+                            self._emit_pitch_from_buffer()
 
                         self.msleep(100) # Throttled to 10Hz for smoother UI updates
                 break

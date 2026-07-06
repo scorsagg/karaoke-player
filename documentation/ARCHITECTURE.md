@@ -141,6 +141,14 @@ Validation rules:
 - Overlapping/touching ranges are merged before command construction
 - Empty valid set blocks export
 
+### Playback Pitch Display (updated 2026-06-30)
+
+The Pitch page now includes a live note readout for playback audio:
+- AudioAnalyzerThread emits a pitch signal alongside the existing level signal
+- The main window converts frequency to MIDI and note names for the UI
+- The Pitch page shows a large note label plus frequency/confidence details
+- Playback loopback is the first supported source; microphone input can reuse the same display path later
+
 ### Convert & Export: Amplify & Export (updated 2026-06-30)
 
 Convert & Export owns export-time amplification instead of the studio pages:

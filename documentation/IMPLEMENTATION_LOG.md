@@ -1,5 +1,23 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Pitch Lock Indicator + Stable Note Display (2026-06-30) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/pitch_page.py`, `source_code/main.py`
+
+### Problem
+Users needed confirmation that live pitch detection is reliable, while still keeping the note visible and stable.
+
+### Fix
+- Added a `Pitch lock` status line in the Pitch page live display panel.
+- Wired lock-state updates in `main.py` based on detection confidence and stability state.
+- Kept the large note label visible and stable, with smoothed Hz details below it.
+
+### Result
+- Users can immediately see whether pitch detection is `searching`, `stabilizing`, or confidently locked.
+- The pitch UI is easier to trust during real-time song playback.
+
 # Change: Playback Stop / Detach Control (2026-06-30) - COMPLETE ✅
 
 **Status:** Implemented
