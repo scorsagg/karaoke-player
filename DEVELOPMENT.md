@@ -192,6 +192,8 @@ config/
 - **Convert & Export**: Amplify now uses export-time FFmpeg volume gain instead of live studio playback gain
 - **Mode selection**: `Amplification + ▲` exports with the entered positive amount; `Reduce amplification - ▼` exports with the reciprocal factor
 - **Amount input**: positive-only spinner with 0.25 steps, supporting values from 0.25x to 10.00x
+- **Anti-clipping**: boost exports above `1.0x` apply a peak limiter (`alimiter`) after gain to reduce distortion while keeping the boost audible
+- **Meter readout**: dB Output mode shows true `dBFS` plus approximate SPL context for better gain validation
 - **Workflow**: export file is auto-loaded after processing, then the amplify control resets to `1.00x`
 - **Naming**: output files use readable suffixes like `amp_up_5_times` and `amp_down_5_times`
 - **Studio pages**: Audio Studio and Video Studio no longer expose live amplify tabs
@@ -220,6 +222,14 @@ Implementation references:
 - Audio Studio remains audio-only by policy
 - Extraction workflow is owned by Video Studio
 - Convert & Export owns format conversion and normalization
+
+### Feature: Video Studio Fullscreen Access ✅
+- Full video/fullscreen button is available on all Video Studio tabs.
+- Users can enter fullscreen while trimming, playback-window setup, extraction, or widening.
+
+### Feature: Optional UI Visibility (Pitch/Amplify) ✅
+- Pitch page live analyzer panel is hidden in UI while retaining its internal widgets for runtime safety.
+- Convert & Export Amplify tab is hidden from the tab bar while keeping existing control objects available.
 
 ### Modularized UI
 - All UI components in separate files (`source_code/ui/`)

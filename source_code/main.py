@@ -462,6 +462,7 @@ class KaraokeApp(QWidget):
                 self.video_frame.setMaximumHeight(220)
             self.fullscreen_btn.setVisible(False)
         elif idx == PAGE_VIDEO_STUDIO:  # Video Studio (includes Widen Video tab)
+            self.fullscreen_btn.setVisible(True)
             # Update the "currently working on" labels for both Video Tools and Widen tab
             if self.video_path:
                 fname = os.path.basename(self.video_path)
@@ -520,7 +521,7 @@ class KaraokeApp(QWidget):
         else:  # Trimming / Playback Window - compact frame
             self.video_frame.setMinimumHeight(80)
             self.video_frame.setMaximumHeight(160)
-            self.fullscreen_btn.setVisible(False)
+            self.fullscreen_btn.setVisible(True)
         self.video_frame.updateGeometry()
         if self.layout():
             self.layout().invalidate()
@@ -2138,13 +2139,23 @@ class KaraokeApp(QWidget):
         if mode == "reduce":
             self.amp_status_label.setText(f"Reducing amplification for {os.path.basename(self.video_path)} by {amount:.2f}x...")
         else:
-            self.amp_status_label.setText(f"Amplifying {os.path.basename(self.video_path)} by {amount:.2f}x...")
+            self.amp_status_label.setText(f"Amplifying {os.path.basename(self.video_path)} by {amount:.2f}x with anti-clipping limiter...")
         self.launch_async_task(cmd, abs_out, "amplify_task", override_duration=duration)
 
     def build_amplify_export_cmd(self, input_file, output_file, factor, media_kind, src_ext):
         """Build FFmpeg command to amplify audio or video and preserve the appropriate container."""
         ffmpeg_path = self.settings["ffmpeg_path"]
-        volume_filter = f"volume={factor}"
+        # Apply a limiter only when boosting above 1.0x to reduce clipping distortion.
+        try:
+            factor_value = float(factor)
+        except Exception:
+            factor_value = 1.0
+
+        if factor_value > 1.0:
+            # Keep boost audible while still catching hard peaks.
+            volume_filter = f"volume={factor_value:.4f},alimiter=limit=0.98:attack=5:release=50"
+        else:
+            volume_filter = f"volume={factor_value:.4f}"
 
         if media_kind == "video":
             return [

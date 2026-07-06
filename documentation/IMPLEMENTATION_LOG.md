@@ -1,5 +1,76 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Hide Pitch Analyzer Panel + Hide Amplify Tab (2026-07-06) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/pitch_page.py`, `source_code/ui/convert_export_page.py`
+
+### Problem
+User requested the live pitch analyzers to be hidden and the Amplify tab to be hidden from Convert & Export.
+
+### Fix
+- Pitch page live analyzer frame is hidden at UI level.
+- Amplify tab remains added to the Convert & Export `QTabWidget`, but is hidden via tab visibility.
+- Control/widget instances are still created to keep `main.py` signal wiring stable.
+
+### Result
+- Pitch analyzer visuals are hidden from the page.
+- Amplify tab is no longer visible in Convert & Export.
+
+# Change: Video Studio Fullscreen Button Across Tabs (2026-07-06) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Fullscreen was available only on the Widen tab, even though other Video Studio tabs also work with video and need full-frame inspection.
+
+### Fix
+- Updated `handle_navigation_change()` to keep fullscreen visible when entering Video Studio.
+- Updated `_on_video_tools_tab_changed()` so non-Widen tabs no longer hide fullscreen.
+
+### Result
+- Full video/fullscreen is now consistently available throughout Video Studio workflows.
+
+# Change: Amplify Gain Visibility + Limiter Tuning (2026-07-06) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/widgets/audio_meter.py`
+
+### Problem
+Users reported that amplified exports could still read similarly in the meter (for example ~84 dB), making it look like amplification did not work.
+
+### Fix
+- Tuned amplify boost filter to `volume=<factor>,alimiter=limit=0.98:attack=5:release=50`.
+- Removed the limiter setting that could over-attenuate perceived boost.
+- Updated meter text so dB Output mode now shows true `dBFS` and includes approximate SPL context.
+
+### Result
+- Amplified exports better preserve audible gain while still reducing clipping.
+- Users can verify gain changes directly via dBFS readout instead of relying only on coarse SPL estimates.
+
+# Change: Amplify Export Anti-Clipping Limiter (2026-07-06) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/ui/convert_export_page.py`
+
+### Problem
+Amplifying exported media by factors above `1.0x` could introduce audible distortion due to clipped peaks.
+
+### Fix
+- Updated `build_amplify_export_cmd()` to append a limiter when boost factor is above `1.0x`.
+- New boost filter chain: `volume=<factor>,alimiter=limit=0.95:level=disabled:attack=5:release=50`.
+- Kept reduce/neutral exports unchanged (`volume=<factor>` only).
+- Updated Convert & Export amplify UI note and runtime status text to indicate anti-clipping behavior.
+
+### Result
+- Boosted exports retain louder output while significantly reducing clipping artifacts.
+- Users can amplify videos with cleaner audio, especially at higher gain amounts.
+
 # Change: Pitch Lock Indicator + Stable Note Display (2026-06-30) - COMPLETE ✅
 
 **Status:** Implemented

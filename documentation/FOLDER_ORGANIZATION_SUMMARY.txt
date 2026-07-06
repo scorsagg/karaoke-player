@@ -206,12 +206,22 @@ Build Standalone Executable (v3):
     • Amplify & Export: Convert & Export page owns export-time ffmpeg gain
        - Signed mode buttons: Amplification + / Reduce amplification -
        - Positive-only amount spinner with 0.25-step increments
+      - Boost exports above 1.0x now include a tuned peak limiter to reduce clipping while preserving audible gain
+      - Meter dB Output mode now shows true dBFS with approximate SPL context
        - Auto-loads exported result and resets to 1.00x baseline
     • UI Location: Audio Studio + Video Studio + Convert & Export
    • Auto-reload: Both features automatically load results into player
    • Integrated with ProcessThread for progress updates and cancellation
    • Validates all prerequisites before building
    • Optimization level adjusted for NumPy compatibility
+
+✅ Video Studio Fullscreen Access (2026-07-06):
+   • Full video/fullscreen button is now visible across all Video Studio tabs
+   • Improves frame inspection during trimming, playback window setup, extraction, and widen workflows
+
+✅ UI Visibility Toggles (2026-07-06):
+   • Pitch page live analyzer panel hidden from UI (widgets kept for compatibility)
+   • Convert & Export Amplify tab hidden from tab bar (backend controls retained)
 
 ═══════════════════════════════════════════════════════════════════════════════
 

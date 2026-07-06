@@ -190,6 +190,7 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Signed mode selector:
   - `Amplification + ▲` exports with the entered positive amount directly
   - `Reduce amplification - ▼` exports with the reciprocal factor
+- Anti-clipping protection: when boost factor is above `1.0x`, export applies a peak limiter after gain (`volume + alimiter`) to reduce clipping while keeping boost audible
 - Amount spinner stays positive-only and uses 0.25 steps
 - Exported result auto-loads after processing, then resets the control back to the neutral baseline (`1.00x`)
 - Output naming uses readable suffixes such as `amp_up_5_times` and `amp_down_5_times`
@@ -201,6 +202,7 @@ The key fix: **Never call player.stop() when decoder is active** instead:
   - Methods: `get_total_seconds()`, `set_total_seconds(seconds)`, `get_display_text()`
   - Displays time clearly in HH:MM:SS format
 - **History Detection:** Audio files loaded from history now show visualization automatically
+- **Meter Clarity:** dB Output mode now shows true `dBFS` with approximate SPL context so loudness changes are easier to verify
 
 **Auto-Reload:** After export, file automatically loads into player (via handle_task_completion)
 
@@ -261,6 +263,20 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 **What changed:**
 - `widen_active_video_canvas()` → restored original working FFmpeg filter + added `-preset ultrafast`
   - Filter: `crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`
+
+### 15. VIDEO STUDIO FULLSCREEN ACCESS (2026-07-06) ✅ COMPLETE
+**Files changed:** `source_code/main.py` only
+
+**What changed:**
+- Full video/fullscreen button remains visible across all Video Studio tabs (Trimming, Playback Window, Audio Extraction, Widen Video).
+- Previously it was shown only on the Widen tab, which blocked quick full-frame inspection on other video workflows.
+
+### 16. UI VISIBILITY TOGGLES (2026-07-06) ✅ COMPLETE
+**Files changed:** `source_code/ui/pitch_page.py`, `source_code/ui/convert_export_page.py`
+
+**What changed:**
+- Pitch page live analyzer panel is hidden from the UI while retaining widget instances for runtime signal safety.
+- Convert & Export Amplify tab is hidden from the tab bar while retaining controls to avoid breaking existing `main.py` wiring.
 
 ### 13. VIDEO TOOLS - RANGE-ROW VIDEO TRIMMING (2026-06-29) ✅ COMPLETE
 **Files changed:** `source_code/ui/video_tools_page.py`, `source_code/main.py`
