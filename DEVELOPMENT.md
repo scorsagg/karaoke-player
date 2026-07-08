@@ -71,7 +71,7 @@ source_code/
 │   ├── pitch_page.py         # Playback page
 │   ├── audio_studio_page.py  # Audio Studio (audio-only tools)
 │   ├── video_tools_page.py   # Video Studio (trim/playback/extract/widen)
-│   └── convert_export_page.py # Convert & Export (conversion/normalization)
+│   └── convert_export_page.py # Convert & Export (conversion/normalization/vocal separation)
 ├── services/
 │   ├── audio_service.py      # Audio analyzer coordination
 │   ├── player_service.py     # VLC player abstraction
@@ -198,6 +198,42 @@ config/
 - **Naming**: output files use readable suffixes like `amp_up_5_times` and `amp_down_5_times`
 - **Studio pages**: Audio Studio and Video Studio no longer expose live amplify tabs
 
+### Feature: Vocal Separator (Demucs Default) ✅
+- **Convert & Export** includes a dedicated `Vocal Separator` tab
+- Default backend is `Demucs: htdemucs_ft` for higher quality separation on Python 3.13
+- Faster fallback remains available via `audio-separator` UVR models
+- Default export target is instrumental-only for the common karaoke workflow
+- `Fast mode` applies backend-specific speed tuning
+- Demucs backend now runs through the Python API with `soundfile` input loading, avoiding the failing `torchaudio`/`torchcodec` CLI load path
+- Demucs tqdm console output is parsed in `audio_separator_thread.py` and bridged into Qt progress signals so the splash progress bar moves during separation
+- New `Demucs Music Recovery` control blends 0-30% of original mix back into the instrumental stem to preserve accompaniment under vocals (at the cost of possible faint vocal bleed)
+- Recovery blending is applied during stem export using numpy arrays to avoid additional large torch tensor allocations and reduce crash risk on long tracks
+- Demucs now executes inside an isolated subprocess worker script; if torch/demucs crashes natively, the main app process remains alive and shows a controlled task error
+- Splash status text is phase-aware for Demucs (`Downloading model files`, `Running separation pass n/m`, `Applying music recovery`) and now uses a fixed expected total (for example `1/4` to `4/4`) instead of changing denominators
+- Thread lifetime is finalized on `QThread.finished` so output auto-load does not destroy the worker before it fully exits
+
+### Feature: Join & Merge Tab ✅
+- **Convert & Export** includes a new `Join & Merge` tab for combining two selected files.
+- Supports three workflows:
+   - video + audio: karaoke mux (replace/attach selected audio track to selected video)
+   - audio + audio: join two audio files end-to-end
+   - video + video: join two videos end-to-end
+- Join Behaviour selector supports `Auto`, `Append`, and `Overlay`.
+- Auto defaults:
+   - same-type pairs (`audio+audio`, `video+video`) -> `Append`
+   - mixed `video+audio` -> `Overlay`
+- Mixed `video+audio` can still be set manually to `Append` for continuity workflows (video is extended by freeze-frame while selected audio is appended at end).
+- `audio+audio` supports both `Append` (concat) and `Overlay` (mix).
+- Video+audio overlay replacement now enforces explicit stream mapping (`0:v:0` + `1:a:0`) and excludes source audio tracks to prevent accidental dual-audio outputs.
+- Video+audio overlay now uses strict ffmpeg replacement mapping equivalent to:
+   - `-map 0:v:0 -map 1:a:0 -c:v copy -shortest`
+- Join & Merge media typing now uses extension-first classification for merge mode to avoid treating audio files with embedded artwork streams as video.
+- Join & Merge input selectors now show selected filename directly on each button with clear selected styling, plus readable full path text/tooltip.
+- Join & Merge now displays the exact final ffmpeg command before execution and logs it (`[merge_task] final_cmd`) for command-line parity debugging.
+- The final merge command is now auto-copied to clipboard (and copied again on merge failure) so users can paste it directly without relying on message-box text selection.
+- Fixed a video+audio routing regression in `main.py` where Input B audio could be replaced by Input A video in command construction; merge builder now enforces one-video/one-audio mapping explicitly.
+- Uses ffmpeg processing with async splash progress and cancellation via `merge_task`.
+
 ### Feature: Video Tools - Trimming (Playback-Style Rows) ✅
 - Video Trimming now uses row-based Start/End controls (like Playback Window)
 - Add multiple keep-ranges and export them in one output
@@ -221,7 +257,7 @@ Implementation references:
 ### Navigation Improvements ✅
 - Audio Studio remains audio-only by policy
 - Extraction workflow is owned by Video Studio
-- Convert & Export owns format conversion and normalization
+- Convert & Export owns format conversion, normalization, and external vocal-separator workflow entry
 
 ### Feature: Video Studio Fullscreen Access ✅
 - Full video/fullscreen button is available on all Video Studio tabs.

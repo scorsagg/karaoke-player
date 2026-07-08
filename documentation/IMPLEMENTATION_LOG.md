@@ -1,5 +1,441 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Merge Command Clipboard Copy UX Fix (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Users could not copy command text from modal message dialogs, making verification and manual rerun difficult.
+
+### Fix
+- Final ffmpeg merge command is now copied to clipboard automatically when prepared.
+- On merge failure, the same command is copied again for immediate debugging use.
+
+### Result
+- Users can paste the exact command with `Ctrl+V` into terminal or text editor without dialog text selection.
+
+# Change: Video+Audio Merge Input Routing Fix (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+For some video+audio merges, the generated command used the video path for both `-i` inputs, even when Input B was an audio file.
+
+### Fix
+- Corrected mixed-pair command builder routing so:
+   - `video,audio` maps to `video_input=A`, `audio_input=B`
+   - `audio,video` maps to `video_input=B`, `audio_input=A`
+- Added guard checks for invalid pair composition and same-file resolution.
+
+### Result
+- Final ffmpeg command now uses the actually selected audio input for karaoke replacement merges.
+
+# Change: Join & Merge Final Command Visibility (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Users could not verify whether app-generated merge commands matched manually tested ffmpeg commands.
+
+### Fix
+- Added final command preview dialog before merge execution.
+- Stored and logged exact command string (`[merge_task] final_cmd`).
+- Included command text in merge failure warning dialog for direct troubleshooting.
+
+### Result
+- Users can now compare app command and manual command one-to-one.
+
+# Change: Join & Merge Input Selection Visibility UX (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+After selecting Input A/B, users could not easily confirm the chosen files because button text stayed generic and filename display looked too subtle.
+
+### Fix
+- Updated input button defaults and styling for better visibility.
+- On selection, each button now changes to a clear selected state (`✔ Input X selected: ...`).
+- Labels now show larger readable text with both filename and full path, plus tooltip support for long paths.
+
+### Result
+- Users can immediately verify selected Input A/B before running Join & Merge.
+
+# Change: Video+Audio Overlay Simplified to Strict Karaoke Mapping (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Users reported original audio still present in some video+audio overlay merges and requested standard explicit ffmpeg replacement semantics.
+
+### Fix
+- Simplified overlay command path to strict stream mapping pattern:
+   - map video only from input video (`0:v:0`)
+   - map audio only from input audio (`1:a:0`)
+   - copy video and encode replacement audio
+- Removed extra mapping complexity to align behavior with expected karaoke remux command style.
+
+### Result
+- video+audio overlay path now follows predictable standard replacement behavior.
+
+# Change: Video+Audio Replacement Mapping Fix in Join & Merge (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Some video+audio merge outputs still contained original source audio, even when replacement behavior was expected.
+
+### Fix
+- Updated video+audio overlay command to enforce selected streams and explicitly exclude source audio mapping.
+- Added merge-specific extension-first media classification to prevent audio files (with embedded artwork streams) from being misrouted as video inputs.
+
+### Result
+- video+audio overlay now behaves like explicit karaoke replacement mapping (`0:v:0` + `1:a:0`) and avoids accidental source audio carry-over.
+
+# Change: Video+Audio Manual Append Support in Join & Merge (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Auto defaults are correct for most users (mixed `video+audio` overlays), but some continuity workflows need explicit append of selected audio after the video timeline.
+
+### Fix
+- Kept Auto default behavior unchanged (`video+audio` -> overlay).
+- Enabled manual `Append` override for mixed `video+audio` in behavior resolution.
+- Implemented append command path using ffmpeg timeline extension:
+   - extend video with freeze-frame (`tpad`)
+   - prepend silence for original video duration and then append selected audio via concat.
+
+### Result
+- Mixed `video+audio` supports both overlay and append while preserving requested Auto defaults.
+
+# Change: Join & Merge Behavior Defaults + Audio Overlay (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+Users needed overlay support for `audio+audio` too, with predictable defaults: same-type should default to append, while mixed `video+audio` should default to overlay.
+
+### Fix
+- Replaced the old video-only mode control with a unified `Join Behaviour` selector (`Auto`, `Append`, `Overlay`).
+- Implemented type-based Auto defaults:
+   - same-type (`audio+audio`, `video+video`) -> append
+   - mixed `video+audio` -> overlay
+- Added `audio+audio` overlay implementation using ffmpeg `amix`.
+
+### Result
+- Join & Merge now supports both append and overlay for same-type media, while keeping karaoke video+audio merge behavior as overlay by default.
+
+# Change: Join & Merge Video+Video Modes (Append and Overlay) (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+Users needed both timeline behaviors for video+video operations: appended timeline (`A then B`) and same-time merge (`A+B from 0`).
+
+### Fix
+- Added `Video+Video Mode` selector in Join & Merge tab:
+   - `Append (A then B)`
+   - `Overlay (A + B at same time)`
+- Updated ffmpeg command builder:
+   - Append -> concat pipeline
+   - Overlay -> blended video + mixed audio pipeline with shortest-duration output
+
+### Result
+- Users can choose either extended timeline output or same-time merged output explicitly.
+
+# Change: Join & Merge Tab in Convert & Export (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+Users needed a direct way to create karaoke outputs by combining separated audio with source video, plus generalized joining for audio+audio and video+video.
+
+### Fix
+- Added new `Join & Merge` tab with two independent file pickers and output format selector.
+- Implemented auto-mode resolution based on file types:
+   - video+audio -> merge/mux into output video
+   - audio+audio -> join into one audio output
+   - video+video -> join into one video output
+- Integrated with existing async ffmpeg execution (`merge_task`) and completion handling.
+
+### Result
+- Karaoke track creation and general two-file joining are available in one workflow inside Convert & Export.
+
+# Change: Demucs Fixed Pass Denominator in Progress UI (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`
+
+### Problem
+Progress labels showed growing pass denominators (`1/1`, `2/2`, `3/3`), which made users uncertain about expected completion.
+
+### Fix
+- Demucs subprocess now emits an explicit total pass count (`DEMUCS_PASS_TOTAL=<n>`) based on loaded bag-of-model size.
+- Parent worker displays separation status with fixed denominator counters (`pass x/n`).
+
+### Result
+- Users can see a stable expected pass count (for example `1/4`, `2/4`, `3/4`, `4/4`).
+
+# Change: Demucs Progress Messaging Clarity (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`
+
+### Problem
+The splash repeatedly showed `Running Demucs separation... %`, which looked like a stuck loop when Demucs legitimately restarted percentages across model downloads and bag-of-model passes.
+
+### Fix
+- Added phase-aware status labels while parsing Demucs subprocess output:
+   - Model-file download phase with file index
+   - Separation phase with pass counters (`pass n/m`)
+   - Recovery blend phase indicator
+
+### Result
+- Users can distinguish normal repeated progress cycles from actual looping/hanging behavior.
+
+# Change: Demucs Native Crash Containment via Subprocess Isolation (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`
+
+### Problem
+Demucs runs were still able to terminate the whole app process near startup/model-load on some systems, with no Python traceback in the main process.
+
+### Fix
+- Moved Demucs execution into a dedicated subprocess runner script launched by `AudioSeparatorThread`.
+- Parent worker now streams subprocess output, maps tqdm percentages into splash progress, and handles non-zero exit as a task failure instead of app termination.
+
+### Result
+- Main Qt application remains alive even when torch/demucs fails natively.
+- User now gets a controlled separator error message with subprocess log tail.
+
+# Change: Demucs Recovery Blend Memory Stabilization (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`
+
+### Problem
+After introducing Demucs Music Recovery, app runs could terminate near model-load/inference on some long tracks without a Python traceback, consistent with native memory pressure.
+
+### Fix
+- Removed redundant torch tensor clone of the full input mix in Demucs path.
+- Moved recovery blend math to export-time numpy arrays (`instrumental_np` with `wav_np`) instead of torch tensors.
+
+### Result
+- Lower peak memory pressure during separation.
+- Demucs compute path remains unchanged while recovery blend stays available.
+
+# Change: Demucs Music Recovery Control for Instrument Preservation (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`, `source_code/workers/audio_separator_thread.py`
+
+### Problem
+Demucs produced cleaner vocal removal than UVR, but some instruments that overlap vocals were also removed too aggressively.
+
+### Fix
+- Added `Demucs Music Recovery` in the Vocal Separator UI (0%, 10%, 20%, 30%).
+- Wired selected value through `main.py` into `AudioSeparatorThread`.
+- In Demucs path, instrumental stem now optionally blends back a controlled amount of original mix:
+   - `instrumental = (1-r)*instrumental + r*original_mix`, where `r` is 0.00-0.30.
+
+### Result
+- Users can reduce over-erasure of voice-coupled instruments while keeping Demucs as default quality backend.
+- Tradeoff is explicit: higher recovery preserves more accompaniment but can reintroduce faint vocal bleed.
+
+# Change: Demucs Live Progress Bridge for Splash UI (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`
+
+### Problem
+Demucs showed active tqdm progress in console output, but the in-app splash progress bar stayed mostly static between coarse milestone updates.
+
+### Fix
+- Added a Demucs stream adapter that captures stdout/stderr text emitted by tqdm during `apply_model()`.
+- Parsed percentage values from that stream and emitted mapped Qt `progress` signals while separation runs.
+- Updated status text dynamically (for example `Running Demucs separation... 62%`) so users can see active phase progress.
+
+### Result
+- Splash progress now moves continuously during Demucs processing instead of appearing stuck.
+
+# Change: Demucs TorchCodec Workaround via Python API (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`
+
+### Problem
+Demucs launched in Python 3.13, but its CLI failed during `torchaudio.load()` because `torchcodec` native DLLs could not load reliably on this machine.
+
+### Fix
+- Reworked the Demucs backend to avoid the CLI audio loading path.
+- The worker now loads prepared WAV audio with `soundfile`, normalizes it, and calls the Demucs Python API directly via `demucs.pretrained.get_model()` and `demucs.apply.apply_model()`.
+
+### Result
+- Demucs no longer depends on the broken `torchcodec` runtime path for input loading.
+- The higher-quality Demucs backend can continue to be the default separator path in the app.
+
+# Change: Demucs Becomes Default Separator Backend (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`, `source_code/workers/audio_separator_thread.py`
+
+### Problem
+The fast UVR model path worked, but separation quality still left noticeable vocals in the instrumental output.
+
+### Fix
+- Updated the Vocal Separator tab so Demucs (`htdemucs_ft`) is the default backend/model.
+- Kept the UVR/audio-separator path available as a faster alternative.
+- Added backend-aware speed tuning for `Fast mode`.
+
+### Result
+- The default in-app separation path now prioritizes better quality under the working Python 3.13 runtime.
+- Users can still switch to the faster UVR path when turnaround time matters more than stem quality.
+
+# Change: Audio-Separator Thread Finalization Fix (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+After successful vocal separation, the app could crash with `QThread: Destroyed while thread '' is still running` when the output stem was auto-loaded immediately.
+
+### Fix
+- Kept the audio-separator worker in `active_tasks` during `separator_done` handling.
+- Released the worker reference only when the built-in `QThread.finished` signal fired.
+
+### Result
+- Output auto-load no longer destroys the worker before the thread fully exits.
+- Successful separation can flow directly into playback without the thread lifecycle crash.
+
+# Change: Vocal Separator via audio-separator CLI (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`, `source_code/workers/audio_separator_thread.py`, `build_system/KaraokeStudioPro.spec`
+
+### Problem
+The Demucs in-process approach was not reliable in the active environment, but the user had success with the external `audio-separator` CLI and UVR MDX model.
+
+### Fix
+- Reintroduced a `Vocal Separator` tab using the external `audio-separator` command.
+- Set `UVR-MDX-NET-Voc_FT.onnx` as the default model.
+- Set instrumental-only export as the default karaoke workflow.
+- Added `Fast mode` to reduce MDX overlap for faster CPU processing.
+- Added a worker that optionally extracts WAV audio from video inputs before invoking the external CLI.
+
+### Result
+- Vocal removal now depends on the external CLI path the user already prefers.
+- The default path is optimized for faster karaoke instrumental generation rather than maximum model complexity.
+
+# Change: Revert Vocal Separator / Demucs Integration (2026-07-07) - COMPLETE ✅
+
+**Status:** Reverted
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`, `build_system/KaraokeStudioPro.spec`, `documentation/requirements.txt`, `build_system/requirements-build.txt`
+
+### Problem
+The Demucs-based vocal separation workflow did not operate reliably in the active environment.
+
+### Fix
+- Removed the `Vocal Separator` tab from Convert & Export.
+- Removed main-window wiring and task flow for vocal separation.
+- Removed Demucs-specific dependency/build references.
+
+### Result
+- The application is back to the pre-Demucs workflow surface.
+- Convert & Export now contains only the supported conversion/normalization/export flows.
+
+# Change: Persistent Crash Diagnostics Logging (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Recent crashes could occur with limited terminal output, making root-cause diagnosis slow.
+
+### Fix
+- Added persistent file logger writing to `config/app_debug.log`.
+- Added task lifecycle logs: launch, status updates, subprocess output, completion, cancellation, shutdown-stop results.
+- Added global uncaught exception hook to capture fatal tracebacks into the same log file.
+
+### Result
+- Future conversion/separation failures can be diagnosed from `config/app_debug.log` even when console output is truncated.
+
+# Change: QThread Lifecycle Fix for Conversion/Separation (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/workers/vocal_separator_thread.py`
+
+### Problem
+During conversion/separation workflows, the app could crash with `QThread: Destroyed while thread '' is still running` when a task was cancelled or replaced.
+
+### Fix
+- Updated task cancellation path to call `thread.stop()` and `thread.wait(2000)` before cleanup.
+- Renamed vocal separator completion signal from `finished` to `separator_done` to avoid collisions with `QThread.finished`.
+
+### Result
+- Worker threads are now stopped deterministically before object destruction.
+- Conversion/separation cancellation no longer triggers QThread destruction crashes.
+
+# Change: Convert & Export Vocal Separator Backend (2026-07-07) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`, `source_code/workers/vocal_separator_thread.py`, `build_system/KaraokeStudioPro.spec`, `documentation/requirements.txt`, `build_system/requirements-build.txt`
+
+### Problem
+User requested a dedicated Vocal Separator tab in Convert & Export and asked for full backend implementation.
+
+### Fix
+- Added a new `🎤 Vocal Separator` tab to Convert & Export.
+- Added UI controls for engine selection, stem target, output format, and action button.
+- Added `VocalSeparatorThread` worker to run separation asynchronously.
+- Implemented complete flow in `main.py`:
+   - start separator
+   - show cancellable splash progress
+   - auto-load selected output stem on success
+- Implemented backend pipeline in worker:
+   - optional video audio extraction with ffmpeg
+   - engine execution (`demucs`, `spleeter`, `openunmix`)
+   - stem detection and export to WAV/FLAC/MP3
+- Updated build spec hiddenimports and requirements docs.
+
+### Result
+- Convert & Export now has a working vocal separation workflow in-app.
+- Users can generate vocals/instrumental stems and immediately load the selected output.
+
 # Change: Hide Pitch Analyzer Panel + Hide Amplify Tab (2026-07-06) - COMPLETE ✅
 
 **Status:** Implemented

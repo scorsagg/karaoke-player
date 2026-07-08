@@ -4,6 +4,8 @@ import os
 import subprocess
 import time
 import json
+import logging
+import traceback
 from pathlib import Path
 
 # Add parent directory to path so we can import source_code as a module
@@ -17,6 +19,7 @@ from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtGui import QPixmap, QColor, QCursor
 
 from source_code.workers.audio_analyzer import AudioAnalyzerThread
+from source_code.workers.audio_separator_thread import AudioSeparatorThread
 from source_code.workers.process_thread import ProcessThread
 from source_code.dialogs.settings_dialog import SettingsDialog
 from source_code.services.player_service import PlayerService
@@ -109,6 +112,8 @@ class KaraokeApp(QWidget):
         config_dir = app_dir / "config"
         config_dir.mkdir(exist_ok=True)
         self.settings_file = config_dir / "settings.json"
+        self.debug_log_file = config_dir / "app_debug.log"
+        self._setup_debug_logger()
 
         bundled_ffmpeg = get_resource_path("ffmpeg.exe")
         bundled_ytdlp = get_resource_path("yt-dlp.exe")
@@ -145,6 +150,39 @@ class KaraokeApp(QWidget):
         try:
             with open(self.settings_file, 'w') as f: json.dump(self.settings, f, indent=2)
         except: pass
+
+    def _setup_debug_logger(self):
+        """Initialize persistent debug logging to config/app_debug.log."""
+        self.debug_logger = logging.getLogger("karaoke_app")
+        self.debug_logger.setLevel(logging.INFO)
+        self.debug_logger.propagate = False
+
+        if not self.debug_logger.handlers:
+            file_handler = logging.FileHandler(self.debug_log_file, encoding="utf-8")
+            formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+            file_handler.setFormatter(formatter)
+            self.debug_logger.addHandler(file_handler)
+
+        self.log_debug("[app] debug logger initialized")
+
+    def log_debug(self, message):
+        """Log to both console and persistent file for post-crash diagnostics."""
+        try:
+            print(message)
+        except Exception:
+            pass
+
+        try:
+            if hasattr(self, "debug_logger") and self.debug_logger:
+                self.debug_logger.info(message)
+        except Exception:
+            pass
+
+    def log_exception(self, context, exc):
+        """Log exception details with traceback."""
+        tb_text = traceback.format_exc()
+        self.log_debug(f"[{context}] ERROR: {exc}")
+        self.log_debug(tb_text)
 
     def setup_ui(self):
         """Set up the entire UI using modularized UI components"""
@@ -249,6 +287,21 @@ class KaraokeApp(QWidget):
         self.normalize_cb = convert_export_components["normalize_cb"]
         self.normalize_lufs_combo = convert_export_components["normalize_lufs_combo"]
         normalize_btn = convert_export_components["normalize_btn"]
+        self.vocal_model_combo = convert_export_components["vocal_model_combo"]
+        self.vocal_target_combo = convert_export_components["vocal_target_combo"]
+        self.vocal_output_format_combo = convert_export_components["vocal_output_format_combo"]
+        self.vocal_fast_cb = convert_export_components["vocal_fast_cb"]
+        self.vocal_recovery_combo = convert_export_components["vocal_recovery_combo"]
+        self.vocal_sep_btn = convert_export_components["vocal_sep_btn"]
+        self.vocal_status_label = convert_export_components["vocal_status_label"]
+        self.merge_input_a_btn = convert_export_components["merge_input_a_btn"]
+        self.merge_input_a_label = convert_export_components["merge_input_a_label"]
+        self.merge_input_b_btn = convert_export_components["merge_input_b_btn"]
+        self.merge_input_b_label = convert_export_components["merge_input_b_label"]
+        self.merge_output_format_combo = convert_export_components["merge_output_format_combo"]
+        self.merge_mode_combo = convert_export_components["merge_mode_combo"]
+        self.merge_execute_btn = convert_export_components["merge_execute_btn"]
+        self.merge_status_label = convert_export_components["merge_status_label"]
         self.amp_factor_spin = convert_export_components["amp_factor_spin"]
         self.amp_mode_group = convert_export_components.get("amp_mode_group")
         self.amp_btn = convert_export_components["amp_btn"]
@@ -363,8 +416,17 @@ class KaraokeApp(QWidget):
             pass
         convert_btn.clicked.connect(self.convert_audio_format)
         normalize_btn.clicked.connect(self.normalize_audio)
+        self.vocal_sep_btn.clicked.connect(self.start_audio_separator)
+        self.merge_input_a_btn.clicked.connect(self.select_merge_input_a)
+        self.merge_input_b_btn.clicked.connect(self.select_merge_input_b)
+        self.merge_execute_btn.clicked.connect(self.execute_join_merge)
+        self.merge_mode_combo.currentTextChanged.connect(lambda _v: self._update_merge_status_hint())
         self.amp_btn.clicked.connect(self.amplify_export_media)
         self.convert_source_combo.currentTextChanged.connect(lambda _v: self.refresh_conversion_targets())
+
+        self.merge_input_a_path = ""
+        self.merge_input_b_path = ""
+        self._last_merge_cmd_text = ""
         # Video Tools: Video Trimming (uses video loaded from Media Loader page)
         video_trim_btn.clicked.connect(self.trim_video)
         self.video_trim_clear_btn.clicked.connect(self.clear_video_trim_ranges)
@@ -1146,9 +1208,7 @@ class KaraokeApp(QWidget):
             self.status_label.setText(f"Status: Playing {os.path.basename(self.video_path)}")
 
         except Exception as e:
-            print(f"[main.load_video] ❌ Engine Fault: {e}")
-            import traceback
-            traceback.print_exc()
+            self.log_exception("main.load_video", e)
             loader.close()
             self.status_label.setText("Status: Load failed")
         finally:
@@ -2258,6 +2318,542 @@ class KaraokeApp(QWidget):
         duration = self.get_video_duration_via_ffprobe(abs_in)
         self.launch_async_task(cmd, abs_out, "normalize_task", override_duration=duration)
 
+    def select_merge_input_a(self):
+        """Pick first input for Join & Merge tab."""
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Input A",
+            self.settings["download_directory"],
+            "Media Files (*.mp4 *.mkv *.avi *.mov *.webm *.mts *.m2ts *.mp3 *.wav *.aac *.m4a *.flac *.ogg *.opus *.wma);;All Files (*)",
+        )
+        if not path:
+            return
+
+        self.merge_input_a_path = path
+        media_type = self._classify_media_type_for_merge(path)
+        self._set_merge_input_display("A", path, media_type)
+        self._update_merge_status_hint()
+
+    def select_merge_input_b(self):
+        """Pick second input for Join & Merge tab."""
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Input B",
+            self.settings["download_directory"],
+            "Media Files (*.mp4 *.mkv *.avi *.mov *.webm *.mts *.m2ts *.mp3 *.wav *.aac *.m4a *.flac *.ogg *.opus *.wma);;All Files (*)",
+        )
+        if not path:
+            return
+
+        self.merge_input_b_path = path
+        media_type = self._classify_media_type_for_merge(path)
+        self._set_merge_input_display("B", path, media_type)
+        self._update_merge_status_hint()
+
+    def _set_merge_input_display(self, slot, path, media_type):
+        """Update Join & Merge controls so selected files are immediately obvious."""
+        if slot not in {"A", "B"}:
+            return
+
+        base_name = os.path.basename(path)
+        clipped_name = base_name if len(base_name) <= 38 else (base_name[:35] + "...")
+        full_line = f"Input {slot} ({media_type.upper()}): {base_name}"
+        detail_line = f"Path: {path}"
+
+        if slot == "A":
+            self.merge_input_a_btn.setText(f"✔ Input A selected: {clipped_name}")
+            self.merge_input_a_btn.setStyleSheet("background-color: #1f7a4f; color: white; height: 36px; font-weight: bold;")
+            self.merge_input_a_label.setText(f"{full_line}\n{detail_line}")
+            self.merge_input_a_label.setStyleSheet("color: #d5ffe9; font-size: 11px; font-weight: bold;")
+            self.merge_input_a_label.setToolTip(path)
+            self.merge_input_a_btn.setToolTip(path)
+            return
+
+        self.merge_input_b_btn.setText(f"✔ Input B selected: {clipped_name}")
+        self.merge_input_b_btn.setStyleSheet("background-color: #1f7a4f; color: white; height: 36px; font-weight: bold;")
+        self.merge_input_b_label.setText(f"{full_line}\n{detail_line}")
+        self.merge_input_b_label.setStyleSheet("color: #d5ffe9; font-size: 11px; font-weight: bold;")
+        self.merge_input_b_label.setToolTip(path)
+        self.merge_input_b_btn.setToolTip(path)
+
+    def _classify_media_type_for_merge(self, file_path):
+        """Classify media for Join & Merge with extension-first handling for audio files with artwork streams."""
+        ext = os.path.splitext(file_path)[1].lower()
+        audio_exts = {'.mp3', '.wav', '.aac', '.m4a', '.flac', '.ogg', '.opus', '.wma', '.amr'}
+        video_exts = {'.mp4', '.avi', '.mkv', '.mov', '.webm', '.mts', '.m2ts', '.mpeg'}
+
+        if ext in audio_exts:
+            return "audio"
+        if ext in video_exts:
+            return "video"
+
+        return self.classify_media_type(file_path)
+
+    def _resolve_merge_behavior(self, mode):
+        """Resolve append/overlay behavior from UI selection with type-based defaults."""
+        selected = self.merge_mode_combo.currentText().strip().lower() if hasattr(self, "merge_mode_combo") else "auto"
+        if "append" in selected:
+            return "append"
+        if "overlay" in selected:
+            return "overlay"
+
+        # Auto mode defaults:
+        # - same-type joins use append
+        # - mixed video+audio merge uses overlay
+        if mode in {"audio_audio_join", "video_video_join"}:
+            return "append"
+        return "overlay"
+
+    def _update_merge_status_hint(self):
+        """Update Join & Merge status with resolved behavior preview."""
+        input_a = getattr(self, "merge_input_a_path", "")
+        input_b = getattr(self, "merge_input_b_path", "")
+        if not input_a or not input_b:
+            self.merge_status_label.setText("Ready. Select two files to begin.")
+            return
+
+        type_a = self._classify_media_type_for_merge(input_a)
+        type_b = self._classify_media_type_for_merge(input_b)
+        if "unknown" in {type_a, type_b}:
+            self.merge_status_label.setText("Selected files are not recognized as audio/video.")
+            return
+
+        if {type_a, type_b} == {"video", "audio"}:
+            mode = "video_audio_merge"
+        elif type_a == "audio" and type_b == "audio":
+            mode = "audio_audio_join"
+        elif type_a == "video" and type_b == "video":
+            mode = "video_video_join"
+        else:
+            self.merge_status_label.setText("Unsupported combination. Use video+audio, audio+audio, or video+video.")
+            return
+
+        behavior = self._resolve_merge_behavior(mode)
+        self.merge_status_label.setText(
+            f"Ready: {mode.replace('_', ' ')} with {behavior} behavior"
+        )
+
+    def _resolve_join_merge_output(self, mode, input_a, input_b):
+        """Resolve output path/extension based on selected mode and optional format override."""
+        base_a = os.path.splitext(os.path.basename(input_a))[0]
+        base_b = os.path.splitext(os.path.basename(input_b))[0]
+        fmt_choice = self.merge_output_format_combo.currentText().strip().upper()
+        behavior = self._resolve_merge_behavior(mode)
+
+        if mode == "video_audio_merge":
+            ext = "mp4"
+            if fmt_choice in {"MP4", "MKV"}:
+                ext = fmt_choice.lower()
+            return os.path.join(self.settings["download_directory"], f"{base_a}_{base_b}_karaoke_merge.{ext}")
+
+        if mode == "audio_audio_join":
+            ext = "wav"
+            if fmt_choice in {"WAV", "MP3"}:
+                ext = fmt_choice.lower()
+            suffix = "overlay" if behavior == "overlay" else "append"
+            return os.path.join(self.settings["download_directory"], f"{base_a}_{base_b}_{suffix}.{ext}")
+
+        # video_video_join
+        ext = "mp4"
+        if fmt_choice in {"MP4", "MKV"}:
+            ext = fmt_choice.lower()
+        suffix = "overlay" if behavior == "overlay" else "append"
+        return os.path.join(self.settings["download_directory"], f"{base_a}_{base_b}_{suffix}.{ext}")
+
+    def _build_join_merge_cmd(self, input_a, input_b, mode, out_path):
+        """Build ffmpeg command for merge/join operations."""
+        ffmpeg = self.settings["ffmpeg_path"]
+        out_ext = os.path.splitext(out_path)[1].lower()
+
+        if mode == "video_audio_merge":
+            a_type = self._classify_media_type_for_merge(input_a)
+            b_type = self._classify_media_type_for_merge(input_b)
+            if a_type == "video" and b_type == "audio":
+                video_input = input_a
+                audio_input = input_b
+            elif a_type == "audio" and b_type == "video":
+                video_input = input_b
+                audio_input = input_a
+            else:
+                raise RuntimeError(
+                    f"video_audio_merge expected one video + one audio, got a_type={a_type}, b_type={b_type}"
+                )
+
+            if os.path.normcase(os.path.abspath(video_input)) == os.path.normcase(os.path.abspath(audio_input)):
+                raise RuntimeError("Invalid video+audio merge pairing: video and audio inputs resolved to the same file")
+
+            behavior = self._resolve_merge_behavior(mode)
+
+            if behavior == "append":
+                try:
+                    vdur = float(self.get_video_duration_via_ffprobe(video_input))
+                except Exception:
+                    vdur = 0.0
+                if vdur <= 0:
+                    vdur = 1.0
+
+                try:
+                    adur = float(self.get_video_duration_via_ffprobe(audio_input))
+                except Exception:
+                    adur = 0.0
+                if adur <= 0:
+                    adur = 1.0
+
+                return [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    video_input,
+                    "-i",
+                    audio_input,
+                    "-filter_complex",
+                    f"[0:v]setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={adur:.3f}[v];"
+                    f"anullsrc=channel_layout=stereo:sample_rate=44100:d={vdur:.3f}[sil];"
+                    "[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];"
+                    "[sil][a1]concat=n=2:v=0:a=1[a]",
+                    "-map",
+                    "[v]",
+                    "-map",
+                    "[a]",
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "fast",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "192k",
+                    out_path,
+                ]
+
+            cmd = [
+                ffmpeg,
+                "-y",
+                "-i",
+                video_input,
+                "-i",
+                audio_input,
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-c:v",
+                "copy",
+                "-shortest",
+                "-sn",
+                "-dn",
+            ]
+            if out_ext == ".mkv":
+                cmd += ["-c:a", "aac", "-b:a", "192k", out_path]
+            else:
+                cmd += ["-c:a", "aac", "-b:a", "192k", out_path]
+            return cmd
+
+        if mode == "audio_audio_join":
+            behavior = self._resolve_merge_behavior(mode)
+            if behavior == "overlay":
+                cmd = [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    input_a,
+                    "-i",
+                    input_b,
+                    "-filter_complex",
+                    "[0:a]aresample=44100,asetpts=PTS-STARTPTS[a0];[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];[a0][a1]amix=inputs=2:duration=longest:dropout_transition=2[a]",
+                    "-map",
+                    "[a]",
+                ]
+            else:
+                cmd = [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    input_a,
+                    "-i",
+                    input_b,
+                    "-filter_complex",
+                    "[0:a]aresample=44100,asetpts=PTS-STARTPTS[a0];[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];[a0][a1]concat=n=2:v=0:a=1[a]",
+                    "-map",
+                    "[a]",
+                ]
+            if out_ext == ".mp3":
+                cmd += ["-c:a", "libmp3lame", "-b:a", "320k", out_path]
+            else:
+                cmd += ["-c:a", "pcm_s16le", "-ar", "44100", out_path]
+            return cmd
+
+        # video_video_join
+        behavior = self._resolve_merge_behavior(mode)
+        if behavior == "overlay":
+            return [
+                ffmpeg,
+                "-y",
+                "-i",
+                input_a,
+                "-i",
+                input_b,
+                "-filter_complex",
+                "[0:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v0];"
+                "[1:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v1];"
+                "[v0][v1]blend=all_mode='screen':all_opacity=0.5[v];"
+                "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]amix=inputs=2:duration=shortest:dropout_transition=2[a]",
+                "-map",
+                "[v]",
+                "-map",
+                "[a]",
+                "-shortest",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "fast",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                out_path,
+            ]
+
+        return [
+            ffmpeg,
+            "-y",
+            "-i",
+            input_a,
+            "-i",
+            input_b,
+            "-filter_complex",
+            "[0:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setpts=PTS-STARTPTS[v0];"
+            "[1:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setpts=PTS-STARTPTS[v1];"
+            "[0:a]aresample=44100,asetpts=PTS-STARTPTS[a0];"
+            "[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];"
+            "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]",
+            "-map",
+            "[v]",
+            "-map",
+            "[a]",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            out_path,
+        ]
+
+    def execute_join_merge(self):
+        """Execute media join/merge operation from Convert & Export tab."""
+        input_a = getattr(self, "merge_input_a_path", "")
+        input_b = getattr(self, "merge_input_b_path", "")
+
+        if not input_a or not os.path.exists(input_a):
+            QMessageBox.warning(self, "Missing Input", "Select Input A first")
+            return
+        if not input_b or not os.path.exists(input_b):
+            QMessageBox.warning(self, "Missing Input", "Select Input B first")
+            return
+
+        type_a = self._classify_media_type_for_merge(input_a)
+        type_b = self._classify_media_type_for_merge(input_b)
+        if "unknown" in {type_a, type_b}:
+            QMessageBox.warning(self, "Unsupported File", "Only audio and video files are supported")
+            return
+
+        if {type_a, type_b} == {"video", "audio"}:
+            mode = "video_audio_merge"
+        elif type_a == "audio" and type_b == "audio":
+            mode = "audio_audio_join"
+        elif type_a == "video" and type_b == "video":
+            mode = "video_video_join"
+        else:
+            QMessageBox.warning(self, "Unsupported Combination", "Supported: video+audio, audio+audio, video+video")
+            return
+
+        out_path = self._resolve_join_merge_output(mode, input_a, input_b)
+        abs_a = os.path.abspath(input_a).replace("\\", "/")
+        abs_b = os.path.abspath(input_b).replace("\\", "/")
+        abs_out = os.path.abspath(out_path).replace("\\", "/")
+
+        cmd = self._build_join_merge_cmd(abs_a, abs_b, mode, abs_out)
+        cmd_text = subprocess.list2cmdline([str(part) for part in cmd])
+        self._last_merge_cmd_text = cmd_text
+        self.log_debug(f"[merge_task] final_cmd | {cmd_text}")
+
+        try:
+            QApplication.clipboard().setText(cmd_text)
+        except Exception:
+            pass
+
+        self.merge_status_label.setText("Final ffmpeg command copied to clipboard. Paste it anywhere to inspect.")
+        self.merge_status_label.setToolTip(cmd_text)
+
+        QMessageBox.information(
+            self,
+            "Join & Merge - Final ffmpeg Command",
+            "Final ffmpeg command has been copied to clipboard.\n\n"
+            "Paste (Ctrl+V) into Notepad/terminal to inspect or run manually.",
+        )
+
+        duration_hint = 0
+        try:
+            dur_a = self.get_video_duration_via_ffprobe(abs_a)
+            dur_b = self.get_video_duration_via_ffprobe(abs_b)
+            behavior = self._resolve_merge_behavior(mode)
+            if mode == "video_video_join" and behavior == "overlay":
+                duration_hint = min(dur_a, dur_b)
+            elif mode == "video_video_join" and behavior == "append":
+                duration_hint = dur_a + dur_b
+            elif mode == "video_audio_merge" and behavior == "append":
+                duration_hint = dur_a + dur_b
+            elif mode == "video_audio_merge" and behavior == "overlay":
+                duration_hint = min(dur_a, dur_b)
+            elif mode == "audio_audio_join" and behavior == "overlay":
+                duration_hint = max(dur_a, dur_b)
+            elif mode == "audio_audio_join" and behavior == "append":
+                duration_hint = dur_a + dur_b
+            else:
+                duration_hint = min(dur_a, dur_b)
+        except Exception:
+            duration_hint = 0
+
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path):
+            pix.fill(QColor("#1e1e1e"))
+
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("merge_task"))
+        self.export_splash.show()
+
+        behavior = self._resolve_merge_behavior(mode)
+        self.merge_status_label.setText(f"Running {mode.replace('_', ' ')} with {behavior} behavior...")
+        self.launch_async_task(cmd, abs_out, "merge_task", override_duration=duration_hint)
+
+    def start_audio_separator(self):
+        """Run the selected separator backend, defaulting to Demucs quality mode."""
+        if not self.video_path:
+            QMessageBox.warning(self, "No File", "Load an audio or video file first")
+            return
+
+        selection = self.vocal_model_combo.currentText()
+        target_text = self.vocal_target_combo.currentText()
+        output_format = self.vocal_output_format_combo.currentText().lower()
+        fast_mode = self.vocal_fast_cb.isChecked()
+        recovery_text = self.vocal_recovery_combo.currentText()
+        demucs_music_recovery = 0
+        try:
+            demucs_music_recovery = int(str(recovery_text).split("%")[0].strip())
+        except Exception:
+            demucs_music_recovery = 0
+
+        if selection.startswith("Demucs:"):
+            backend_name = "demucs"
+            model_filename = "htdemucs_ft" if "htdemucs_ft" in selection else "htdemucs"
+        else:
+            backend_name = "audio-separator"
+            if "UVR_MDXNET_KARA_2.onnx" in selection:
+                model_filename = "UVR_MDXNET_KARA_2.onnx"
+            else:
+                model_filename = "UVR-MDX-NET-Voc_FT.onnx"
+
+        target_map = {
+            "Instrumental only (Recommended)": "instrumental_only",
+            "Vocals only": "vocals_only",
+            "Vocals + Instrumental": "both",
+        }
+        target_mode = target_map.get(target_text, "instrumental_only")
+
+        self.log_debug(
+            f"[audio_separator_task] start | input={self.video_path} | backend={backend_name} | model={model_filename} | "
+            f"target={target_mode} | format={output_format} | fast_mode={fast_mode} | demucs_music_recovery={demucs_music_recovery}%"
+        )
+
+        loading_path = get_resource_path("Loading.png")
+        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
+        if not os.path.exists(loading_path):
+            pix.fill(QColor("#1e1e1e"))
+
+        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
+        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("audio_separator_task"))
+        self.export_splash.set_progress(5, f"Starting Vocal Separator ({model_filename})...")
+        self.export_splash.show()
+
+        model_dir = os.path.join(self.settings["base_directory"], "config", "audio_separator_models")
+        os.makedirs(model_dir, exist_ok=True)
+
+        self.kill_allocated_task("audio_separator_task")
+        thread = AudioSeparatorThread(
+            input_path=os.path.abspath(self.video_path).replace("\\", "/"),
+            ffmpeg_path=self.settings["ffmpeg_path"],
+            output_dir=self.settings["download_directory"],
+            backend_name=backend_name,
+            model_filename=model_filename,
+            output_format=output_format,
+            target_mode=target_mode,
+            fast_mode=fast_mode,
+            model_file_dir=model_dir,
+            demucs_music_recovery=demucs_music_recovery,
+        )
+
+        self.active_tasks["audio_separator_task"] = thread
+        thread.status_update.connect(lambda text: self.vocal_status_label.setText(text))
+        thread.status_update.connect(lambda text: self.export_splash.set_progress(self.export_splash.pbar.value(), text))
+        thread.status_update.connect(lambda text: self.log_debug(f"[audio_separator_task] status | {text}"))
+        thread.progress.connect(lambda v: self.export_splash.set_progress(v, self.export_splash.showMessageLabel.text()))
+        thread.line_output.connect(lambda line: self.log_debug(f"[audio_separator_task] output | {line}"))
+        thread.separator_done.connect(self.handle_audio_separator_completion)
+        thread.finished.connect(lambda: self._finalize_audio_separator_thread("audio_separator_task"))
+        thread.start()
+
+    def _finalize_audio_separator_thread(self, task_key):
+        """Drop the audio separator thread reference only after QThread.finished fires."""
+        self.active_tasks.pop(task_key, None)
+        self.log_debug(f"[{task_key}] thread finished | reference released")
+
+    def handle_audio_separator_completion(self, success, instrumental_path, vocals_path, error_text):
+        """Handle completion callback for external audio-separator runs."""
+        self.log_debug(
+            f"[audio_separator_task] done | success={success} | instrumental={instrumental_path} | "
+            f"vocals={vocals_path} | error={error_text}"
+        )
+
+        if self.export_splash:
+            self.export_splash.close()
+            self.export_splash = None
+
+        self.status_label.setText("Status: Ready")
+
+        if not success:
+            self.vocal_status_label.setText("Audio separator failed")
+            QMessageBox.warning(self, "Vocal Separator", error_text or "Audio separation failed")
+            return
+
+        chosen_target = self.vocal_target_combo.currentText()
+        to_load = ""
+        if chosen_target == "Vocals only":
+            to_load = vocals_path
+        elif chosen_target == "Vocals + Instrumental":
+            to_load = instrumental_path if os.path.exists(instrumental_path) else vocals_path
+        else:
+            to_load = instrumental_path
+
+        created = [p for p in [instrumental_path, vocals_path] if p and os.path.exists(p)]
+        if to_load and os.path.exists(to_load):
+            self.load_video(to_load, is_audio_only=True)
+            self.audio_tools_file_path = to_load
+            self.audio_file_status.setText(f"✅ {os.path.basename(to_load)} (Separated Stem)")
+
+        if created:
+            created_names = "\n".join([f"- {os.path.basename(p)}" for p in created])
+            self.vocal_status_label.setText(f"✅ Audio separation complete ({len(created)} file(s))")
+            QMessageBox.information(self, "Vocal Separator", f"Created stem file(s):\n{created_names}")
+            QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
+            return
+
+        self.vocal_status_label.setText("Audio separation completed, but no output files were found")
+        QMessageBox.warning(self, "Vocal Separator", "Separation finished but no output files were found.")
+
     def trim_video(self):
         """Trim video using range rows from Video Tools tab (similar to Playback Window)."""
         if not self.video_path:
@@ -2476,18 +3072,38 @@ class KaraokeApp(QWidget):
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
         self.kill_allocated_task(task_key)
 
+        self.log_debug(
+            f"[{task_key}] launch | output={out_path} | duration_hint={override_duration} | cmd={' '.join(map(str, cmd))}"
+        )
+
         thread = ProcessThread(cmd, override_duration)
         self.active_tasks[task_key] = thread
 
         thread.status_update.connect(lambda text: self.export_splash.set_progress(self.export_splash.pbar.value(), text))
+        thread.status_update.connect(lambda text: self.log_debug(f"[{task_key}] status | {text}"))
         thread.progress.connect(lambda v: self.export_splash.set_progress(v, self.export_splash.showMessageLabel.text()))
+        thread.line_output.connect(lambda line: self.log_debug(f"[{task_key}] output | {line}"))
         thread.finished.connect(lambda success: self.handle_task_completion(task_key, out_path, success))
         thread.start()
 
     def kill_allocated_task(self, task_key):
         if task_key in self.active_tasks:
             thread = self.active_tasks.pop(task_key)
-            thread.stop()
+            was_running = False
+            try:
+                was_running = thread.isRunning()
+            except Exception:
+                pass
+            self.log_debug(f"[{task_key}] cancel requested | running={was_running}")
+            try:
+                thread.stop()
+            except Exception:
+                pass
+            try:
+                waited = thread.wait(2000)
+                self.log_debug(f"[{task_key}] cancel wait complete | stopped={waited}")
+            except Exception:
+                self.log_debug(f"[{task_key}] cancel wait raised exception")
             if self.export_splash:
                 self.export_splash.close()
                 self.export_splash = None
@@ -2495,17 +3111,24 @@ class KaraokeApp(QWidget):
 
     def stop_all_tasks(self):
         """Stop all active tasks during app shutdown"""
+        self.log_debug(f"[tasks] stop_all_tasks | active_count={len(self.active_tasks)}")
         for task_key in list(self.active_tasks.keys()):
             try:
                 thread = self.active_tasks[task_key]
                 thread.stop()
-                thread.wait(1000)
+                waited = thread.wait(1000)
+                self.log_debug(f"[{task_key}] shutdown stop | stopped={waited}")
             except Exception:
-                pass
+                self.log_debug(f"[{task_key}] shutdown stop | exception while stopping")
         self.active_tasks.clear()
 
     def handle_task_completion(self, task_key, out_path, success):
         self.active_tasks.pop(task_key, None)
+
+        self.log_debug(
+            f"[{task_key}] completion | success={success} | out_path={out_path} | "
+            f"exists={bool(out_path and os.path.exists(out_path))}"
+        )
 
         if self.export_splash:
             self.export_splash.close()
@@ -2514,6 +3137,18 @@ class KaraokeApp(QWidget):
         self.status_label.setText("Status: Ready")
 
         if not success:
+            if task_key == "merge_task" and getattr(self, "_last_merge_cmd_text", ""):
+                try:
+                    QApplication.clipboard().setText(self._last_merge_cmd_text)
+                except Exception:
+                    pass
+                QMessageBox.warning(
+                    self,
+                    "Processing Break",
+                    "Execution pipeline stopped or configuration error checked.\n\n"
+                    "Final ffmpeg command has been copied to clipboard for debugging.",
+                )
+                return
             QMessageBox.warning(self, "Processing Break", "Execution pipeline stopped or configuration error checked.")
             return
 
@@ -2522,6 +3157,8 @@ class KaraokeApp(QWidget):
             is_audio_task = task_key in ["extract_task", "trim_task", "convert_task"]
             if task_key == "amplify_task":
                 is_audio_task = getattr(self, '_current_export_media_kind', 'audio') == 'audio'
+            if task_key == "merge_task":
+                is_audio_task = self.classify_media_type(out_path) == "audio"
             self.load_video(out_path, is_audio_only=is_audio_task)
             
             # For extraction task, update audio_tools_file_path and extraction status
@@ -2537,6 +3174,14 @@ class KaraokeApp(QWidget):
                 output_name = os.path.basename(out_path)
                 self.audio_file_status.setText(f"✅ {output_name} (Processed Audio)")
 
+            if task_key == "merge_task":
+                output_name = os.path.basename(out_path)
+                media_kind = self.classify_media_type(out_path)
+                self.merge_status_label.setText(f"✅ Merge completed: {output_name}")
+                if media_kind == "audio":
+                    self.audio_tools_file_path = out_path
+                    self.audio_file_status.setText(f"✅ {output_name} (Merged Output)")
+
             if task_key == "amplify_task":
                 self.amp_status_label.setText(f"✅ Amplified file loaded: {os.path.basename(out_path)}")
                 self._reset_export_amplify_factor(os.path.basename(out_path))
@@ -2551,6 +3196,8 @@ class KaraokeApp(QWidget):
             if task_key in ["extract_task", "trim_task"]:
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_AUDIO_STUDIO))
             if task_key in ["convert_task", "normalize_task", "amplify_task"]:
+                QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
+            if task_key == "merge_task":
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
 
             # Navigate back to Video Tools page after widening
@@ -3073,7 +3720,30 @@ class ModernSplashScreen(QSplashScreen):
         self.showMessageLabel.setText(message)
         QApplication.processEvents()
 
+def log_uncaught_exception(exc_type, exc_value, exc_traceback):
+    """Global uncaught exception handler for startup/runtime fatal errors."""
+    try:
+        app_dir = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(__file__).parent.parent
+        config_dir = app_dir / "config"
+        config_dir.mkdir(exist_ok=True)
+        log_file = config_dir / "app_debug.log"
+
+        logger = logging.getLogger("karaoke_app_boot")
+        logger.setLevel(logging.ERROR)
+        logger.propagate = False
+        if not logger.handlers:
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
+            formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+
+        tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+        logger.error("Uncaught exception:\n%s", tb_text)
+    except Exception:
+        pass
+
 if __name__ == "__main__":
+    sys.excepthook = log_uncaught_exception
     app = QApplication(sys.argv)
     splash_path = get_resource_path("splash.png")
     if os.path.exists(splash_path):

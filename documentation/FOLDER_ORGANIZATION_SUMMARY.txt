@@ -34,7 +34,7 @@
 │  │  ├─ pitch_page.py            (Playback controls page)
 │  │  ├─ audio_studio_page.py     (Audio Studio: audio-only trimming + playback window)
 │  │  ├─ video_tools_page.py      (Video Studio: trimming, playback window, extraction, widen)
-│  │  └─ convert_export_page.py   (Convert & Export: format conversion + normalization + amplify/export)
+│  │  └─ convert_export_page.py   (Convert & Export: format conversion + normalization + vocal separator + amplify/export)
 │  │
 │  ├─ 📁 widgets/
 │  │  ├─ __init__.py
@@ -44,7 +44,8 @@
 │  └─ 📁 workers/
 │     ├─ __init__.py
 │     ├─ audio_analyzer.py        (Real-time audio analysis thread)
-│     └─ process_thread.py        (Command execution thread)
+│     ├─ process_thread.py        (Command execution thread)
+│     └─ audio_separator_thread.py (External audio-separator worker)
 │
 ├─ 🛠️ BUILD_SYSTEM/
 │  ├─ build.py                    (Smart build orchestrator v3)
@@ -154,6 +155,8 @@ Build Standalone Executable (v3):
     • Windows audio meter now uses soundcard loopback backend first (speaker capture), with sounddevice fallback
     • Sidebar status now refreshes on file load start/success/failure (prevents stale auto-reduce text)
     • Splash progress bar now updates visibly during file preparation and loading stages
+   • Task cancellation now waits for worker shutdown (`stop()+wait()`) to prevent QThread-destroyed crashes during conversion/separation
+   • Persistent debug log added at config/app_debug.log (task lifecycle + worker subprocess output)
    • PlayerService auto-configures Windows VLC runtime paths for source runs
      (PATH + VLC_PLUGIN_PATH + add_dll_directory)
 
@@ -203,6 +206,33 @@ Build Standalone Executable (v3):
        - Target formats are media-aware based on loaded source
        - Quality selector: High (320k), Medium (192k), Low (128k)
     • Loudness Normalization (Feature 8): available for audio and video sources
+    • Vocal Separator (2026-07-07): Demucs default + UVR fast alternative
+       - Default backend/model: Demucs htdemucs_ft
+       - Faster fallback: audio-separator UVR models
+       - Default target: instrumental-only export
+       - Fast mode applies backend-specific speed tuning
+       - Demucs Music Recovery control (0-30%) blends back original mix to preserve instruments under vocals
+      - Recovery blending is done in numpy export path to avoid extra torch tensor copies and reduce long-track crash risk
+       - Video inputs are pre-extracted to WAV before separation
+       - Demucs path uses Python API + soundfile input loading to avoid torchaudio/torchcodec CLI failures
+      - Demucs inference runs in an isolated subprocess so native crashes do not terminate the main app
+       - Demucs tqdm output is parsed into worker progress signals so the splash bar updates continuously
+      - Demucs status messaging now shows download phase and fixed separation pass counters (for example 1/4 through 4/4)
+       - Worker reference is released only after `QThread.finished` to prevent destruction during output auto-load
+      • Join & Merge (2026-07-08): Convert & Export tab for two-input media combination
+         - video+audio: mux karaoke output video
+         - audio+audio: append (concat) or overlay (mix)
+         - video+video: append (A then B) or overlay (A+B from start)
+         - Auto behavior defaults: same-type append, mixed video+audio overlay
+         - Manual video+audio append mode extends video with freeze-frame and appends selected audio at end
+         - video+audio overlay now replaces source audio via explicit stream mapping (prevents original audio retention)
+         - replacement mapping follows strict karaoke remux pattern: map video from input A and audio from input B only
+         - merge mode media typing uses extension-first classification to avoid artwork-based false video detection
+         - selected Input A/B now show prominent confirmation text on buttons with full-path labels/tooltips
+         - exact final ffmpeg command is shown before processing and written to debug log for verification
+         - final merge command is auto-copied to clipboard so users can paste/run it directly
+         - fixed video+audio input routing so selected audio file is used correctly (no accidental duplicate video inputs)
+         - Uses async `merge_task` pipeline with splash progress and cancel support
     • Amplify & Export: Convert & Export page owns export-time ffmpeg gain
        - Signed mode buttons: Amplification + / Reduce amplification -
        - Positive-only amount spinner with 0.25-step increments
