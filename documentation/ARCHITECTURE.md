@@ -81,7 +81,7 @@ source_code/
 │   ├── pitch_page.py              # Playback controls page
 │   ├── audio_studio_page.py       # Audio-only tools (trim ranges + playback window)
 │   ├── video_tools_page.py        # Video tools + extraction + widen + playback window
-│   ├── convert_export_page.py     # Format conversion + normalization + amplify/export
+│   ├── convert_export_page.py     # Format conversion + normalization + vocal separator + amplify/export
 │   ├── sidebar.py                 # Navigation list
 │   ├── playback_bar.py            # Playback action bar (play/pause/stop/seek/volume/audio meter)
 │   └── main_layout.py             # Stack construction/wiring
@@ -94,7 +94,8 @@ source_code/
 └── workers/
     ├── __init__.py
     ├── audio_analyzer.py          # Audio level capture thread
-    └── process_thread.py          # Generic subprocess executor
+    ├── process_thread.py          # Generic subprocess executor
+    └── audio_separator_thread.py  # External audio-separator CLI worker
 ```
 
 ### Page Layout & Scroll Architecture (updated 2026-06-29)
@@ -161,6 +162,43 @@ Convert & Export owns export-time amplification instead of the studio pages:
 - The audio meter dB Output mode displays true `dBFS` with approximate SPL context for clearer verification of gain changes
 - After load, the control resets to the neutral `1.00x` baseline so the new file becomes the reference point
 
+### Convert & Export: Vocal Separator Tab (updated 2026-07-07)
+
+Convert & Export includes a dual-backend vocal separation workflow:
+- Default backend/model: `Demucs: htdemucs_ft`
+- Faster alternative backend: `audio-separator` with UVR MDX models
+- Default target: instrumental-only export for karaoke workflows
+- Optional `Fast mode` applies backend-specific tuning for speed
+- Optional `Demucs Music Recovery` (0-30%) blends a controlled portion of original mix into instrumental output to retain instruments under vocals
+- Recovery blend is applied in export-time numpy space (not extra torch graph tensors) to keep memory usage stable on longer inputs
+- Video inputs are converted to WAV first via ffmpeg, then passed into the chosen separator backend
+- Demucs runs via the Python API using `soundfile`-loaded audio tensors, avoiding the failing `torchaudio.load()` + `torchcodec` CLI path
+- Demucs inference is executed in an isolated subprocess script to contain native crashes and keep the Qt app process alive
+- Demucs tqdm output is captured and translated into worker `progress` signals so the splash bar reflects active separation progress
+- Demucs status labels now expose phase context (model-file download vs separation pass counters) with fixed pass totals (for example `1/4`, `2/4`, `3/4`, `4/4`) so repeated percentage cycles are understandable
+- The worker stays referenced until `QThread.finished` fires, preventing thread-destroyed crashes during auto-load of the output stem
+
+### Convert & Export: Join & Merge Tab (updated 2026-07-08)
+
+- Two independent input selectors (`Input A`, `Input B`) allow arbitrary pairing.
+- A unified `Join Behaviour` selector controls append/overlay behavior.
+- Mode is auto-detected from media types:
+    - video+audio -> mux karaoke output video
+    - audio+audio -> append (concat) or overlay (amix)
+    - video+video -> append (concat) or overlay (blend+amix)
+- Auto behavior defaults:
+    - same-type pairs -> append
+    - mixed video+audio -> overlay
+- Manual override is available for mixed video+audio append mode: video timeline is extended with freeze-frame and selected audio is appended.
+- Mixed video+audio overlay replacement uses explicit ffmpeg stream mapping to keep only selected video and selected replacement audio in output.
+- Overlay path follows strict replacement mapping (`0:v:0` + `1:a:0`) with copied video and replaced audio.
+- Join mode classification is extension-first for media pairing to avoid MP3/embedded-artwork false video classification.
+- Merge input controls now provide high-visibility selected states (button text + label + tooltip path) so users can verify A/B file picks before processing.
+- Join & Merge presents the exact final ffmpeg command before execution and records it in logs for reproducible troubleshooting.
+- Join & Merge also auto-copies the final command to clipboard for easy paste/replay outside the app.
+- video+audio input routing now explicitly maps by detected pair direction (`video,audio` or `audio,video`) with a defensive same-file guard.
+- Runtime path is implemented in `main.py` (`execute_join_merge`, `_resolve_join_merge_output`, `_build_join_merge_cmd`) and uses existing `launch_async_task` pipeline.
+
 ### Video Studio: Fullscreen Access (updated 2026-07-06)
 
 - The fullscreen/full-video button is available across all Video Studio tabs.
@@ -186,6 +224,7 @@ Convert & Export owns export-time amplification instead of the studio pages:
 - Manage audio analyzer thread
 - Refresh sidebar status text on load start/success/failure events
 - Drive splash progress updates through full load lifecycle, including preparation phase
+- Persist task lifecycle logs and uncaught exceptions to `config/app_debug.log`
 - Clean shutdown and resource cleanup
 
 **Key Methods:**

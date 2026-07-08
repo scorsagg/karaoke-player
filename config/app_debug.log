@@ -1,0 +1,78 @@
+2026-07-08 10:53:41,352 | INFO | [app] debug logger initialized
+2026-07-08 10:55:43,666 | INFO | [merge_task] final_cmd | D:\Srikanth\Academics\Python\karaoke-player\resources\ffmpeg.exe -y -i "D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu.mp4" -i "D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu.mp4" -map 0:v:0 -map 1:a:0 -c:v copy -shortest -sn -dn -c:a aac -b:a 192k "D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4"
+2026-07-08 10:56:50,011 | INFO | [tasks] stop_all_tasks | active_count=0
+2026-07-08 10:56:50,043 | INFO | [merge_task] launch | output=D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4 | duration_hint=281.054331 | cmd=D:\Srikanth\Academics\Python\karaoke-player\resources\ffmpeg.exe -y -i D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu.mp4 -i D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu.mp4 -map 0:v:0 -map 1:a:0 -c:v copy -shortest -sn -dn -c:a aac -b:a 192k D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4
+2026-07-08 10:59:46,047 | INFO | [app] debug logger initialized
+2026-07-08 10:59:59,537 | INFO | [merge_task] final_cmd | D:\Srikanth\Academics\Python\karaoke-player\resources\ffmpeg.exe -y -i "D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu.mp4" -i "D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_1_instrumental.wav" -map 0:v:0 -map 1:a:0 -c:v copy -shortest -sn -dn -c:a aac -b:a 192k "D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4"
+2026-07-08 11:00:07,468 | INFO | [merge_task] launch | output=D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4 | duration_hint=281.054331 | cmd=D:\Srikanth\Academics\Python\karaoke-player\resources\ffmpeg.exe -y -i D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu.mp4 -i D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_1_instrumental.wav -map 0:v:0 -map 1:a:0 -c:v copy -shortest -sn -dn -c:a aac -b:a 192k D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4
+2026-07-08 11:00:07,511 | INFO | [merge_task] output | ffmpeg version N-116599-g43cde54fc1-20240812 Copyright (c) 2000-2024 the FFmpeg developers
+2026-07-08 11:00:07,511 | INFO | [merge_task] output | built with gcc 14.2.0 (crosstool-NG 1.26.0.106_ed12fa6)
+2026-07-08 11:00:07,511 | INFO | [merge_task] output | configuration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --enable-gpl --enable-version3 --disable-debug --disable-w32threads --enable-pthreads --enable-iconv --enable-zlib --enable-libfreetype --enable-libfribidi --enable-gmp --enable-libxml2 --enable-lzma --enable-fontconfig --enable-libharfbuzz --enable-libvorbis --enable-opencl --disable-libpulse --enable-libvmaf --disable-libxcb --disable-xlib --enable-amf --enable-libaom --enable-libaribb24 --enable-avisynth --enable-chromaprint --enable-libdav1d --enable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --enable-libvpl --enable-openal --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librav1e --enable-librubberband --enable-schannel --enable-sdl2 --enable-libsoxr --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --disable-libdrm --enable-vaapi --enable-libvidstab --enable-vulkan --enable-libshaderc --enable-libplacebo --enable-libvvenc --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxvid --enable-libzimg --enable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs=-lgomp --extra-ldflags=-pthread --extra-ldexeflags= --cc=x86_64-w64-mingw32-gcc --cxx=x86_64-w64-mingw32-g++ --ar=x86_64-w64-mingw32-gcc-ar --ranlib=x86_64-w64-mingw32-gcc-ranlib --nm=x86_64-w64-mingw32-gcc-nm --extra-version=20240812
+2026-07-08 11:00:07,511 | INFO | [merge_task] output | libavutil      59. 34.100 / 59. 34.100
+2026-07-08 11:00:07,511 | INFO | [merge_task] output | libavcodec     61. 11.100 / 61. 11.100
+2026-07-08 11:00:07,512 | INFO | [merge_task] output | libavformat    61.  5.101 / 61.  5.101
+2026-07-08 11:00:07,512 | INFO | [merge_task] output | libavdevice    61.  2.100 / 61.  2.100
+2026-07-08 11:00:07,512 | INFO | [merge_task] output | libavfilter    10.  2.102 / 10.  2.102
+2026-07-08 11:00:07,512 | INFO | [merge_task] output | libswscale      8.  2.100 /  8.  2.100
+2026-07-08 11:00:07,512 | INFO | [merge_task] output | libswresample   5.  2.100 /  5.  2.100
+2026-07-08 11:00:07,512 | INFO | [merge_task] output | libpostproc    58.  2.100 / 58.  2.100
+2026-07-08 11:00:07,522 | INFO | [merge_task] output | Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu.mp4':
+2026-07-08 11:00:07,522 | INFO | [merge_task] output | Metadata:
+2026-07-08 11:00:07,523 | INFO | [merge_task] output | major_brand     : isom
+2026-07-08 11:00:07,523 | INFO | [merge_task] output | minor_version   : 512
+2026-07-08 11:00:07,523 | INFO | [merge_task] output | compatible_brands: isomiso2avc1mp41
+2026-07-08 11:00:07,523 | INFO | [merge_task] output | encoder         : Lavf61.5.101
+2026-07-08 11:00:07,523 | INFO | [merge_task] output | Duration: 00:04:41.05, start: 0.000000, bitrate: 1463 kb/s
+2026-07-08 11:00:07,524 | INFO | [merge_task] output | Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1920x1080 [SAR 1:1 DAR 16:9], 1330 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+2026-07-08 11:00:07,524 | INFO | [merge_task] output | Metadata:
+2026-07-08 11:00:07,524 | INFO | [merge_task] output | handler_name    : ISO Media file produced by Google Inc.
+2026-07-08 11:00:07,524 | INFO | [merge_task] output | vendor_id       : [0][0][0][0]
+2026-07-08 11:00:07,524 | INFO | [merge_task] output | Stream #0:1[0x2](eng): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 128 kb/s (default)
+2026-07-08 11:00:07,524 | INFO | [merge_task] output | Metadata:
+2026-07-08 11:00:07,525 | INFO | [merge_task] output | handler_name    : ISO Media file produced by Google Inc.
+2026-07-08 11:00:07,525 | INFO | [merge_task] output | vendor_id       : [0][0][0][0]
+2026-07-08 11:00:07,539 | INFO | [merge_task] output | [aist#1:0/pcm_s16le @ 000001f90cd85b40] Guessed Channel Layout: stereo
+2026-07-08 11:00:07,539 | INFO | [merge_task] output | Input #1, wav, from 'D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_1_instrumental.wav':
+2026-07-08 11:00:07,540 | INFO | [merge_task] output | Duration: 00:04:41.05, bitrate: 1411 kb/s
+2026-07-08 11:00:07,540 | INFO | [merge_task] output | Stream #1:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 44100 Hz, stereo, s16, 1411 kb/s
+2026-07-08 11:00:07,540 | INFO | [merge_task] output | Stream mapping:
+2026-07-08 11:00:07,540 | INFO | [merge_task] output | Stream #0:0 -> #0:0 (copy)
+2026-07-08 11:00:07,540 | INFO | [merge_task] output | Stream #1:0 -> #0:1 (pcm_s16le (native) -> aac (native))
+2026-07-08 11:00:07,540 | INFO | [merge_task] output | Press [q] to stop, [?] for help
+2026-07-08 11:00:07,543 | INFO | [merge_task] output | Output #0, mp4, to 'D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4':
+2026-07-08 11:00:07,543 | INFO | [merge_task] output | Metadata:
+2026-07-08 11:00:07,543 | INFO | [merge_task] output | major_brand     : isom
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | minor_version   : 512
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | compatible_brands: isomiso2avc1mp41
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | encoder         : Lavf61.5.101
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | Stream #0:0(und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1920x1080 [SAR 1:1 DAR 16:9], q=2-31, 1330 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | Metadata:
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | handler_name    : ISO Media file produced by Google Inc.
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | vendor_id       : [0][0][0][0]
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | Stream #0:1: Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, stereo, fltp, 192 kb/s
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | Metadata:
+2026-07-08 11:00:07,544 | INFO | [merge_task] output | encoder         : Lavc61.11.100 aac
+2026-07-08 11:00:08,576 | INFO | [merge_task] output | size=    7424KiB time=00:00:37.38 bitrate=1626.8kbits/s speed=71.8x
+2026-07-08 11:00:08,576 | INFO | [merge_task] status | Converting Video Layout... 13%
+2026-07-08 11:00:09,081 | INFO | [merge_task] output | size=   11776KiB time=00:01:01.11 bitrate=1578.5kbits/s speed=  59x
+2026-07-08 11:00:09,082 | INFO | [merge_task] status | Converting Video Layout... 21%
+2026-07-08 11:00:09,602 | INFO | [merge_task] output | size=   17152KiB time=00:01:27.42 bitrate=1607.2kbits/s speed=56.7x
+2026-07-08 11:00:09,603 | INFO | [merge_task] status | Converting Video Layout... 31%
+2026-07-08 11:00:10,110 | INFO | [merge_task] output | size=   22784KiB time=00:02:00.95 bitrate=1543.1kbits/s speed=58.7x
+2026-07-08 11:00:10,111 | INFO | [merge_task] status | Converting Video Layout... 43%
+2026-07-08 11:00:10,635 | INFO | [merge_task] output | size=   29952KiB time=00:02:36.73 bitrate=1565.5kbits/s speed=  61x
+2026-07-08 11:00:10,636 | INFO | [merge_task] status | Converting Video Layout... 55%
+2026-07-08 11:00:11,144 | INFO | [merge_task] output | size=   34304KiB time=00:03:01.51 bitrate=1548.2kbits/s speed=58.6x
+2026-07-08 11:00:11,145 | INFO | [merge_task] status | Converting Video Layout... 64%
+2026-07-08 11:00:11,659 | INFO | [merge_task] output | size=   40192KiB time=00:03:32.99 bitrate=1545.8kbits/s speed=59.1x
+2026-07-08 11:00:11,660 | INFO | [merge_task] status | Converting Video Layout... 75%
+2026-07-08 11:00:12,182 | INFO | [merge_task] output | size=   46848KiB time=00:04:07.96 bitrate=1547.7kbits/s speed=60.2x
+2026-07-08 11:00:12,184 | INFO | [merge_task] status | Converting Video Layout... 88%
+2026-07-08 11:00:12,249 | INFO | [merge_task] output | size=   52224KiB time=00:04:39.68 bitrate=1529.7kbits/s speed=60.2x
+2026-07-08 11:00:12,250 | INFO | [merge_task] status | Converting Video Layout... 99%
+2026-07-08 11:00:12,251 | INFO | [merge_task] output | [out#0/mp4 @ 000001f90cd61440] video:45633KiB audio:6843KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.353902%
+2026-07-08 11:00:12,251 | INFO | [merge_task] output | size=   52662KiB time=00:04:40.95 bitrate=1535.5kbits/s speed=59.7x
+2026-07-08 11:00:12,251 | INFO | [merge_task] status | Converting Video Layout... 99%
+2026-07-08 11:00:12,251 | INFO | [merge_task] output | [aac @ 000001f90cdcd740] Qavg: 584.276
+2026-07-08 11:00:12,255 | INFO | [merge_task] completion | success=True | out_path=D:/Entertainment/youtube-downloads/Srikanth/Downloads/Naguva Hoovellavu_Naguva Hoovellavu_1_instrumental_karaoke_merge.mp4 | exists=True
+2026-07-08 11:03:39,013 | INFO | [tasks] stop_all_tasks | active_count=0

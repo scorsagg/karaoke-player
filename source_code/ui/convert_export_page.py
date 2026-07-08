@@ -102,7 +102,171 @@ def create_convert_export_page():
 
     tabs.addTab(norm_tab, "📊 Normalization")
 
-    # Tab 3: Amplify & Export
+    # Tab 3: Vocal Separator
+    vocal_tab = QWidget()
+    vocal_layout = QVBoxLayout(vocal_tab)
+    vocal_layout.setContentsMargins(10, 10, 10, 10)
+
+    vocal_title = QLabel("<b>VOCAL SEPARATOR</b>")
+    vocal_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
+    vocal_layout.addWidget(vocal_title)
+
+    vocal_info = QLabel(
+        "Defaults to Demucs for higher quality vocal separation on Python 3.13. "
+        "A faster audio-separator UVR path is still available when speed matters more than quality."
+    )
+    vocal_info.setStyleSheet("color: #aaa; font-size: 11px;")
+    vocal_info.setWordWrap(True)
+    vocal_layout.addWidget(vocal_info)
+
+    vocal_source_label = QLabel(
+        "Demucs works best from the Python 3.13 environment. UVR/audio-separator remains available as a faster alternative."
+    )
+    vocal_source_label.setStyleSheet("color: #e67e22; font-size: 10px; font-style: italic;")
+    vocal_source_label.setWordWrap(True)
+    vocal_layout.addWidget(vocal_source_label)
+
+    model_row = QHBoxLayout()
+    model_row.addWidget(QLabel("Backend / Model:"))
+    vocal_model_combo = QComboBox()
+    vocal_model_combo.addItems([
+        "Demucs: htdemucs_ft (High Quality Default)",
+        "Demucs: htdemucs (Faster)",
+        "audio-separator: UVR-MDX-NET-Voc_FT.onnx (Fast)",
+        "audio-separator: UVR_MDXNET_KARA_2.onnx",
+    ])
+    model_row.addWidget(vocal_model_combo)
+    model_row.addStretch()
+    vocal_layout.addLayout(model_row)
+
+    target_row = QHBoxLayout()
+    target_row.addWidget(QLabel("Export:"))
+    vocal_target_combo = QComboBox()
+    vocal_target_combo.addItems([
+        "Instrumental only (Recommended)",
+        "Vocals only",
+        "Vocals + Instrumental",
+    ])
+    target_row.addWidget(vocal_target_combo)
+    target_row.addStretch()
+    vocal_layout.addLayout(target_row)
+
+    format_row = QHBoxLayout()
+    format_row.addWidget(QLabel("Output Format:"))
+    vocal_output_format_combo = QComboBox()
+    vocal_output_format_combo.addItems(["WAV", "FLAC", "MP3"])
+    format_row.addWidget(vocal_output_format_combo)
+    format_row.addStretch()
+    vocal_layout.addLayout(format_row)
+
+    vocal_fast_cb = QCheckBox("Fast mode (backend-specific speed tuning, lower quality)")
+    vocal_layout.addWidget(vocal_fast_cb)
+
+    recovery_row = QHBoxLayout()
+    recovery_row.addWidget(QLabel("Demucs Music Recovery:"))
+    vocal_recovery_combo = QComboBox()
+    vocal_recovery_combo.addItems([
+        "0% (Cleanest Vocal Removal)",
+        "10% (Balanced)",
+        "20% (More Music Under Vocals)",
+        "30% (Maximum Music Recovery)",
+    ])
+    vocal_recovery_combo.setCurrentIndex(1)
+    recovery_row.addWidget(vocal_recovery_combo)
+    recovery_row.addStretch()
+    vocal_layout.addLayout(recovery_row)
+
+    recovery_info = QLabel("Applies only to Demucs instrumental output. Higher values keep more music but may leave faint vocals.")
+    recovery_info.setStyleSheet("color: #888; font-size: 10px;")
+    recovery_info.setWordWrap(True)
+    vocal_layout.addWidget(recovery_info)
+
+    vocal_sep_btn = QPushButton("Separate Vocals")
+    vocal_sep_btn.setStyleSheet("background-color: #d35400; height: 35px; font-weight: bold; color: white;")
+    vocal_layout.addWidget(vocal_sep_btn)
+
+    vocal_status_label = QLabel("Ready. Load a file, then separate with Demucs or the faster UVR path.")
+    vocal_status_label.setStyleSheet("color: #888; font-size: 10px;")
+    vocal_layout.addWidget(vocal_status_label)
+    vocal_layout.addStretch()
+
+    tabs.addTab(vocal_tab, "🎤 Vocal Separator")
+
+    # Tab 4: Join & Merge
+    merge_tab = QWidget()
+    merge_layout = QVBoxLayout(merge_tab)
+    merge_layout.setContentsMargins(10, 10, 10, 10)
+
+    merge_title = QLabel("<b>JOIN & MERGE</b>")
+    merge_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
+    merge_layout.addWidget(merge_title)
+
+    merge_info = QLabel(
+        "Supports: video+audio merge (karaoke mux), audio+audio join, and video+video join. "
+        "Pick two input files and export a combined output."
+    )
+    merge_info.setStyleSheet("color: #aaa; font-size: 11px;")
+    merge_info.setWordWrap(True)
+    merge_layout.addWidget(merge_info)
+
+    merge_input_a_btn = QPushButton("Input A: Click to select")
+    merge_input_a_btn.setStyleSheet("background-color: #3a3a3a; color: white; height: 36px; font-weight: bold;")
+    merge_layout.addWidget(merge_input_a_btn)
+
+    merge_input_a_label = QLabel("Input A: Not selected")
+    merge_input_a_label.setStyleSheet("color: #bcbcbc; font-size: 11px; font-weight: bold;")
+    merge_input_a_label.setWordWrap(True)
+    merge_layout.addWidget(merge_input_a_label)
+
+    merge_input_b_btn = QPushButton("Input B: Click to select")
+    merge_input_b_btn.setStyleSheet("background-color: #3a3a3a; color: white; height: 36px; font-weight: bold;")
+    merge_layout.addWidget(merge_input_b_btn)
+
+    merge_input_b_label = QLabel("Input B: Not selected")
+    merge_input_b_label.setStyleSheet("color: #bcbcbc; font-size: 11px; font-weight: bold;")
+    merge_input_b_label.setWordWrap(True)
+    merge_layout.addWidget(merge_input_b_label)
+
+    merge_fmt_row = QHBoxLayout()
+    merge_fmt_row.addWidget(QLabel("Output Format:"))
+    merge_output_format_combo = QComboBox()
+    merge_output_format_combo.addItems(["Auto (Recommended)", "MP4", "MKV", "WAV", "MP3"])
+    merge_fmt_row.addWidget(merge_output_format_combo)
+    merge_fmt_row.addStretch()
+    merge_layout.addLayout(merge_fmt_row)
+
+    merge_mode_row = QHBoxLayout()
+    merge_mode_row.addWidget(QLabel("Join Behaviour:"))
+    merge_mode_combo = QComboBox()
+    merge_mode_combo.addItems([
+        "Auto (Type-based Default)",
+        "Append (A then B)",
+        "Overlay (A + B at same time)",
+    ])
+    merge_mode_row.addWidget(merge_mode_combo)
+    merge_mode_row.addStretch()
+    merge_layout.addLayout(merge_mode_row)
+
+    merge_mode_info = QLabel(
+        "Auto default: same-type inputs (audio+audio, video+video) use Append. "
+        "Mixed video+audio uses Overlay (karaoke mux)."
+    )
+    merge_mode_info.setStyleSheet("color: #888; font-size: 10px;")
+    merge_mode_info.setWordWrap(True)
+    merge_layout.addWidget(merge_mode_info)
+
+    merge_execute_btn = QPushButton("Join / Merge Now")
+    merge_execute_btn.setStyleSheet("background-color: #16a085; height: 35px; font-weight: bold; color: white;")
+    merge_layout.addWidget(merge_execute_btn)
+
+    merge_status_label = QLabel("Ready. Select two files to begin.")
+    merge_status_label.setStyleSheet("color: #888; font-size: 10px;")
+    merge_layout.addWidget(merge_status_label)
+    merge_layout.addStretch()
+
+    tabs.addTab(merge_tab, "🔗 Join & Merge")
+
+    # Tab 5: Amplify & Export
     amp_tab = QWidget()
     amp_layout = QVBoxLayout(amp_tab)
     amp_layout.setContentsMargins(10, 10, 10, 10)
@@ -215,6 +379,21 @@ def create_convert_export_page():
         "normalize_cb": normalize_cb,
         "normalize_lufs_combo": normalize_lufs_combo,
         "normalize_btn": normalize_btn,
+        "vocal_model_combo": vocal_model_combo,
+        "vocal_target_combo": vocal_target_combo,
+        "vocal_output_format_combo": vocal_output_format_combo,
+        "vocal_fast_cb": vocal_fast_cb,
+        "vocal_recovery_combo": vocal_recovery_combo,
+        "vocal_sep_btn": vocal_sep_btn,
+        "vocal_status_label": vocal_status_label,
+        "merge_input_a_btn": merge_input_a_btn,
+        "merge_input_a_label": merge_input_a_label,
+        "merge_input_b_btn": merge_input_b_btn,
+        "merge_input_b_label": merge_input_b_label,
+        "merge_output_format_combo": merge_output_format_combo,
+        "merge_mode_combo": merge_mode_combo,
+        "merge_execute_btn": merge_execute_btn,
+        "merge_status_label": merge_status_label,
         "amp_mode_group": amp_mode_group,
         "amp_factor_spin": amp_factor_spin,
         "amp_btn": amp_btn,

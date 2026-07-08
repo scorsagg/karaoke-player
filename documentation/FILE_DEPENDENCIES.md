@@ -144,13 +144,15 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 4. Download & Queue button completion
 5. Convert to 16:9 button completion
 
-### 9. AUDIO PROCESSING FEATURES (Features 6, 7, 8, 15) ✅ COMPLETE
+### 9. AUDIO PROCESSING FEATURES (Features 6, 7, 8, 15 + Dual-Backend Vocal Separation) ✅ COMPLETE
 **Status:** Fully Implemented & Enhanced in v3
 
 **Related files:**
 - `source_code/ui/audio_studio_page.py` → Audio Studio trimming UI with row-based ranges
-- `source_code/ui/convert_export_page.py` → Convert & Export (format conversion and normalization)
-- `source_code/main.py` → trim_audio(), convert_audio_format(), build_format_conversion_cmd() methods, audio overlay, history loading
+- `source_code/ui/convert_export_page.py` → Convert & Export (format conversion, normalization, vocal separator)
+- `source_code/main.py` → trim_audio(), convert_audio_format(), build_format_conversion_cmd(), start_audio_separator(), handle_audio_separator_completion() methods, audio overlay, history loading
+- `source_code/workers/audio_separator_thread.py` → Demucs + audio-separator CLI orchestration and optional video-audio extraction
+- `build_system/KaraokeStudioPro.spec` → hiddenimports for audio separator worker
 - `documentation/ARCHITECTURE.md` → Audio Processing section
 - `documentation/IMPLEMENTATION_LOG.md` → Features 6 & 7 + UX improvements entry
 
@@ -194,6 +196,38 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Amount spinner stays positive-only and uses 0.25 steps
 - Exported result auto-loads after processing, then resets the control back to the neutral baseline (`1.00x`)
 - Output naming uses readable suffixes such as `amp_up_5_times` and `amp_down_5_times`
+
+**Vocal Separator (Demucs Default + UVR Fast Alternative) ✅ COMPLETE**
+- Dedicated `Vocal Separator` tab is present in Convert & Export
+- Default backend/model is `Demucs: htdemucs_ft`
+- Faster alternative remains available via `audio-separator` UVR models
+- Fast mode applies backend-specific tuning: lower overlap and lighter Demucs chunk settings for quicker CPU inference
+- Demucs Music Recovery (0-30%) controls how much original mix is blended back into instrumental output to reduce over-erasure of voice-coupled instruments
+- Recovery blend is performed during numpy export to avoid extra large torch tensor copies that can destabilize long-track processing
+- Video inputs are pre-extracted to WAV with ffmpeg before separation
+- Requires the selected backend (`demucs` or `audio-separator`) to be installed in the active Python interpreter
+- Demucs uses the Python API with `soundfile` loading so the backend does not depend on the broken `torchcodec` runtime path
+- Demucs inference is launched in a subprocess runner so native torch/demucs failures do not terminate the main UI process
+- Demucs tqdm output is parsed and emitted as Qt `progress` updates so splash progress stays active during subprocess separation
+- Demucs progress status text now distinguishes download phase vs separation pass (n/m) with fixed denominator totals to avoid loop confusion when percentages restart
+- Worker cleanup is deferred until `QThread.finished` so completion handling can load the output safely
+
+**Join & Merge (Convert & Export) ✅ COMPLETE**
+- New `Join & Merge` tab in Convert & Export with two file selectors and output format chooser
+- Supported combinations: video+audio merge, audio+audio join, video+video join
+- Behavior selector: `Auto`, `Append`, `Overlay`
+- Auto defaults: same-type pairs append, mixed video+audio overlay
+- audio+audio supports both append (concat) and overlay (amix)
+- mixed video+audio also supports manual append mode (freeze-frame video extension + appended selected audio)
+- video+audio overlay replacement now explicitly drops source audio mapping to avoid original track retention
+- video+audio overlay replacement uses strict stream mapping (`0:v:0` + `1:a:0`) to mirror standard karaoke remux behavior
+- merge mode uses extension-first media typing to prevent audio-with-artwork misclassification as video
+- merge input UI now highlights selected A/B files on buttons and labels with full path tooltip for selection confidence
+- exact final ffmpeg command is shown before merge execution and logged for command parity verification
+- final merge command is auto-copied to clipboard (including on merge failure) for quick manual testing
+- video+audio command builder now enforces explicit pair-direction mapping so selected audio input cannot be replaced by selected video input
+- `main.py` resolves mode from `classify_media_type()` and builds ffmpeg commands accordingly
+- Uses existing async task pipeline with task key `merge_task`
 
 **UX Improvements ✅ COMPLETE**
 - **Audio Visualization Overlay:** Green glowing widget shows "🎵 Audio File Loaded" for audio-only files

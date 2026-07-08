@@ -38,6 +38,7 @@ a = Analysis(
         'vlc',
         'PySide6',
         'numpy',
+        'source_code.workers.audio_separator_thread',
         'source_code.services.file_loading_service',
         'source_code.ui.video_tools_page',
     ],
