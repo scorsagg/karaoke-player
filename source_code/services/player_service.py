@@ -195,12 +195,12 @@ class PlayerService(QObject):
                 print(f"[PlayerService.clear_media] ✓ Media object released")
             except Exception as e:
                 print(f"[PlayerService.clear_media] ⚠️  Error releasing media: {e}")
-        self._stopped = False
+        self._stopped = True
         
         print(f"[PlayerService.clear_media] ✓ EXIT")
 
     def stop(self):
-        """Stop playback, rewind to the beginning, and detach the video surface."""
+        """Stop playback, detach output, and release media so file locks are cleared."""
         import time
         print(f"[PlayerService.stop] 🛑 ENTRY")
         try:
@@ -255,6 +255,14 @@ class PlayerService(QObject):
 
                 self.detach_video_widget()
                 print(f"[PlayerService.stop] 🔌 Video widget detached")
+
+                # Release VLC's media binding so Windows file locks are dropped after Stop.
+                try:
+                    self._player.set_media(None)
+                    self._media = None
+                    print(f"[PlayerService.stop] 🗑️  Media reference cleared")
+                except Exception as e:
+                    print(f"[PlayerService.stop] ⚠️  Error clearing media reference: {e}")
 
                 try:
                     self._player.audio_set_mute(was_muted)

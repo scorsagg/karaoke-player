@@ -175,7 +175,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Demucs runs via the Python API using `soundfile`-loaded audio tensors, avoiding the failing `torchaudio.load()` + `torchcodec` CLI path
 - Demucs inference is executed in an isolated subprocess script to contain native crashes and keep the Qt app process alive
 - Demucs tqdm output is captured and translated into worker `progress` signals so the splash bar reflects active separation progress
-- Demucs status labels now expose phase context (model-file download vs separation pass counters) with fixed pass totals (for example `1/4`, `2/4`, `3/4`, `4/4`) so repeated percentage cycles are understandable
+- Demucs status labels now expose phase context (model-file download vs separation pass counters) with an up-front expected pass total and adaptive denominator expansion if extra loops appear, so repeated percentage cycles are understandable
 - The worker stays referenced until `QThread.finished` fires, preventing thread-destroyed crashes during auto-load of the output stem
 
 ### Convert & Export: Join & Merge Tab (updated 2026-07-08)
@@ -208,6 +208,34 @@ Convert & Export includes a dual-backend vocal separation workflow:
 
 - Pitch page live analyzer panel can be hidden without removing underlying widgets.
 - Convert & Export can hide the Amplify tab while preserving backend control references for compatibility.
+
+### Playback Timing Consistency (updated 2026-07-09)
+
+- On every new media load, timer/range controls are reset across both studio pages:
+    - Audio Studio: Audio Trimming + Playback Window
+    - Video Studio: Video Trimming + Playback Window
+- Default first-row values are synchronized to current media duration (`00:00 -> full length`).
+- Seekbar rendering in `main.py::update_ui()` uses elapsed-time ratio (`time/duration`) for more stable end-of-track visuals than raw VLC position.
+- End-of-track UI reset now uses elapsed-time threshold near media end to avoid early visual completion on some files.
+- `main.py::load_video()` now performs centralized media-type detection so direct Media Loader audio files are treated as audio-only for overlay/visual state.
+
+### Stop/Detach File Handle Release (updated 2026-07-09)
+
+- `services/player_service.py::stop()` now clears VLC media binding after detach (`set_media(None)` + local media ref clear).
+- This ensures Stop not only detaches the video surface but also releases source media file locks for delete/replace operations.
+
+### Global Studio Page Reset On Load (updated 2026-07-09)
+
+- `main.py::finish_loading()` now triggers a centralized UI reset path for studio pages.
+- Join & Merge selections are fully cleared on every new file load.
+- Studio tab selections (Audio Studio / Video Studio / Convert & Export) return to default tab 0.
+- Convert/Normalize/Vocal/Amplify controls are reset to baseline defaults before new operations.
+
+### Pitch Export Tempo Preservation (updated 2026-07-09)
+
+- Export pitch shifting in `main.py::export_video()` now uses explicit two-stage tempo handling (`atempo=1/pitch_factor` then `atempo=speed`) so pitch and speed remain independent.
+- Lowering pitch no longer implies slower tempo unless speed control is intentionally changed.
+- The export path now probes source audio sample rate and uses it for `asetrate/aresample` to avoid duration drift on 48 kHz or other non-44.1 kHz inputs.
 
 ---
 

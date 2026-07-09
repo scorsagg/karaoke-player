@@ -209,7 +209,7 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Demucs uses the Python API with `soundfile` loading so the backend does not depend on the broken `torchcodec` runtime path
 - Demucs inference is launched in a subprocess runner so native torch/demucs failures do not terminate the main UI process
 - Demucs tqdm output is parsed and emitted as Qt `progress` updates so splash progress stays active during subprocess separation
-- Demucs progress status text now distinguishes download phase vs separation pass (n/m) with fixed denominator totals to avoid loop confusion when percentages restart
+- Demucs progress status text now distinguishes download phase vs separation pass (n/m), announces expected total passes up-front, and grows the denominator if additional pass loops are detected
 - Worker cleanup is deferred until `QThread.finished` so completion handling can load the output safely
 
 **Join & Merge (Convert & Export) ✅ COMPLETE**
@@ -311,6 +311,65 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 **What changed:**
 - Pitch page live analyzer panel is hidden from the UI while retaining widget instances for runtime signal safety.
 - Convert & Export Amplify tab is hidden from the tab bar while retaining controls to avoid breaking existing `main.py` wiring.
+
+### 17. PLAYBACK TIMER RESET + SEEKBAR VISUAL SYNC (2026-07-09) ✅ COMPLETE
+**Files changed:** `source_code/main.py`
+
+**What changed:**
+- New-file load now resets timer/range controls across all related pages:
+  - Audio Studio: Audio Trimming + Playback Window
+  - Video Studio: Video Trimming + Playback Window
+- Default row values are reapplied using current media duration (`00:00` to full length).
+- Seekbar progress in `update_ui()` now uses elapsed-time ratio (`get_time()/get_length()`) instead of raw VLC position ratio.
+- End-of-track UI transition now keys off elapsed time near duration (`duration - 250ms`) to avoid early visual completion.
+- `load_video()` now auto-detects audio-only files so Media Loader direct audio loads get the same audio-overlay behavior as extracted/converted audio loads.
+
+**If modifying this area, also review:**
+- Playback update loop in `source_code/main.py::update_ui()`
+- File-load completion path in `source_code/main.py::finish_loading()`
+- Range-row reset helpers in `source_code/main.py` (`_reset_all_page_timers_on_load`, `_sync_all_page_timer_defaults_from_media`)
+
+### 18. STOP FILE-LOCK RELEASE (2026-07-09) ✅ COMPLETE
+**Files changed:** `source_code/services/player_service.py`
+
+**What changed:**
+- `PlayerService.stop()` now clears VLC media binding (`set_media(None)` + `_media = None`) after detaching output.
+- This releases source file handles more reliably after pressing Stop.
+- `PlayerService.clear_media()` now keeps player inactive state (`_stopped = True`).
+
+**If modifying this area, also review:**
+- `source_code/main.py::handle_stop()`
+- `source_code/services/file_loading_service.py` cleanup behavior (avoid regressions in load-cycle stability)
+
+### 19. FULL PAGE RESET ON NEW FILE LOAD (2026-07-09) ✅ COMPLETE
+**Files changed:** `source_code/main.py`
+
+**What changed:**
+- `finish_loading()` now resets page-specific controls for all studio pages on each new load.
+- Join & Merge now fully resets (input paths, selected styles/labels/tooltips, mode/output selectors, status text).
+- Audio/Video/Convert tab indexes reset to default first tab.
+- Convert/Normalize/Vocal/Amplify controls reset to baseline defaults.
+- Conversion target options are refreshed for the newly loaded media type.
+
+**If modifying this area, also review:**
+- `source_code/main.py::_reset_all_page_controls_on_load()`
+- `source_code/main.py::_reset_join_merge_controls()`
+- `source_code/main.py::finish_loading()`
+
+### 20. PITCH SHIFT TEMPO PRESERVATION (2026-07-09) ✅ COMPLETE
+**Files changed:** `source_code/main.py`
+
+**What changed:**
+- `export_video()` now uses explicit decoupled audio tempo correction:
+  - `asetrate=<input_sample_rate>*pf`
+  - `atempo=1/pf` (pitch compensation)
+  - `atempo=s` (user speed)
+- Prevents pitch-down exports from unintentionally sounding slower.
+- Added `get_audio_sample_rate_via_ffprobe()` helper to avoid sample-rate mismatch drift on non-44.1k inputs.
+
+**If modifying this area, also review:**
+- `source_code/main.py::export_video()`
+- `source_code/ui/pitch_page.py` speed/pitch controls
 
 ### 13. VIDEO TOOLS - RANGE-ROW VIDEO TRIMMING (2026-06-29) ✅ COMPLETE
 **Files changed:** `source_code/ui/video_tools_page.py`, `source_code/main.py`
