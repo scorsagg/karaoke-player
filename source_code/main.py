@@ -26,6 +26,7 @@ from source_code.services.player_service import PlayerService
 from source_code.services.download_service import DownloadService
 from source_code.services.audio_service import AudioService
 from source_code.services.file_loading_service import FileLoadingService
+from source_code.services.realtime_pitch_service import RealtimePitchService
 from source_code.ui.main_layout import create_main_layout
 from source_code.ui.extra_page import TimePickerWidget
 
@@ -97,6 +98,9 @@ class KaraokeApp(QWidget):
 
         # Initialize file loading service for thread-safe file operations
         self.file_loading_service = FileLoadingService(self.audio_service, self.player)
+
+        # Real-time pitch-shift service (ffmpeg decode -> SoundTouch -> sounddevice playback).
+        self.realtime_pitch = RealtimePitchService(ffmpeg_path=self.settings.get("ffmpeg_path", "ffmpeg"))
 
         # Initialize download service
         self.download_service = DownloadService(self.settings, ProcessThread)
@@ -257,6 +261,8 @@ class KaraokeApp(QWidget):
         self.speed_input = pitch_page_components["speed_input"]
         self.speed_plus = pitch_page_components["speed_plus"]
         self.speed_reset = pitch_page_components["speed_reset"]
+        self.realtime_pitch_toggle = pitch_page_components.get("realtime_pitch_toggle")
+        self.realtime_pitch_status = pitch_page_components.get("realtime_pitch_status")
         self.export_btn = pitch_page_components["export_btn"]
         
         extra_page_components = components["extra_page_components"]
@@ -382,7 +388,7 @@ class KaraokeApp(QWidget):
         media_loader_download_btn.clicked.connect(lambda: self.download_video())
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
         self.play_btn.clicked.connect(self.handle_play)
-        self.pause_btn.clicked.connect(self.player.pause)
+        self.pause_btn.clicked.connect(self.handle_pause)
         self.stop_btn.clicked.connect(self.handle_stop)
         self.back_btn.clicked.connect(lambda: self.jump_time(-10000))
         self.fwd_btn.clicked.connect(lambda: self.jump_time(10000))
@@ -391,6 +397,9 @@ class KaraokeApp(QWidget):
         self.seek_slider.sliderPressed.connect(self.on_slider_pressed)
         self.seek_slider.sliderReleased.connect(self.on_slider_released)
         self.speed_input.valueChanged.connect(lambda v: self.player.set_rate(v))
+        self.pitch_input.valueChanged.connect(self.set_pitch)
+        if self.realtime_pitch_toggle is not None:
+            self.realtime_pitch_toggle.toggled.connect(self.on_realtime_pitch_toggled)
         self.export_btn.clicked.connect(self.export_video)
         self.widen_exec_btn.clicked.connect(self.widen_active_video_canvas)
         audio_file_btn.clicked.connect(self.load_audio_tools_file)
@@ -461,6 +470,8 @@ class KaraokeApp(QWidget):
         self._current_export_media_kind = "unknown"
         self._smoothed_pitch_hz = None
         self._last_pitch_confidence = 0.0
+        self._realtime_pitch_apply_timer = None
+        self._refresh_realtime_pitch_status()
         # Tonic detection accumulator
         self._tonic_note_counts = {}   # note_class (0-11) -> count
         self._tonic_frames_collected = 0
@@ -1069,6 +1080,22 @@ class KaraokeApp(QWidget):
             if duration <= 0: return
             new_time = max(0, min(current + ms, duration - 1000))
             self.player.set_position(new_time / duration)
+            self._resync_realtime_audio_after_seek()
+
+    def _resync_realtime_audio_after_seek(self):
+        """After timeline seeks, restart shifted audio from current position when realtime mode is active."""
+        if not self._is_realtime_pitch_enabled():
+            return
+        try:
+            if not self.realtime_pitch.is_active():
+                return
+            if not self.player.is_active():
+                return
+        except Exception:
+            return
+
+        # Give VLC a moment to apply the seek target before restarting shifted stream.
+        QTimer.singleShot(120, lambda: self.play_shifted(start_from_current=True))
 
     def add_to_history(self, file_path):
         if not file_path or not os.path.exists(file_path): return
@@ -1120,6 +1147,13 @@ class KaraokeApp(QWidget):
     def load_video(self, file_path=None, splash_screen=None, is_audio_only=None):
         print(f"\n\n{'='*80}")
         print(f"[main.load_video] 🎬 ENTRY (file_path={file_path})")
+
+        # Loading a new file always terminates any active real-time shifted playback.
+        try:
+            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
+                self.realtime_pitch.stop()
+        except Exception:
+            pass
         
         if not file_path:
             print(f"[main.load_video] 📂 No file path provided, opening dialog...")
@@ -1215,15 +1249,18 @@ class KaraokeApp(QWidget):
             print(f"[main.load_video] ✓ finish_loading() complete")
 
             self.status_label.setText(f"Status: Playing {os.path.basename(self.video_path)}")
+            self._refresh_realtime_pitch_status()
 
         except Exception as e:
             self.log_exception("main.load_video", e)
             loader.close()
             self.status_label.setText("Status: Load failed")
+            self._refresh_realtime_pitch_status()
         finally:
             # Ensure file loading service is notified of completion
             print(f"[main.load_video] 🔚 Calling file_loading_service.finish_loading(resume_audio={was_playing})...")
             self.file_loading_service.finish_loading(resume_audio=was_playing)
+            self._refresh_realtime_pitch_status()
             print(f"[main.load_video] ✓ file_loading_service.finish_loading() complete")
             print(f"{'='*80}\n")
 
@@ -2004,6 +2041,142 @@ class KaraokeApp(QWidget):
         if ext in audio_exts:
             return "audio"
         return "unknown"
+
+    def load_file(self, path):
+        """Public API: load media for normal playback and real-time pitch workflow."""
+        if not path or not os.path.exists(path):
+            raise FileNotFoundError(f"Media file not found: {path}")
+
+        media_type = self.classify_media_type(path)
+        self.load_video(path, is_audio_only=(media_type == "audio"))
+        self.realtime_pitch.load_file(path)
+        self._refresh_realtime_pitch_status()
+
+    def _is_realtime_pitch_enabled(self):
+        return bool(self.realtime_pitch_toggle is not None and self.realtime_pitch_toggle.isChecked())
+
+    def _refresh_realtime_pitch_status(self):
+        if self.realtime_pitch_status is None:
+            return
+        if not self._is_realtime_pitch_enabled():
+            self.realtime_pitch_status.setText("Real-time pitch: OFF")
+            self.realtime_pitch_status.setStyleSheet("color: #888; font-size: 10px;")
+            return
+
+        if not self.video_path:
+            self.realtime_pitch_status.setText("Real-time pitch: ON (load a file)")
+            self.realtime_pitch_status.setStyleSheet("color: #f1c40f; font-size: 10px;")
+            return
+
+        if self.realtime_pitch.is_active():
+            self.realtime_pitch_status.setText(f"Real-time pitch: ACTIVE ({self.pitch_input.value():+.1f} st)")
+            self.realtime_pitch_status.setStyleSheet("color: #2ecc71; font-size: 10px; font-weight: bold;")
+        else:
+            self.realtime_pitch_status.setText("Real-time pitch: ON (press Play)")
+            self.realtime_pitch_status.setStyleSheet("color: #f1c40f; font-size: 10px;")
+
+    def on_realtime_pitch_toggled(self, enabled):
+        if not enabled:
+            try:
+                if self.realtime_pitch.is_active():
+                    self.realtime_pitch.stop()
+            except Exception:
+                pass
+
+            try:
+                self.player.set_mute(False)
+            except Exception:
+                pass
+
+            self._refresh_realtime_pitch_status()
+            return
+
+        if self.video_path:
+            self.realtime_pitch.load_file(self.video_path)
+
+        # If media is already playing, start shifted stream from current position.
+        if self.player.is_active() and self.video_path:
+            try:
+                self.play_shifted(start_from_current=True)
+            except Exception:
+                pass
+
+        self._refresh_realtime_pitch_status()
+
+    def set_pitch(self, semitones):
+        """Public API: set real-time pitch offset in semitones."""
+        try:
+            semitones = float(semitones)
+        except Exception:
+            semitones = 0.0
+
+        # Keep UI and engine in sync.
+        if hasattr(self, 'pitch_input') and self.pitch_input is not None:
+            self.pitch_input.blockSignals(True)
+            self.pitch_input.setValue(semitones)
+            self.pitch_input.blockSignals(False)
+
+        self.realtime_pitch.set_pitch(semitones)
+
+        # In toggle-enabled mode, apply updated pitch during active playback within ~1s.
+        if self._is_realtime_pitch_enabled() and self.video_path and self.player.is_active():
+            if self._realtime_pitch_apply_timer is None:
+                self._realtime_pitch_apply_timer = QTimer(self)
+                self._realtime_pitch_apply_timer.setSingleShot(True)
+                self._realtime_pitch_apply_timer.timeout.connect(
+                    lambda: self.play_shifted(start_from_current=True)
+                )
+            self._realtime_pitch_apply_timer.start(250)
+
+        self._refresh_realtime_pitch_status()
+
+    def play_shifted(self, start_from_current=False):
+        """Public API: play current media with real-time pitch-shifted audio.
+
+        For video inputs, VLC continues rendering video while its audio is muted and
+        the shifted audio is played through the low-latency sounddevice stream.
+        """
+        if not self.video_path:
+            QMessageBox.warning(self, "No File", "Load a file first")
+            return
+
+        self.realtime_pitch.load_file(self.video_path)
+
+        player_was_active = False
+        start_seconds = 0.0
+        if start_from_current:
+            try:
+                player_was_active = bool(self.player.is_active())
+                start_seconds = max(0.0, float(self.player.get_time() / 1000.0))
+            except Exception:
+                start_seconds = 0.0
+
+        try:
+            # Keep VLC timeline active and muted for both audio/video sources.
+            # Important: while live-retuning during active playback, do NOT reset media,
+            # otherwise UI timeline/seekbar jumps to 0 even though shifted audio starts later.
+            if start_from_current and player_was_active:
+                self.player.set_mute(True)
+            else:
+                self.player.set_media(os.path.abspath(self.video_path))
+                self.player.set_video_widget(int(self.video_frame.winId()))
+                self.player.set_mute(True)
+                if start_seconds > 0:
+                    self.player.set_time(int(start_seconds * 1000))
+                self.player.play()
+        except Exception as exc:
+            QMessageBox.warning(self, "Playback Sync", f"Could not start media timeline: {exc}")
+
+        try:
+            self.realtime_pitch.play_shifted(start_seconds=start_seconds)
+            self.audio_service.start_audio_monitoring()
+            self.status_label.setText(
+                f"Status: Real-time pitch playback ({self.realtime_pitch.pitch_semitones:+.1f} st)"
+            )
+            self._refresh_realtime_pitch_status()
+        except Exception as exc:
+            QMessageBox.warning(self, "Real-time Pitch", str(exc))
+            self._refresh_realtime_pitch_status()
 
     def refresh_conversion_targets(self, file_path=None):
         """Update Convert & Export target formats based on selected source or detected media type."""
@@ -3440,17 +3613,48 @@ class KaraokeApp(QWidget):
         if self.player.is_active():
             target = self.seek_slider.value() / 1000.0
             self.player.set_position(target)
+            self._resync_realtime_audio_after_seek()
             # Re-apply playback window start if user seeks back to zero
             if target == 0.0:
                 QTimer.singleShot(150, self.apply_playback_window)
 
     def handle_play(self):
         """Play button handler — applies Playback Window settings then plays."""
+        if self._is_realtime_pitch_enabled() and self.stack.currentIndex() == PAGE_PLAYBACK:
+            self.play_shifted(start_from_current=True)
+            return
+
         self.apply_playback_window()
+        try:
+            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
+                self.realtime_pitch.stop()
+        except Exception:
+            pass
+        try:
+            self.player.set_mute(False)
+        except Exception:
+            pass
         self.player.play()
+        self._refresh_realtime_pitch_status()
+
+    def handle_pause(self):
+        """Pause button handler — pause video and stop real-time shifted stream."""
+        self.player.pause()
+        try:
+            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
+                self.realtime_pitch.stop()
+        except Exception:
+            pass
+        self._refresh_realtime_pitch_status()
 
     def handle_stop(self):
         """Stop button handler — rewinds to the start and detaches VLC output."""
+        try:
+            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
+                self.realtime_pitch.stop()
+        except Exception:
+            pass
+
         self.player.stop()
         self.audio_service.stop_audio_monitoring()
         self._player_was_active = False
@@ -3460,6 +3664,7 @@ class KaraokeApp(QWidget):
             self.status_label.setText(f"Status: Stopped {os.path.basename(self.video_path)}")
         else:
             self.status_label.setText("Status: Stopped")
+        self._refresh_realtime_pitch_status()
 
     def apply_playback_window(self):
         """Apply active Playback Window settings: collect ranges, seek to first start, register first end cutoff."""
@@ -3795,9 +4000,15 @@ class KaraokeApp(QWidget):
     def closeEvent(self, event):
         """Handle window close event - proper cleanup is now in PlayerService.stop()"""
         try:
+            if hasattr(self, 'realtime_pitch') and self.realtime_pitch:
+                self.realtime_pitch.stop()
+        except Exception:
+            pass
+
+        try:
             # Stop player (uses pause-based cleanup to prevent VLC hang)
-            if hasattr(self, 'player_service') and self.player_service:
-                self.player_service.stop()
+            if hasattr(self, 'player') and self.player:
+                self.player.stop()
         except Exception as e:
             print(f"Error stopping player on close: {e}")
         

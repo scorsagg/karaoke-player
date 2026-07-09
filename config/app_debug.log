@@ -5657,3 +5657,13 @@ RuntimeError: shape '[1, 4, -1, 343980]' is invalid for input of size 2822400
 2026-07-09 22:19:24,621 | INFO | [exporter] output | [aac @ 000001d43340d200] Qavg: 463.740
 2026-07-09 22:19:24,635 | INFO | [exporter] completion | success=True | out_path=D:/Entertainment/youtube-downloads/Srikanth/Downloads/Aayirathil oruthiyamma nee-karaoke_down_1.mp4 | exists=True
 2026-07-09 22:22:18,147 | INFO | [tasks] stop_all_tasks | active_count=0
+2026-07-09 22:41:58,937 | INFO | [app] debug logger initialized
+2026-07-09 22:43:06,677 | INFO | [tasks] stop_all_tasks | active_count=0
+2026-07-09 23:46:50,741 | INFO | [app] debug logger initialized
+2026-07-09 23:47:36,669 | INFO | [tasks] stop_all_tasks | active_count=0
+2026-07-09 23:52:31,587 | INFO | [app] debug logger initialized
+2026-07-09 23:57:26,463 | INFO | [tasks] stop_all_tasks | active_count=0
+2026-07-10 00:02:28,719 | INFO | [app] debug logger initialized
+2026-07-10 00:05:09,567 | INFO | [tasks] stop_all_tasks | active_count=0
+2026-07-10 00:07:17,228 | INFO | [app] debug logger initialized
+2026-07-10 00:09:04,776 | INFO | [tasks] stop_all_tasks | active_count=0

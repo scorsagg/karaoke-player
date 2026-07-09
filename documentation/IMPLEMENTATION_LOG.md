@@ -1,5 +1,115 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Real-Time Pause/Resume Playback Fix (2026-07-10) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+In real-time pitch mode, pressing Pause then Play restarted from beginning, making Pause behave like Stop.
+
+### Fix
+- Updated `handle_play()` realtime path to call `play_shifted(start_from_current=True)`.
+- Resume now starts shifted stream from current timeline position instead of forcing `0s`.
+
+### Result
+- Pause now behaves correctly: Play resumes from paused position in realtime mode.
+
+# Change: Real-Time Pitch Seek/Skip Resync Fix (2026-07-10) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+With real-time pitch mode enabled, seeking with slider or using +/-10s controls moved VLC timeline, but shifted audio stream continued from old position.
+
+### Fix
+- Added `_resync_realtime_audio_after_seek()` in `main.py`.
+- Triggered resync after:
+   - slider release seek (`on_slider_released()`)
+   - skip/jump controls (`jump_time()` used by -10/+10 buttons)
+- Resync uses short delayed restart (`QTimer.singleShot(120ms)`) of shifted stream from current playback timeline.
+
+### Result
+- In real-time pitch mode, both slider seeks and +/-10s skips now keep shifted audio aligned with displayed timeline position.
+
+# Change: Real-Time Retune Seekbar Continuity Fix (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+When changing pitch during active real-time playback, shifted audio resumed from current timestamp but VLC seekbar jumped to `00:00`.
+
+### Fix
+- Updated `play_shifted(start_from_current=True)` behavior:
+   - If VLC is already active, do not call `set_media()` during retune.
+   - Keep existing VLC timeline running and muted.
+   - Restart only shifted audio stream from current timestamp.
+
+### Result
+- During live retune, seekbar/time label now stays aligned with current playback position instead of resetting to zero.
+
+# Change: Pitch Page Real-Time Toggle + Live Apply (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/pitch_page.py`, `source_code/main.py`, `source_code/services/realtime_pitch_service.py`
+
+### Problem
+User requested real-time pitch shifting to be controlled from the Pitch page and only enabled when explicitly confirmed via UI mode toggle.
+
+### Fix
+- Added Pitch page controls:
+   - `Real-time Pitch Mode` checkbox
+   - status label (`OFF`, `ON`, `ACTIVE`)
+- Added toggle-gated runtime behavior in `main.py`:
+   - real-time stream starts only when toggle is ON
+   - Play on Pitch page routes through shifted playback only when toggle is ON
+   - toggle OFF stops shifted stream and returns to normal VLC audio path
+- Improved live pitch apply response:
+   - pitch value updates are debounced (~250 ms)
+   - when playing, shifted stream restarts from current position for fast perceived apply
+- Updated real-time backend to support decode start offset (`play_shifted(start_seconds=...)`) for near-current-position restarts.
+- Replaced unavailable `pysoundtouch` backend with FFmpeg filter streaming backend (`asetrate + aresample + atempo`) piped directly to `sounddevice`.
+- Removed `pysoundtouch` and `ffmpeg-python` from runtime requirements to restore install compatibility.
+
+### Result
+- Real-time pitch is now explicit opt-in from Pitch page.
+- While playing with toggle ON, pitch changes apply within approximately one second and continue playback.
+- `pip install -r documentation/requirements.txt` no longer depends on unavailable `pysoundtouch` package.
+
+# Change: Real-Time Pitch Shift Playback Pipeline (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/services/realtime_pitch_service.py`, `source_code/main.py`, `build_system/KaraokeStudioPro.spec`, `documentation/requirements.txt`
+
+### Problem
+Pitch shifting was available in export workflows, but users requested low-latency real-time pitch-shifted playback for loaded media.
+
+### Fix
+- Added new service: `RealtimePitchService` in `source_code/services/realtime_pitch_service.py`.
+- Real-time pipeline implemented as:
+   - decode via `ffmpeg-python` to PCM float32 stream,
+   - pitch shift via `pysoundtouch` (`SoundTouch`),
+   - low-latency playback via `sounddevice`.
+- Added KaraokeApp public APIs in `main.py`:
+   - `load_file(path)`
+   - `set_pitch(semitones)`
+   - `play_shifted()`
+- For video inputs, `play_shifted()` keeps VLC video active while muting VLC audio and routing shifted audio through the real-time stream.
+- Lifecycle guards added so load/stop/pause/close terminate active real-time streams cleanly.
+- Added build/runtime dependency entries:
+   - spec hidden import: `source_code.services.realtime_pitch_service`
+   - requirements: `ffmpeg-python`, `pysoundtouch`
+
+### Result
+- App now supports live pitch-shifted playback with responsive controls and video-sync-compatible routing for karaoke workflows.
+
 # Change: Pitch Shift Tempo Preservation Fix (2026-07-09) - COMPLETE ✅
 
 **Status:** Implemented
