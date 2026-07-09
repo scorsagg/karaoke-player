@@ -198,6 +198,23 @@ config/
 - This prevents pitch-down operations from unintentionally reducing song speed.
 - Export now reads source audio sample rate via ffprobe and avoids hardcoded 44.1 kHz pitch base, fixing slowdown on 48 kHz sources.
 
+### Real-Time Pitch Shift Playback ✅ (updated 2026-07-09)
+- Added low-latency real-time pitch-shift playback pipeline:
+   - FFmpeg decode + filter pipeline (`asetrate + aresample + atempo`)
+   - Audio output via `sounddevice`
+- New app-level methods in `source_code/main.py`:
+   - `load_file(path)`
+   - `set_pitch(semitones)`
+   - `play_shifted()`
+- Pitch page now includes a `Real-time Pitch Mode` toggle; shifted playback is used only when this toggle is ON.
+- With toggle ON and active playback, changing pitch applies quickly by restarting shifted audio from current timeline position (target within ~1 second).
+- Live retune keeps VLC timeline continuous (no active-media rebind), so seekbar/time labels do not jump back to `00:00`.
+- In realtime mode, slider seeks and +/-10s skip controls now resync shifted audio to the new timeline position.
+- In realtime mode, Pause then Play resumes from paused position (not from start).
+- For video inputs, VLC keeps video playback while app mutes VLC audio and outputs shifted audio stream.
+- Added service module: `source_code/services/realtime_pitch_service.py`
+- Runtime requirements remain installable without `pysoundtouch`/`ffmpeg-python` dependencies.
+
 ### Feature: Playback Stop / Detach ✅
 - The playback bar includes a dedicated Stop button next to Play and Pause
 - Stop rewinds playback to time zero, detaches VLC from the widget, and marks playback inactive

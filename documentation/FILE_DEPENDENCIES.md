@@ -371,6 +371,47 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - `source_code/main.py::export_video()`
 - `source_code/ui/pitch_page.py` speed/pitch controls
 
+### 21. REAL-TIME PITCH SHIFT PLAYBACK (2026-07-09) ✅ COMPLETE
+**Files changed:** `source_code/services/realtime_pitch_service.py`, `source_code/main.py`, `build_system/KaraokeStudioPro.spec`, `documentation/requirements.txt`
+
+**What changed:**
+- Added real-time pitch pipeline service using FFmpeg audio filters and `sounddevice` output:
+  - FFmpeg decode + pitch/tempo filter chain (`asetrate + aresample + atempo`)
+  - low-latency playback (`sounddevice`)
+- Compatibility update:
+  - Removed `pysoundtouch` and `ffmpeg-python` from runtime requirements due package availability constraints.
+- Added app-level APIs in `main.py`:
+  - `load_file(path)`
+  - `set_pitch(semitones)`
+  - `play_shifted()`
+- Pitch page integration:
+  - `Real-time Pitch Mode` toggle gates shifted playback activation
+  - Shifted playback path is used from Pitch page Play only when toggle is ON
+  - toggle OFF cleanly returns to normal VLC audio playback path
+- Live change behavior:
+  - While playing and toggle is ON, pitch changes are applied with a short debounce and restart from current timeline position for near-1s response.
+  - During live retune, VLC media is not rebound if already active, preventing seekbar reset to `00:00`.
+  - Slider seek and +/-10s skip actions now trigger shifted-audio resync from current timeline position.
+  - Pause/Play resume path now restarts shifted stream from current timeline position (not from start).
+- Video sync behavior:
+  - video remains rendered by VLC,
+  - VLC audio is muted,
+  - shifted audio plays from the real-time stream.
+- Added load/stop/pause/close lifecycle cleanup to avoid parallel audio pipelines.
+
+**If modifying this area, also review:**
+- `source_code/main.py::play_shifted()`
+- `source_code/main.py::_resync_realtime_audio_after_seek()`
+- `source_code/main.py::jump_time()`
+- `source_code/main.py::on_slider_released()`
+- `source_code/main.py::on_realtime_pitch_toggled()`
+- `source_code/main.py::handle_pause()`
+- `source_code/main.py::handle_stop()`
+- `source_code/ui/pitch_page.py`
+- `source_code/services/realtime_pitch_service.py`
+- `build_system/KaraokeStudioPro.spec` hiddenimports
+- `documentation/requirements.txt` runtime dependencies
+
 ### 13. VIDEO TOOLS - RANGE-ROW VIDEO TRIMMING (2026-06-29) ✅ COMPLETE
 **Files changed:** `source_code/ui/video_tools_page.py`, `source_code/main.py`
 

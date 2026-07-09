@@ -1,7 +1,7 @@
 """Pitch and speed control page UI component"""
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QLabel, QDoubleSpinBox, QFrame, QSizePolicy)
+                               QLabel, QDoubleSpinBox, QFrame, QSizePolicy, QCheckBox)
 from PySide6.QtCore import Qt
 
 
@@ -181,11 +181,25 @@ def create_pitch_page():
         s_row.addWidget(w)
     s_row.addStretch()
 
+    rt_row = QHBoxLayout()
+    realtime_pitch_toggle = QCheckBox("Real-time Pitch Mode")
+    realtime_pitch_toggle.setChecked(False)
+    realtime_pitch_toggle.setStyleSheet("color: #ddd; font-size: 12px; font-weight: bold;")
+
+    realtime_pitch_status = QLabel("Real-time pitch: OFF")
+    realtime_pitch_status.setStyleSheet("color: #888; font-size: 10px;")
+
+    rt_row.addWidget(realtime_pitch_toggle)
+    rt_row.addSpacing(10)
+    rt_row.addWidget(realtime_pitch_status)
+    rt_row.addStretch()
+
     export_btn = QPushButton("Export Unified Master Render File")
     export_btn.setStyleSheet("background-color: #0e639c; height: 45px; font-weight: bold; color: white;")
 
     layout.addLayout(p_row)
     layout.addLayout(s_row)
+    layout.addLayout(rt_row)
     layout.addWidget(export_btn)
     layout.addStretch()
 
@@ -207,5 +221,7 @@ def create_pitch_page():
         "speed_input": speed_input,
         "speed_plus": speed_plus,
         "speed_reset": speed_reset,
+        "realtime_pitch_toggle": realtime_pitch_toggle,
+        "realtime_pitch_status": realtime_pitch_status,
         "export_btn": export_btn
     }

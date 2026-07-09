@@ -9,6 +9,7 @@ Karaoke Studio Pro v3 is a feature-rich cross-platform karaoke application built
 - **Media Engine**: python-vlc (VLC bindings for playback)
 - **Audio Capture**: sounddevice (real-time audio stream analysis)
 - **Audio Processing**: numpy (RMS calculation, SPL conversion, buffer management)
+- **Real-time DSP**: FFmpeg filter streaming + sounddevice (live pitch-shift stream)
 - **YouTube Downloads**: yt-dlp (media downloader)
 - **Video Encoding**: FFmpeg (transcoding and processing)
 - **Build System**: PyInstaller (creates standalone executables)
@@ -73,7 +74,8 @@ source_code/
 │   ├── player_service.py          # VLC playback abstraction
 │   ├── download_service.py        # YouTube/stream download service
 │   ├── file_loading_service.py    # Safe load lifecycle + cleanup coordination
-│   └── audio_service.py           # Audio analysis integration + helper commands
+│   ├── audio_service.py           # Audio analysis integration + helper commands
+│   └── realtime_pitch_service.py  # FFmpeg->SoundTouch->sounddevice live pitch pipeline
 │
 ├── ui/
 │   ├── __init__.py
@@ -236,6 +238,25 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Export pitch shifting in `main.py::export_video()` now uses explicit two-stage tempo handling (`atempo=1/pitch_factor` then `atempo=speed`) so pitch and speed remain independent.
 - Lowering pitch no longer implies slower tempo unless speed control is intentionally changed.
 - The export path now probes source audio sample rate and uses it for `asetrate/aresample` to avoid duration drift on 48 kHz or other non-44.1 kHz inputs.
+
+### Real-Time Pitch Shift Playback (updated 2026-07-09)
+
+- Added `RealtimePitchService` (`source_code/services/realtime_pitch_service.py`) for low-latency live pitch-shift playback.
+- Pipeline:
+    - input decode through FFmpeg to float32 PCM frames,
+    - real-time pitch/tempo transform via FFmpeg filter chain (`asetrate + aresample + atempo`),
+    - stream output via `sounddevice`.
+- `main.py` exposes integration methods:
+    - `load_file(path)`
+    - `set_pitch(semitones)`
+    - `play_shifted()`
+- Pitch page now includes an explicit `Real-time Pitch Mode` toggle that gates this pathway.
+- For video sources, VLC continues video rendering while app mutes VLC audio and plays shifted audio through the real-time stream.
+- Playback lifecycle hooks (`load_video`, pause, stop, close) stop the real-time stream to prevent duplicate audio pipelines.
+- During active playback with toggle ON, pitch changes are applied through a short debounce and stream restart at current timeline position for near-immediate audible updates.
+- Retune path preserves VLC timeline state (no media rebind when already active), so seekbar/time display remains continuous during pitch changes.
+- Slider seeks and +/-10s jump controls also trigger shifted-audio resync so realtime audio remains aligned with VLC timeline after seeking.
+- Pause/Play in realtime mode now resumes from current timeline position instead of restarting from beginning.
 
 ---
 

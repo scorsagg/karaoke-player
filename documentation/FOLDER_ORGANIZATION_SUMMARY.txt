@@ -23,7 +23,8 @@
 │  │  ├─ player_service.py        (VLC player abstraction)
 │  │  ├─ download_service.py      (YouTube/stream downloads)
 │  │  ├─ audio_service.py         (Audio analyzer management & coordination)
-│  │  └─ file_loading_service.py  (Thread-safe file loading with state coordination)
+│  │  ├─ file_loading_service.py  (Thread-safe file loading with state coordination)
+│  │  └─ realtime_pitch_service.py (FFmpeg->SoundTouch->sounddevice real-time pitch playback)
 │  │
 │  ├─ 📁 ui/ (NEW - Modularized UI Components)
 │  │  ├─ __init__.py              (UI package exports)
@@ -237,6 +238,15 @@ Build Standalone Executable (v3):
    • Export pitch shift now applies explicit tempo compensation so lowering pitch does not slow song speed
    • Speed control remains independent and applies only when intentionally changed
    • Source audio sample rate is now probed (no hardcoded 44.1 kHz), fixing slowdown on 48 kHz files
+✅ Real-Time Pitch Shift Playback (2026-07-09):
+   • Added live pitch pipeline (FFmpeg decode/filter processing -> sounddevice output)
+   • New app methods available in main window controller: load_file(path), set_pitch(semitones), play_shifted()
+   • Pitch page now includes Real-time Pitch Mode toggle; shifted playback is active only when enabled
+   • While playing with mode ON, pitch changes apply rapidly from current timeline position
+   • Live retune no longer resets seekbar/time display to 00:00 while audio continues from current position
+   • Slider seek and +/-10s skip now resync shifted audio to the new timeline position
+   • Pause then Play now resumes from the paused position in realtime mode
+   • For video inputs, VLC video stays active while shifted audio is played from low-latency external stream
        - Worker reference is released only after `QThread.finished` to prevent destruction during output auto-load
       • Join & Merge (2026-07-08): Convert & Export tab for two-input media combination
          - video+audio: mux karaoke output video
