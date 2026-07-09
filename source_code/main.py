@@ -260,6 +260,7 @@ class KaraokeApp(QWidget):
         self.export_btn = pitch_page_components["export_btn"]
         
         extra_page_components = components["extra_page_components"]
+        self.audio_tools_tabs = extra_page_components.get("tabs")
         # Audio Tools File Loader controls
         audio_file_btn = extra_page_components["audio_file_btn"]
         self.audio_file_status = extra_page_components["audio_file_status"]
@@ -279,6 +280,7 @@ class KaraokeApp(QWidget):
         self.audio_amp_status_label = extra_page_components.get("amp_status_label")
         # Convert & Export controls
         convert_export_components = components["convert_export_page_components"]
+        self.convert_export_tabs = convert_export_components.get("tabs")
         self.convert_source_combo = convert_export_components["convert_source_combo"]
         self.convert_target_combo = convert_export_components["convert_target_combo"]
         self.convert_quality_combo = convert_export_components["convert_quality_combo"]
@@ -1115,7 +1117,7 @@ class KaraokeApp(QWidget):
         self.extra_tools_container.setVisible(self.extra_tools_is_expanded)
         self.extra_tools_toggle_btn.setText(f"{'▼' if self.extra_tools_is_expanded else '▶'} 🧭 Studios")
 
-    def load_video(self, file_path=None, splash_screen=None, is_audio_only=False):
+    def load_video(self, file_path=None, splash_screen=None, is_audio_only=None):
         print(f"\n\n{'='*80}")
         print(f"[main.load_video] 🎬 ENTRY (file_path={file_path})")
         
@@ -1130,6 +1132,13 @@ class KaraokeApp(QWidget):
                 return
             file_path = f
             print(f"[main.load_video] ✓ File selected: {file_path}")
+
+        # Keep audio-only UI behavior consistent regardless of load entry point.
+        detected_audio_only = self.classify_media_type(file_path) == "audio"
+        if is_audio_only is None:
+            is_audio_only = detected_audio_only
+        elif detected_audio_only and not is_audio_only:
+            is_audio_only = True
 
         # Create/show splash as early as possible so users can see progress during preparation.
         if splash_screen is None:
@@ -1222,8 +1231,10 @@ class KaraokeApp(QWidget):
         self.pitch_input.setValue(0.0)
         self.speed_input.setValue(1.0)
         self._reset_pitch_display()
-        # Reset playback window on every new file load
-        self.clear_playback_window()
+        # Reset all time-picker based controls on every new file load.
+        self._reset_all_page_timers_on_load()
+        # Reset all page-specific controls/statuses on every new file load.
+        self._reset_all_page_controls_on_load(is_audio_only)
         if self.video_path: self.filename_label.setText(f"Playing: {os.path.basename(self.video_path)}")
 
         loader.set_progress(100, "Ready")
@@ -1253,15 +1264,149 @@ class KaraokeApp(QWidget):
         else:
             self.hide_audio_visualization()
 
-        # Set initial playback window defaults: first row start=0, end=media length
+        # Ensure timer rows match currently loaded media duration.
+        self._sync_all_page_timer_defaults_from_media()
+
+    def _reset_rows_to_single_range(self, container, add_row_fn, default_start=0, default_end=0):
+        """Reset a range-row container to one row with provided defaults."""
+        if container is None or not callable(add_row_fn):
+            return
+
+        layout = container.layout()
+        if layout is None:
+            return
+
+        while layout.count() > 0:
+            item = layout.takeAt(0)
+            row = item.widget()
+            if row:
+                row.deleteLater()
+
+        add_row_fn(int(default_start), int(default_end))
+
+    def _reset_all_page_timers_on_load(self):
+        """Reset all timer/range controls across Audio Studio and Video Studio pages."""
+        # Reset stateful playback-window runtime guards.
+        self._pw_end_ms = None
+        self._pw_ranges = []
+        self._pw_range_idx = 0
+
+        # Reset all range-based timer UIs to a single default row.
+        self._reset_rows_to_single_range(self.video_trim_ranges_container, self.video_trim_add_range, 0, 0)
+        self._reset_rows_to_single_range(self.audio_trim_ranges_container, self.audio_trim_add_range, 0, 0)
+        self._reset_rows_to_single_range(self.video_pw_ranges_container, self.video_pw_add_range, 0, 0)
+        self._reset_rows_to_single_range(self.audio_pw_ranges_container, self.audio_pw_add_range, 0, 0)
+
+        # Keep status labels consistent after reset.
+        self.video_trim_status_label.setText("Ready to trim video")
+        self.audio_trim_status_label.setText("Ready to trim audio")
+        self.video_pw_status_label.setText("No playback window active")
+        self.video_pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
+        if self.audio_pw_status_label is not None:
+            self.audio_pw_status_label.setText("No playback window active")
+            self.audio_pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
+
+    def _set_first_row_end_to_duration(self, container, duration_seconds):
+        """Set first row to 00:00 -> media duration for range-row containers."""
+        if container is None:
+            return
+
+        layout = container.layout()
+        if layout is None or layout.count() == 0:
+            return
+
+        row = layout.itemAt(0).widget()
+        if row is None:
+            return
+
+        pickers = row.findChildren(TimePickerWidget)
+        if len(pickers) < 2:
+            return
+
+        pickers[0].set_total_seconds(0)
+        pickers[1].set_total_seconds(max(0, int(duration_seconds)))
+
+    def _reset_join_merge_controls(self):
+        """Reset Join & Merge tab inputs, labels, and mode/output controls."""
+        self.merge_input_a_path = ""
+        self.merge_input_b_path = ""
+        self._last_merge_cmd_text = ""
+
+        self.merge_input_a_btn.setText("Input A: Click to select")
+        self.merge_input_a_btn.setStyleSheet("background-color: #3a3a3a; color: white; height: 36px; font-weight: bold;")
+        self.merge_input_a_btn.setToolTip("")
+        self.merge_input_a_label.setText("Input A: Not selected")
+        self.merge_input_a_label.setStyleSheet("color: #bcbcbc; font-size: 11px; font-weight: bold;")
+        self.merge_input_a_label.setToolTip("")
+
+        self.merge_input_b_btn.setText("Input B: Click to select")
+        self.merge_input_b_btn.setStyleSheet("background-color: #3a3a3a; color: white; height: 36px; font-weight: bold;")
+        self.merge_input_b_btn.setToolTip("")
+        self.merge_input_b_label.setText("Input B: Not selected")
+        self.merge_input_b_label.setStyleSheet("color: #bcbcbc; font-size: 11px; font-weight: bold;")
+        self.merge_input_b_label.setToolTip("")
+
+        self.merge_output_format_combo.setCurrentIndex(0)
+        self.merge_mode_combo.setCurrentIndex(0)
+        self.merge_status_label.setText("Ready. Select two files to begin.")
+        self.merge_status_label.setToolTip("")
+
+    def _reset_all_page_controls_on_load(self, is_audio_only):
+        """Reset tab selection and control defaults across all studio pages on new load."""
+        if self.audio_tools_tabs is not None:
+            self.audio_tools_tabs.setCurrentIndex(0)
+        if self.video_tools_tabs is not None:
+            self.video_tools_tabs.setCurrentIndex(0)
+        if self.convert_export_tabs is not None:
+            self.convert_export_tabs.setCurrentIndex(0)
+
+        # Reset trim/export format selectors to defaults.
+        self.trim_format_combo.setCurrentIndex(0)
+        self.video_trim_format_combo.setCurrentIndex(0)
+        self.extract_format_combo.setCurrentIndex(0)
+
+        # Reset Convert & Export controls.
+        self.convert_source_combo.setCurrentIndex(0)
+        self.convert_quality_combo.setCurrentIndex(1)
+        self.normalize_cb.setChecked(True)
+        self.normalize_lufs_combo.setCurrentIndex(0)
+
+        # Reset Vocal Separator controls/status.
+        self.vocal_model_combo.setCurrentIndex(0)
+        self.vocal_target_combo.setCurrentIndex(0)
+        self.vocal_output_format_combo.setCurrentIndex(0)
+        self.vocal_fast_cb.setChecked(False)
+        self.vocal_recovery_combo.setCurrentIndex(1)
+        self.vocal_status_label.setText("Ready. Load a file, then separate with Demucs or the faster UVR path.")
+
+        # Reset Join & Merge controls (requested behavior).
+        self._reset_join_merge_controls()
+
+        # Reset amplify export controls/status.
+        self._reset_export_amplify_factor(os.path.basename(self.video_path) if self.video_path else None)
+        self.amp_status_label.setText("Ready to amplify")
+
+        # Reset Audio Studio file status so stale operation tags are cleared.
+        if is_audio_only and self.video_path:
+            self.audio_file_status.setText(f"✅ {os.path.basename(self.video_path)} (Audio)")
+        else:
+            self.audio_file_status.setText("No file loaded")
+
+        # Keep conversion targets in sync with currently loaded media type.
+        self.refresh_conversion_targets(self.video_path)
+
+    def _sync_all_page_timer_defaults_from_media(self):
+        """Apply loaded media duration to default rows on all timer pages."""
         try:
             total_ms = max(0, int(self.player.get_length()))
             total_s = total_ms // 1000
-            self._initialize_playback_window_row(self.video_pw_ranges_container, total_s)
-            if getattr(self, 'audio_pw_ranges_container', None) is not None:
-                self._initialize_playback_window_row(self.audio_pw_ranges_container, total_s)
         except Exception:
-            pass
+            total_s = 0
+
+        self._set_first_row_end_to_duration(self.video_trim_ranges_container, total_s)
+        self._set_first_row_end_to_duration(self.audio_trim_ranges_container, total_s)
+        self._set_first_row_end_to_duration(self.video_pw_ranges_container, total_s)
+        self._set_first_row_end_to_duration(self.audio_pw_ranges_container, total_s)
 
     def _set_active_playback_window_controls(self, page_idx=None):
         """Bind playback-window helpers to the active page's controls (audio or video studio)."""
@@ -1568,6 +1713,32 @@ class KaraokeApp(QWidget):
         except:
             return 0
 
+    def get_audio_sample_rate_via_ffprobe(self, target_path):
+        """Return first audio stream sample-rate, falling back to 44100."""
+        if not os.path.exists(target_path):
+            return 44100
+        try:
+            cmd = [
+                self.settings["ffprobe_path"],
+                "-v", "error",
+                "-select_streams", "a:0",
+                "-show_entries", "stream=sample_rate",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                target_path,
+            ]
+            startupinfo = None
+            if sys.platform == "win32":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, text=True, timeout=3)
+            sample_rate = int(float((res.stdout or "").strip()))
+            if sample_rate <= 0:
+                return 44100
+            return sample_rate
+        except Exception:
+            return 44100
+
     def export_video(self):
         if not self.video_path: return
 
@@ -1581,13 +1752,11 @@ class KaraokeApp(QWidget):
 
         s, p = self.speed_input.value(), self.pitch_input.value()
         pf = 2**(p/12)
-        tempo_val = s / pf
-
-        atempo_list = []
-        curr_t = tempo_val
-        while curr_t > 2.0: atempo_list.append("atempo=2.0"); curr_t /= 2.0
-        while curr_t < 0.5: atempo_list.append("atempo=0.5"); curr_t /= 0.5
-        atempo_list.append(f"atempo={round(curr_t, 4)}")
+        # Keep pitch and tempo controls decoupled:
+        # 1) asetrate changes pitch+tempo by pf
+        # 2) atempo=1/pf restores original tempo
+        # 3) atempo=s applies requested speed control
+        pitch_comp = 1.0 / pf
 
         # Build output filename from original file name + pitch/speed tokens
         orig_name = os.path.splitext(os.path.basename(self.video_path))[0]
@@ -1618,9 +1787,10 @@ class KaraokeApp(QWidget):
         out = os.path.join(self.settings["download_directory"], out_name)
         abs_in = os.path.abspath(self.video_path).replace("\\", "/")
         abs_out = os.path.abspath(out).replace("\\", "/")
+        input_sr = self.get_audio_sample_rate_via_ffprobe(abs_in)
 
         cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-filter_complex", 
-               f"[0:v]setpts=PTS/{s}[v];[0:a]asetrate=44100*{pf},aresample=44100,{','.join(atempo_list)}[a]", 
+               f"[0:v]setpts=PTS/{s}[v];[0:a]asetrate={input_sr}*{pf},aresample={input_sr},atempo={pitch_comp:.6f},atempo={s:.6f}[a]", 
                "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-b:v", "2000k", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", abs_out]
 
         duration = self.get_video_duration_via_ffprobe(abs_in) / s
@@ -3219,14 +3389,15 @@ class KaraokeApp(QWidget):
                 self._player_was_active = True
                 dur = self.player.get_length()
                 if dur > 0 and not self.is_user_sliding:
-                    pos = self.player.get_position()
-                    self.seek_slider.setValue(int(pos * 1000))
                     ms = self.player.get_time()
-                    self.time_label.setText(f"{max(0, (ms//1000)//60):02d}:{(ms//1000)%60:02d}")
+                    safe_ms = max(0, int(ms))
+                    seek_ratio = min(1.0, float(safe_ms) / float(dur)) if dur > 0 else 0.0
+                    self.seek_slider.setValue(int(seek_ratio * 1000))
+                    self.time_label.setText(f"{(safe_ms//1000)//60:02d}:{(safe_ms//1000)%60:02d}")
                     self.duration_label.setText(f"{(dur//1000)//60:02d}:{(dur//1000)%60:02d}")
                     # Playback Window: stop at end cutoff
                     pw_end_ms = getattr(self, '_pw_end_ms', None)
-                    if pw_end_ms is not None and ms >= pw_end_ms:
+                    if pw_end_ms is not None and safe_ms >= pw_end_ms:
                         # If there are more ranges queued, advance to next range
                         ranges = getattr(self, '_pw_ranges', []) or []
                         idx = getattr(self, '_pw_range_idx', 0)
@@ -3249,7 +3420,7 @@ class KaraokeApp(QWidget):
                             self.time_label.setText("00:00")
                             self.pw_status_label.setText("Playback window ended")
                             QTimer.singleShot(100, self.player.stop)
-                    elif pos >= 0.99:
+                    elif safe_ms >= max(0, int(dur) - 250):
                         self.audio_service.stop_audio_monitoring()
                         self._player_was_active = False
                         self.seek_slider.setValue(0)

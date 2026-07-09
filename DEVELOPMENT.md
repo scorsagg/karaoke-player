@@ -177,6 +177,27 @@ config/
 - Settings are cleared automatically on every new file load (`clear_playback_window()`)
 - Timer loop in `update_ui()` enforces the end-cutoff via `_pw_end_ms`
 
+### Playback Timeline Reliability ✅ (updated 2026-07-09)
+- New media load now resets all timer/range controls across Audio Studio and Video Studio tabs.
+- Timer defaults are synchronized to loaded media length (`00:00 -> duration`) to avoid stale values from prior tracks.
+- Seekbar progress now derives from elapsed-time ratio (`get_time()/get_length()`), improving visual sync near media end.
+- End-of-track UI completion threshold now uses elapsed time close to full duration to reduce early visual ending.
+- `load_video()` now auto-detects audio-only inputs so direct Media Loader audio files consistently show audio overlay state.
+
+### Stop Lock-Release Behavior ✅ (updated 2026-07-09)
+- Stop now clears VLC media binding in `player_service.py` after detaching output, so files can be deleted/replaced after Stop.
+- This is distinct from file-loading cleanup logic, which still avoids risky stop paths during load transitions.
+
+### Full Page Reset On New Load ✅ (updated 2026-07-09)
+- New file loads now reset page-specific controls across Audio Studio, Video Studio, and Convert & Export.
+- Join & Merge input picks and visual selected states are cleared on each new file.
+- Studio tabs return to default first tab and conversion/separator/amplify controls reset to baseline values.
+
+### Pitch/Speed Decoupled Export ✅ (updated 2026-07-09)
+- Export path now preserves tempo when pitch changes by applying explicit pitch compensation (`atempo=1/pf`) and then user speed (`atempo=s`).
+- This prevents pitch-down operations from unintentionally reducing song speed.
+- Export now reads source audio sample rate via ffprobe and avoids hardcoded 44.1 kHz pitch base, fixing slowdown on 48 kHz sources.
+
 ### Feature: Playback Stop / Detach ✅
 - The playback bar includes a dedicated Stop button next to Play and Pause
 - Stop rewinds playback to time zero, detaches VLC from the widget, and marks playback inactive
@@ -209,7 +230,7 @@ config/
 - New `Demucs Music Recovery` control blends 0-30% of original mix back into the instrumental stem to preserve accompaniment under vocals (at the cost of possible faint vocal bleed)
 - Recovery blending is applied during stem export using numpy arrays to avoid additional large torch tensor allocations and reduce crash risk on long tracks
 - Demucs now executes inside an isolated subprocess worker script; if torch/demucs crashes natively, the main app process remains alive and shows a controlled task error
-- Splash status text is phase-aware for Demucs (`Downloading model files`, `Running separation pass n/m`, `Applying music recovery`) and now uses a fixed expected total (for example `1/4` to `4/4`) instead of changing denominators
+- Splash status text is phase-aware for Demucs (`Downloading model files`, `Running separation pass n/m`, `Applying music recovery`) and now announces expected passes up-front while allowing the denominator to expand if additional pass loops are detected
 - Thread lifetime is finalized on `QThread.finished` so output auto-load does not destroy the worker before it fully exits
 
 ### Feature: Join & Merge Tab ✅

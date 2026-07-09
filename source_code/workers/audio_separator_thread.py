@@ -207,6 +207,7 @@ def main():
     model.cpu()
     model.eval()
 
+    shifts = 1 if fast_mode else 2
     pass_total = 1
     try:
         if hasattr(model, "models") and model.models is not None:
@@ -214,6 +215,7 @@ def main():
     except Exception:
         pass_total = 1
     print(f"DEMUCS_PASS_TOTAL={pass_total}", flush=True)
+    print(f"DEMUCS_EXPECTED_PASSES={max(1, pass_total * shifts)}", flush=True)
 
     wav_np, sr = sf.read(prepared_audio, always_2d=True, dtype="float32")
     if sr != int(model.samplerate):
@@ -228,7 +230,6 @@ def main():
     else:
         std = torch.tensor(1.0, dtype=wav.dtype)
 
-    shifts = 1 if fast_mode else 2
     overlap = 0.1 if fast_mode else 0.25
     segment = 8 if fast_mode else None
 
@@ -364,6 +365,14 @@ if __name__ == "__main__":
                     except Exception:
                         separation_total = 1
 
+                expected_match = re.search(r"demucs_expected_passes=(\d+)", lower_line)
+                if expected_match:
+                    try:
+                        separation_total = max(1, int(expected_match.group(1)))
+                        self.status_update.emit(f"Running Demucs separation (pass {separation_pass}/{separation_total})...")
+                    except Exception:
+                        pass
+
                 match = re.search(r"(\d{1,3})%", line)
                 if match:
                     percent = max(0, min(100, int(match.group(1))))
@@ -378,7 +387,7 @@ if __name__ == "__main__":
                         if last_separation_percent >= 80 and percent <= 20:
                             separation_pass += 1
                         if separation_pass > separation_total:
-                            separation_pass = separation_total
+                            separation_total = separation_pass
                         last_separation_percent = percent
 
                         ui_progress = 60 + int(percent * 0.28)

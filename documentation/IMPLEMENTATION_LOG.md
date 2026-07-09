@@ -1,5 +1,123 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Pitch Shift Tempo Preservation Fix (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Pitch reduction during export could be perceived as reducing playback speed; tempo was not consistently preserved.
+
+### Fix
+- Updated `export_video()` audio filter chain to decouple pitch compensation from speed control:
+   - `asetrate=44100*pf`
+   - `atempo=1/pf` (restore original tempo)
+   - `atempo=s` (apply explicit user speed)
+- This replaces the combined tempo calculation path with explicit two-stage tempo control.
+- Added audio sample-rate probing via ffprobe and replaced hardcoded `44100` in pitch export chain with source stream sample rate.
+- Export chain now uses `asetrate=<input_sr>*pf,aresample=<input_sr>,atempo=1/pf,atempo=s`.
+
+### Result
+- Reducing pitch now preserves tempo unless user explicitly changes speed.
+- 48 kHz source files no longer experience hidden ~8.1% slowdown caused by 44.1 kHz hardcoded pitch base.
+
+# Change: Full Page State Reset on New File Load (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+After loading a new file, some page states (especially Join & Merge selections and Convert/Export controls) retained previous values.
+
+### Fix
+- Added centralized new-load reset path in `finish_loading()` via `_reset_all_page_controls_on_load(is_audio_only)`.
+- Added `_reset_join_merge_controls()` to clear:
+   - input paths
+   - selected button styles/text
+   - labels/tooltips
+   - mode/output selectors
+   - status/command cache
+- Reset page/tab defaults across Audio Studio, Video Studio, and Convert & Export tabs.
+- Reset conversion/normalization/vocal/amplify selectors and status labels to baseline defaults.
+- Kept conversion target options synchronized to currently loaded media after reset.
+
+### Result
+- Loading any new file now starts all pages from a clean UI baseline, including Join & Merge.
+
+# Change: Stop Now Releases File Lock (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/services/player_service.py`
+
+### Problem
+After pressing Stop, some media files remained locked by VLC, so deleting/moving them from Windows Explorer could fail.
+
+### Fix
+- Updated `PlayerService.stop()` to clear VLC's bound media reference (`set_media(None)` + `_media = None`) after detaching the video widget.
+- Updated `PlayerService.clear_media()` to keep player inactive state (`_stopped = True`) after media release.
+
+### Result
+- Pressing Stop now releases playback file handles more reliably, enabling delete/replace workflows after stopping.
+
+# Change: Media Loader Audio Overlay Consistency Fix (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Directly loading an audio file from Media Loader could show a blank video area instead of the audio overlay, while converted/extracted audio showed the overlay correctly.
+
+### Fix
+- Updated `load_video()` to auto-detect audio-only inputs using `classify_media_type()`.
+- If detected media is audio-only, `is_audio_only` is forced true even when caller did not pass the flag.
+
+### Result
+- Audio overlay now appears consistently for audio files loaded from Media Loader, history, conversions, and extraction flows.
+
+# Change: Global Timer Reset on File Load + Seekbar End-Sync Fix (2026-07-09) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+- Timer controls on studio pages could retain stale values from a previously loaded file.
+- Seekbar progress used VLC position ratio, which could visually reach end before playback truly finished on some media.
+
+### Fix
+- Added a load-time reset path that clears and reinitializes all timer/range controls across:
+   - Audio Studio: Audio Trimming + Playback Window
+   - Video Studio: Video Trimming + Playback Window
+- Default rows are rebuilt on every load and synchronized to current media duration (`00:00 -> media end`).
+- Updated UI progress calculation to derive seekbar position from `current_time / duration` instead of raw VLC position.
+- End-of-track visual stop condition now follows elapsed time threshold (`time >= duration - 250ms`).
+
+### Result
+- Loading a new file consistently resets timer controls across all relevant pages.
+- Seekbar and elapsed-time label stay visually aligned with actual playback until true media end.
+
+# Change: Demucs Pass Counter Overflow Fix (2026-07-08) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`
+
+### Problem
+Demucs progress could continue into additional loops after the displayed denominator reached `4/4`, so the splash status looked stuck at `4/4` while more passes were still running.
+
+### Fix
+- Demucs subprocess now emits `DEMUCS_EXPECTED_PASSES=<n>` so the UI can start with a better up-front pass estimate.
+- Parent worker now parses that expected total and no longer clamps the pass counter at the prior denominator.
+- If more loop resets are detected than expected, the denominator is expanded dynamically so status stays truthful (`pass x/x` grows as needed).
+
+### Result
+- Progress text no longer gets pinned at `4/4` during additional loops.
+- Users see a more accurate total earlier and still get correct pass numbers if Demucs runs extra iterations.
+
 # Change: Merge Command Clipboard Copy UX Fix (2026-07-08) - COMPLETE ✅
 
 **Status:** Implemented

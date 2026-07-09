@@ -217,7 +217,26 @@ Build Standalone Executable (v3):
        - Demucs path uses Python API + soundfile input loading to avoid torchaudio/torchcodec CLI failures
       - Demucs inference runs in an isolated subprocess so native crashes do not terminate the main app
        - Demucs tqdm output is parsed into worker progress signals so the splash bar updates continuously
-      - Demucs status messaging now shows download phase and fixed separation pass counters (for example 1/4 through 4/4)
+      - Demucs status messaging now shows download phase with expected separation passes up-front and adaptive pass counters when extra loops are detected
+
+✅ Playback Timing Reliability (2026-07-09):
+   • On each new file load, timer/range controls reset across Audio Studio and Video Studio pages
+   • Default timer rows are re-synced to loaded media duration (00:00 to media end)
+   • Seekbar progression now uses elapsed playback time ratio for more accurate end-of-song visuals
+   • Direct Media Loader audio file loads now auto-detect as audio-only and show the same audio overlay visuals
+
+✅ Stop File-Lock Release (2026-07-09):
+   • Stop now detaches output and clears VLC media binding so source files can be deleted/replaced after pressing Stop
+
+✅ Full Page Reset On New Load (2026-07-09):
+   • New file load resets Join & Merge selections and clears selected input styles/status
+   • Audio Studio / Video Studio / Convert & Export tabs reset to default first tab
+   • Convert/Normalize/Vocal/Amplify controls reset to baseline defaults each load
+
+✅ Pitch Tempo Preservation (2026-07-09):
+   • Export pitch shift now applies explicit tempo compensation so lowering pitch does not slow song speed
+   • Speed control remains independent and applies only when intentionally changed
+   • Source audio sample rate is now probed (no hardcoded 44.1 kHz), fixing slowdown on 48 kHz files
        - Worker reference is released only after `QThread.finished` to prevent destruction during output auto-load
       • Join & Merge (2026-07-08): Convert & Export tab for two-input media combination
          - video+audio: mux karaoke output video
