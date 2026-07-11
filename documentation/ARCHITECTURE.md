@@ -171,7 +171,8 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Faster alternative backend: `audio-separator` with UVR MDX models
 - Default target: instrumental-only export for karaoke workflows
 - Optional `Fast mode` applies backend-specific tuning for speed
-- Optional `Demucs Music Recovery` (0-30%) blends a controlled portion of original mix into instrumental output to retain instruments under vocals
+- Optional `Demucs Music Recovery` now includes finer low-end presets (`0, 3, 5, 7, 10, 15, 20, 30%`) for subtler accompaniment recovery
+- Recovery mode now offers `Standard blend`, `Side-heavy recovery`, and `Center-aware recovery` to restore more accompaniment while limiting center-vocal bleed
 - Recovery blend is applied in export-time numpy space (not extra torch graph tensors) to keep memory usage stable on longer inputs
 - Video inputs are converted to WAV first via ffmpeg, then passed into the chosen separator backend
 - Demucs runs via the Python API using `soundfile`-loaded audio tensors, avoiding the failing `torchaudio.load()` + `torchcodec` CLI path
@@ -179,6 +180,8 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Demucs tqdm output is captured and translated into worker `progress` signals so the splash bar reflects active separation progress
 - Demucs status labels now expose phase context (model-file download vs separation pass counters) with an up-front expected pass total and adaptive denominator expansion if extra loops appear, so repeated percentage cycles are understandable
 - The worker stays referenced until `QThread.finished` fires, preventing thread-destroyed crashes during auto-load of the output stem
+- Packaged/offline runtime shows a persistent warning (plus one-time dialog) and enforces backend+model preflight checks before starting separation
+- Source/local runtime does not enforce cached-model preflight, allowing normal first-use model download when internet is available
 
 ### Convert & Export: Join & Merge Tab (updated 2026-07-08)
 
@@ -194,6 +197,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Manual override is available for mixed video+audio append mode: video timeline is extended with freeze-frame and selected audio is appended.
 - Mixed video+audio overlay replacement uses explicit ffmpeg stream mapping to keep only selected video and selected replacement audio in output.
 - Overlay path follows strict replacement mapping (`0:v:0` + `1:a:0`) with copied video and replaced audio.
+- Mixed video+audio Overlay now supports a user-defined audio start offset (`0.0s` default) that delays replacement audio cue while video timeline remains unchanged.
 - Join mode classification is extension-first for media pairing to avoid MP3/embedded-artwork false video classification.
 - Merge input controls now provide high-visibility selected states (button text + label + tooltip path) so users can verify A/B file picks before processing.
 - Join & Merge presents the exact final ffmpeg command before execution and records it in logs for reproducible troubleshooting.
@@ -220,6 +224,11 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Seekbar rendering in `main.py::update_ui()` uses elapsed-time ratio (`time/duration`) for more stable end-of-track visuals than raw VLC position.
 - End-of-track UI reset now uses elapsed-time threshold near media end to avoid early visual completion on some files.
 - `main.py::load_video()` now performs centralized media-type detection so direct Media Loader audio files are treated as audio-only for overlay/visual state.
+- `main.py::handle_play()` and `main.py::on_slider_released()` now rebind media automatically when prior stop/end paths released VLC media, so replay after completion remains reliable.
+- End-of-track display now clamps the final half-second to full duration label to avoid visible one-second under-reporting.
+- `main.py::on_slider_released()` stores a pending seek target when inactive/end-state and `main.py::handle_play()` applies it after playback starts once timing info is available.
+- `main.py::apply_playback_window()` now treats a single full-track range (`00:00 -> duration`) as no active window, preventing unintended rewind-on-play.
+- `main.py::_ensure_media_loaded_for_playback()` now forces a media rebind when VLC reports `Ended` state, because this state can appear loaded but may ignore seek/play until rebound.
 
 ### Stop/Detach File Handle Release (updated 2026-07-09)
 

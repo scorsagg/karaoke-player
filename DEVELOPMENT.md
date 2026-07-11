@@ -183,6 +183,10 @@ config/
 - Seekbar progress now derives from elapsed-time ratio (`get_time()/get_length()`), improving visual sync near media end.
 - End-of-track UI completion threshold now uses elapsed time close to full duration to reduce early visual ending.
 - `load_video()` now auto-detects audio-only inputs so direct Media Loader audio files consistently show audio overlay state.
+- Natural end-of-track no longer forces hard stop media-clear from the UI loop; replay, seek-then-play, and pause/stop/play after completion now recover correctly.
+- Final half-second label clamping now shows full duration at track end (prevents visible `mm:ss` underflow such as `4:40` for a `4:41` track).
+- Inactive-state slider seeks are now deferred and applied immediately after Play starts; full-track playback-window rows are treated as inactive so they do not force rewind to `00:00` on Play.
+- Ended VLC state now triggers explicit media rebind before playback actions, so seek/play and +/-10 operations work immediately after natural completion without requiring manual Stop first.
 
 ### Stop Lock-Release Behavior ✅ (updated 2026-07-09)
 - Stop now clears VLC media binding in `player_service.py` after detaching output, so files can be deleted/replaced after Stop.
@@ -244,10 +248,13 @@ config/
 - `Fast mode` applies backend-specific speed tuning
 - Demucs backend now runs through the Python API with `soundfile` input loading, avoiding the failing `torchaudio`/`torchcodec` CLI load path
 - Demucs tqdm console output is parsed in `audio_separator_thread.py` and bridged into Qt progress signals so the splash progress bar moves during separation
-- New `Demucs Music Recovery` control blends 0-30% of original mix back into the instrumental stem to preserve accompaniment under vocals (at the cost of possible faint vocal bleed)
+- `Demucs Music Recovery` now offers finer presets (`0, 3, 5, 7, 10, 15, 20, 30%`) so accompaniment can be restored more gradually
+- New `Recovery Mode` options (`Standard`, `Side-heavy`, `Center-aware`) give better karaoke tradeoffs when center vocals and accompaniment overlap
 - Recovery blending is applied during stem export using numpy arrays to avoid additional large torch tensor allocations and reduce crash risk on long tracks
 - Demucs now executes inside an isolated subprocess worker script; if torch/demucs crashes natively, the main app process remains alive and shows a controlled task error
 - Splash status text is phase-aware for Demucs (`Downloading model files`, `Running separation pass n/m`, `Applying music recovery`) and now announces expected passes up-front while allowing the denominator to expand if additional pass loops are detected
+- Packaged runtime keeps the offline team-build warning path (banner + one-time popup) and refuses launch when required backend packages or cached models are missing locally
+- Source/local runtime now allows first-use backend/model downloads and does not block launch just because local model cache is empty
 - Thread lifetime is finalized on `QThread.finished` so output auto-load does not destroy the worker before it fully exits
 
 ### Feature: Join & Merge Tab ✅
@@ -265,6 +272,8 @@ config/
 - Video+audio overlay replacement now enforces explicit stream mapping (`0:v:0` + `1:a:0`) and excludes source audio tracks to prevent accidental dual-audio outputs.
 - Video+audio overlay now uses strict ffmpeg replacement mapping equivalent to:
    - `-map 0:v:0 -map 1:a:0 -c:v copy -shortest`
+- Join & Merge now includes `Overlay Audio Start Offset (sec)` for mixed `video+audio` Overlay mode only (default `0.0s`).
+- Positive offset delays replacement audio start (lyric lead-in cue) while video still starts at `00:00`.
 - Join & Merge media typing now uses extension-first classification for merge mode to avoid treating audio files with embedded artwork streams as video.
 - Join & Merge input selectors now show selected filename directly on each button with clear selected styling, plus readable full path text/tooltip.
 - Join & Merge now displays the exact final ffmpeg command before execution and logs it (`[merge_task] final_cmd`) for command-line parity debugging.

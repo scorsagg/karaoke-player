@@ -77,6 +77,7 @@ FEATURES
 │ 📊  Audio Level Monitoring  - Real-time visualization (~60-90 dB SPL)     │
 │ ⚙️  Configurable Threshold   - Auto-reduce at custom level for rooms       │
 │ 🎚️  Playback Control        - Play, pause, seek, speed adjustment         │
+│ 🎤  Vocal Separator         - Visible in app, but not bundled for offline  │
 │ 💾  Settings                - Save preferences and history                │
 └────────────────────────────────────────────────────────────────────────────┘
 
@@ -140,6 +141,12 @@ NOTE: Auto-reduce prevents excessive audio spikes and hearing damage!
    ✓ Try a different video
    ✓ Ensure download directory has enough disk space
 
+❌ Vocal Separator Not Available Offline
+   ✓ This team build keeps Vocal Separator visible, but separator backends/models are not bundled
+   ✓ First use may require internet access and additional backend/model downloads
+   ✓ Offline team machines will show a warning and refuse separator launch safely if requirements are missing
+   ✓ Playback, export, and other bundled features continue to work offline
+
 ❌ Video Playback Issues
    ✓ Check file format is supported (MP4, MKV, AVI, WebM)
    ✓ Try a different video file
@@ -163,7 +170,8 @@ This package includes all necessary components:
 ✓ PySide6             - Qt6 GUI framework
 ✓ Python Libraries    - numpy, sounddevice, and more
 
-No additional installations needed!
+No additional installations needed for the bundled core app features.
+Vocal Separator is the exception: it is visible in the UI but is not guaranteed offline in the team build because separator backends/models are not bundled.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  SUPPORT & UPDATES
