@@ -6,6 +6,8 @@ import time
 import json
 import logging
 import traceback
+import shutil
+import importlib.util
 from pathlib import Path
 
 # Add parent directory to path so we can import source_code as a module
@@ -47,6 +49,7 @@ class KaraokeApp(QWidget):
         self.download_splash = None
         self.export_splash = None
         self._download_from_audio_tools = False
+        self._vocal_offline_dialog_shown = False
 
         self.init_settings_manager()
 
@@ -110,6 +113,8 @@ class KaraokeApp(QWidget):
 
         # Auto-reduce tracking
         self.auto_reduce_active = False
+        self._player_was_active = False
+        self._pending_seek_ratio = None
 
     def init_settings_manager(self):
         app_dir = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(__file__).parent.parent
@@ -300,6 +305,9 @@ class KaraokeApp(QWidget):
         self.vocal_output_format_combo = convert_export_components["vocal_output_format_combo"]
         self.vocal_fast_cb = convert_export_components["vocal_fast_cb"]
         self.vocal_recovery_combo = convert_export_components["vocal_recovery_combo"]
+        self.vocal_recovery_mode_combo = convert_export_components["vocal_recovery_mode_combo"]
+        self.vocal_offline_warning_label = convert_export_components["vocal_offline_warning_label"]
+        self.vocal_offline_warning_label.setVisible(self._should_enforce_vocal_offline_preflight())
         self.vocal_sep_btn = convert_export_components["vocal_sep_btn"]
         self.vocal_status_label = convert_export_components["vocal_status_label"]
         self.merge_input_a_btn = convert_export_components["merge_input_a_btn"]
@@ -308,6 +316,7 @@ class KaraokeApp(QWidget):
         self.merge_input_b_label = convert_export_components["merge_input_b_label"]
         self.merge_output_format_combo = convert_export_components["merge_output_format_combo"]
         self.merge_mode_combo = convert_export_components["merge_mode_combo"]
+        self.merge_audio_offset_spin = convert_export_components["merge_audio_offset_spin"]
         self.merge_execute_btn = convert_export_components["merge_execute_btn"]
         self.merge_status_label = convert_export_components["merge_status_label"]
         self.amp_factor_spin = convert_export_components["amp_factor_spin"]
@@ -432,6 +441,7 @@ class KaraokeApp(QWidget):
         self.merge_input_b_btn.clicked.connect(self.select_merge_input_b)
         self.merge_execute_btn.clicked.connect(self.execute_join_merge)
         self.merge_mode_combo.currentTextChanged.connect(lambda _v: self._update_merge_status_hint())
+        self.merge_audio_offset_spin.valueChanged.connect(lambda _v: self._update_merge_status_hint())
         self.amp_btn.clicked.connect(self.amplify_export_media)
         self.convert_source_combo.currentTextChanged.connect(lambda _v: self.refresh_conversion_targets())
 
@@ -1074,13 +1084,63 @@ class KaraokeApp(QWidget):
         self.pitch_source_label.setText("Source: Playback audio analysis (smoothed)")
 
     def jump_time(self, ms):
-        if self.player.is_active():
+        if not self.player.is_active() and not self._ensure_media_loaded_for_playback():
+            return
+        if self.player.has_media() or self.player.is_active():
             current = self.player.get_time()
             duration = self.player.get_length()
             if duration <= 0: return
-            new_time = max(0, min(current + ms, duration - 1000))
+            new_time = max(0, min(current + ms, duration - 1))
             self.player.set_position(new_time / duration)
             self._resync_realtime_audio_after_seek()
+
+    def _ensure_media_loaded_for_playback(self):
+        """Rebind media when a prior stop/end path has released VLC's active media reference."""
+        needs_rebind = False
+        try:
+            if not self.player.has_media():
+                needs_rebind = True
+            elif hasattr(self.player, 'is_ended') and self.player.is_ended():
+                # Ended state can look loaded but ignore seek/play until media is rebound.
+                needs_rebind = True
+        except Exception:
+            needs_rebind = True
+
+        if not needs_rebind:
+            return True
+
+        if not self.video_path or not os.path.exists(self.video_path):
+            return False
+
+        try:
+            self.player.set_media(self.video_path)
+            return True
+        except Exception as e:
+            self.log_debug(f"[playback_rebind] failed for {self.video_path}: {e}")
+            return False
+
+    def _apply_pending_seek_after_play(self, retries=10):
+        """Apply a deferred seek target after Play when media timing is available."""
+        pending = getattr(self, '_pending_seek_ratio', None)
+        if pending is None:
+            return
+
+        dur = int(self.player.get_length()) if self.player else -1
+        if dur <= 0 and retries > 0:
+            QTimer.singleShot(90, lambda: self._apply_pending_seek_after_play(retries - 1))
+            return
+
+        target = max(0.0, min(float(pending), 1.0))
+        try:
+            if dur > 0:
+                self.player.set_time(int(target * dur))
+            else:
+                self.player.set_position(target)
+        except Exception:
+            pass
+
+        self._pending_seek_ratio = None
+        self._resync_realtime_audio_after_seek()
 
     def _resync_realtime_audio_after_seek(self):
         """After timeline seeks, restart shifted audio from current position when realtime mode is active."""
@@ -1385,6 +1445,7 @@ class KaraokeApp(QWidget):
 
         self.merge_output_format_combo.setCurrentIndex(0)
         self.merge_mode_combo.setCurrentIndex(0)
+        self.merge_audio_offset_spin.setValue(0.0)
         self.merge_status_label.setText("Ready. Select two files to begin.")
         self.merge_status_label.setToolTip("")
 
@@ -1413,7 +1474,9 @@ class KaraokeApp(QWidget):
         self.vocal_target_combo.setCurrentIndex(0)
         self.vocal_output_format_combo.setCurrentIndex(0)
         self.vocal_fast_cb.setChecked(False)
-        self.vocal_recovery_combo.setCurrentIndex(1)
+        default_recovery_index = self.vocal_recovery_combo.findText("5% (Subtle)")
+        self.vocal_recovery_combo.setCurrentIndex(default_recovery_index if default_recovery_index >= 0 else 0)
+        self.vocal_recovery_mode_combo.setCurrentIndex(0)
         self.vocal_status_label.setText("Ready. Load a file, then separate with Demucs or the faster UVR path.")
 
         # Reset Join & Merge controls (requested behavior).
@@ -2772,9 +2835,20 @@ class KaraokeApp(QWidget):
             return
 
         behavior = self._resolve_merge_behavior(mode)
-        self.merge_status_label.setText(
-            f"Ready: {mode.replace('_', ' ')} with {behavior} behavior"
-        )
+        offset_s = 0.0
+        try:
+            offset_s = float(self.merge_audio_offset_spin.value())
+        except Exception:
+            offset_s = 0.0
+
+        if mode == "video_audio_merge" and behavior == "overlay":
+            self.merge_status_label.setText(
+                f"Ready: {mode.replace('_', ' ')} with {behavior} behavior (audio offset {offset_s:.2f}s)"
+            )
+        else:
+            self.merge_status_label.setText(
+                f"Ready: {mode.replace('_', ' ')} with {behavior} behavior"
+            )
 
     def _resolve_join_merge_output(self, mode, input_a, input_b):
         """Resolve output path/extension based on selected mode and optional format override."""
@@ -2869,23 +2943,52 @@ class KaraokeApp(QWidget):
                     out_path,
                 ]
 
-            cmd = [
-                ffmpeg,
-                "-y",
-                "-i",
-                video_input,
-                "-i",
-                audio_input,
-                "-map",
-                "0:v:0",
-                "-map",
-                "1:a:0",
-                "-c:v",
-                "copy",
-                "-shortest",
-                "-sn",
-                "-dn",
-            ]
+            offset_s = 0.0
+            try:
+                offset_s = max(0.0, float(self.merge_audio_offset_spin.value()))
+            except Exception:
+                offset_s = 0.0
+
+            if offset_s > 0.0:
+                delay_ms = int(round(offset_s * 1000.0))
+                cmd = [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    video_input,
+                    "-i",
+                    audio_input,
+                    "-filter_complex",
+                    f"[1:a]adelay={delay_ms}:all=1,aresample=44100,asetpts=PTS-STARTPTS[a]",
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "[a]",
+                    "-c:v",
+                    "copy",
+                    "-shortest",
+                    "-sn",
+                    "-dn",
+                ]
+            else:
+                cmd = [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    video_input,
+                    "-i",
+                    audio_input,
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "1:a:0",
+                    "-c:v",
+                    "copy",
+                    "-shortest",
+                    "-sn",
+                    "-dn",
+                ]
+
             if out_ext == ".mkv":
                 cmd += ["-c:a", "aac", "-b:a", "192k", out_path]
             else:
@@ -3050,7 +3153,11 @@ class KaraokeApp(QWidget):
             elif mode == "video_audio_merge" and behavior == "append":
                 duration_hint = dur_a + dur_b
             elif mode == "video_audio_merge" and behavior == "overlay":
-                duration_hint = min(dur_a, dur_b)
+                try:
+                    offset_s = max(0.0, float(self.merge_audio_offset_spin.value()))
+                except Exception:
+                    offset_s = 0.0
+                duration_hint = min(dur_a, dur_b + offset_s)
             elif mode == "audio_audio_join" and behavior == "overlay":
                 duration_hint = max(dur_a, dur_b)
             elif mode == "audio_audio_join" and behavior == "append":
@@ -3084,11 +3191,18 @@ class KaraokeApp(QWidget):
         output_format = self.vocal_output_format_combo.currentText().lower()
         fast_mode = self.vocal_fast_cb.isChecked()
         recovery_text = self.vocal_recovery_combo.currentText()
+        recovery_mode_text = self.vocal_recovery_mode_combo.currentText()
         demucs_music_recovery = 0
+        demucs_recovery_mode = "standard"
         try:
             demucs_music_recovery = int(str(recovery_text).split("%")[0].strip())
         except Exception:
             demucs_music_recovery = 0
+
+        if recovery_mode_text.startswith("Side-heavy"):
+            demucs_recovery_mode = "side_heavy"
+        elif recovery_mode_text.startswith("Center-aware"):
+            demucs_recovery_mode = "center_aware"
 
         if selection.startswith("Demucs:"):
             backend_name = "demucs"
@@ -3107,9 +3221,28 @@ class KaraokeApp(QWidget):
         }
         target_mode = target_map.get(target_text, "instrumental_only")
 
+        model_dir = self._get_audio_separator_model_dir()
+        enforce_offline_preflight = self._should_enforce_vocal_offline_preflight()
+
+        # Packaged team runtime keeps a one-time warning dialog; source runs use the page banner only.
+        if enforce_offline_preflight and not self._vocal_offline_dialog_shown:
+            QMessageBox.warning(self, "Vocal Separator", self._get_vocal_separator_offline_notice())
+            self._vocal_offline_dialog_shown = True
+
+        preflight_error = self._get_vocal_separator_preflight_error(
+            backend_name,
+            model_filename,
+            model_dir,
+            enforce_offline_preflight=enforce_offline_preflight,
+        )
+        if preflight_error:
+            self.vocal_status_label.setText("Vocal Separator unavailable in this build")
+            QMessageBox.warning(self, "Vocal Separator", preflight_error)
+            return
+
         self.log_debug(
             f"[audio_separator_task] start | input={self.video_path} | backend={backend_name} | model={model_filename} | "
-            f"target={target_mode} | format={output_format} | fast_mode={fast_mode} | demucs_music_recovery={demucs_music_recovery}%"
+            f"target={target_mode} | format={output_format} | fast_mode={fast_mode} | demucs_music_recovery={demucs_music_recovery}% | demucs_recovery_mode={demucs_recovery_mode}"
         )
 
         loading_path = get_resource_path("Loading.png")
@@ -3122,7 +3255,6 @@ class KaraokeApp(QWidget):
         self.export_splash.set_progress(5, f"Starting Vocal Separator ({model_filename})...")
         self.export_splash.show()
 
-        model_dir = os.path.join(self.settings["base_directory"], "config", "audio_separator_models")
         os.makedirs(model_dir, exist_ok=True)
 
         self.kill_allocated_task("audio_separator_task")
@@ -3137,6 +3269,7 @@ class KaraokeApp(QWidget):
             fast_mode=fast_mode,
             model_file_dir=model_dir,
             demucs_music_recovery=demucs_music_recovery,
+            demucs_recovery_mode=demucs_recovery_mode,
         )
 
         self.active_tasks["audio_separator_task"] = thread
@@ -3148,6 +3281,67 @@ class KaraokeApp(QWidget):
         thread.separator_done.connect(self.handle_audio_separator_completion)
         thread.finished.connect(lambda: self._finalize_audio_separator_thread("audio_separator_task"))
         thread.start()
+
+    def _get_vocal_separator_offline_notice(self):
+        return (
+            "Vocal Separator is not included in the offline team build. "
+            "This feature may require internet access and additional model/backend downloads on first use."
+        )
+
+    def _get_audio_separator_model_dir(self):
+        return os.path.join(self.settings["base_directory"], "config", "audio_separator_models")
+
+    def _is_packaged_runtime(self):
+        return bool(getattr(sys, "frozen", False) or hasattr(sys, "_MEIPASS"))
+
+    def _should_enforce_vocal_offline_preflight(self):
+        return self._is_packaged_runtime()
+
+    def _has_local_separator_model(self, model_filename, model_dir):
+        if not os.path.isdir(model_dir):
+            return False
+
+        target = str(model_filename).lower()
+        for root, _dirs, files in os.walk(model_dir):
+            for file_name in files:
+                if target in file_name.lower():
+                    return True
+        return False
+
+    def _get_vocal_separator_preflight_error(self, backend_name, model_filename, model_dir, enforce_offline_preflight=False):
+        missing_runtime = []
+
+        if backend_name == "demucs":
+            if importlib.util.find_spec("demucs") is None:
+                missing_runtime.append("demucs")
+            if importlib.util.find_spec("soundfile") is None:
+                missing_runtime.append("soundfile")
+        else:
+            has_cli = shutil.which("audio-separator") is not None
+            has_module = importlib.util.find_spec("audio_separator") is not None
+            if not has_cli and not has_module:
+                missing_runtime.append("audio-separator")
+
+        if missing_runtime:
+            notice_prefix = ""
+            if enforce_offline_preflight:
+                notice_prefix = self._get_vocal_separator_offline_notice() + "\n\n"
+            return (
+                notice_prefix
+                + "This machine does not currently have the required separator backend installed: "
+                + ", ".join(missing_runtime)
+                + ".\n\nThe app will not start separator processing here, so it should fail safely rather than crash."
+            )
+
+        if enforce_offline_preflight and not self._has_local_separator_model(model_filename, model_dir):
+            return (
+                self._get_vocal_separator_offline_notice()
+                + "\n\n"
+                + f"Local model cache for '{model_filename}' was not found in {model_dir}. "
+                + "On an offline team machine, the separator would not be able to fetch the missing model."
+            )
+
+        return ""
 
     def _finalize_audio_separator_thread(self, task_key):
         """Drop the audio separator thread reference only after QThread.finished fires."""
@@ -3563,10 +3757,12 @@ class KaraokeApp(QWidget):
                 dur = self.player.get_length()
                 if dur > 0 and not self.is_user_sliding:
                     ms = self.player.get_time()
-                    safe_ms = max(0, int(ms))
-                    seek_ratio = min(1.0, float(safe_ms) / float(dur)) if dur > 0 else 0.0
+                    safe_ms = max(0, min(int(ms), int(dur)))
+                    # Show full duration in the final half-second so labels do not appear 1s short.
+                    display_ms = int(dur) if (int(dur) - safe_ms) <= 500 else safe_ms
+                    seek_ratio = min(1.0, float(display_ms) / float(dur)) if dur > 0 else 0.0
                     self.seek_slider.setValue(int(seek_ratio * 1000))
-                    self.time_label.setText(f"{(safe_ms//1000)//60:02d}:{(safe_ms//1000)%60:02d}")
+                    self.time_label.setText(f"{(display_ms//1000)//60:02d}:{(display_ms//1000)%60:02d}")
                     self.duration_label.setText(f"{(dur//1000)//60:02d}:{(dur//1000)%60:02d}")
                     # Playback Window: stop at end cutoff
                     pw_end_ms = getattr(self, '_pw_end_ms', None)
@@ -3589,39 +3785,59 @@ class KaraokeApp(QWidget):
                             self._pw_end_ms = None  # clear immediately to prevent re-triggering on next tick
                             self.audio_service.stop_audio_monitoring()
                             self._player_was_active = False
+                            try:
+                                self.player.pause()
+                                self.player.set_time(0)
+                                self.player.set_position(0.0)
+                            except Exception:
+                                pass
                             self.seek_slider.setValue(0)
                             self.time_label.setText("00:00")
                             self.pw_status_label.setText("Playback window ended")
-                            QTimer.singleShot(100, self.player.stop)
-                    elif safe_ms >= max(0, int(dur) - 250):
-                        self.audio_service.stop_audio_monitoring()
-                        self._player_was_active = False
-                        self.seek_slider.setValue(0)
-                        self.time_label.setText("00:00")
-                        QTimer.singleShot(100, self.player.stop)
             else:
                 # Only stop monitoring once when transitioning from active → inactive
                 if getattr(self, '_player_was_active', False):
                     self.audio_service.stop_audio_monitoring()
                     self._player_was_active = False
+                    # After natural end, rewind timeline to start while keeping media bound for replay.
+                    try:
+                        if self.player.has_media():
+                            self.player.set_time(0)
+                            self.player.set_position(0.0)
+                        self.seek_slider.setValue(0)
+                        self.time_label.setText("00:00")
+                    except Exception:
+                        pass
         except Exception as e:
             print(f"UI loop fault: {e}")
 
     def on_slider_pressed(self): self.is_user_sliding = True
     def on_slider_released(self):
         self.is_user_sliding = False
-        if self.player.is_active():
-            target = self.seek_slider.value() / 1000.0
-            self.player.set_position(target)
-            self._resync_realtime_audio_after_seek()
-            # Re-apply playback window start if user seeks back to zero
-            if target == 0.0:
-                QTimer.singleShot(150, self.apply_playback_window)
+        target = self.seek_slider.value() / 1000.0
+        if self.player.is_active() or self._ensure_media_loaded_for_playback():
+            if self.player.is_active():
+                self.player.set_position(target)
+                self._resync_realtime_audio_after_seek()
+                # Re-apply playback window start if user seeks back to zero
+                if target == 0.0:
+                    QTimer.singleShot(150, self.apply_playback_window)
+            else:
+                # In inactive/end states, store target and apply immediately after Play starts.
+                self._pending_seek_ratio = target
+                dur = int(self.player.get_length()) if self.player else -1
+                if dur > 0:
+                    preview_ms = int(max(0.0, min(1.0, target)) * dur)
+                    self.time_label.setText(f"{(preview_ms//1000)//60:02d}:{(preview_ms//1000)%60:02d}")
 
     def handle_play(self):
         """Play button handler — applies Playback Window settings then plays."""
         if self._is_realtime_pitch_enabled() and self.stack.currentIndex() == PAGE_PLAYBACK:
             self.play_shifted(start_from_current=True)
+            return
+
+        if not self._ensure_media_loaded_for_playback():
+            QMessageBox.warning(self, "Playback", "No media available to play. Please load a file.")
             return
 
         self.apply_playback_window()
@@ -3635,6 +3851,7 @@ class KaraokeApp(QWidget):
         except Exception:
             pass
         self.player.play()
+        self._apply_pending_seek_after_play()
         self._refresh_realtime_pitch_status()
 
     def handle_pause(self):
@@ -3696,6 +3913,16 @@ class KaraokeApp(QWidget):
             print(f"[main.apply_playback_window] collected ranges: {self._pw_ranges}")
         except Exception:
             pass
+
+        # Treat a full-track range as no active playback window so Play won't force a rewind.
+        try:
+            dur_ms = int(self.player.get_length()) if self.player else -1
+        except Exception:
+            dur_ms = -1
+        if len(self._pw_ranges) == 1 and dur_ms > 0:
+            only_start, only_end = self._pw_ranges[0]
+            if only_start <= 0 and only_end >= max(0, dur_ms - 500):
+                self._pw_ranges = []
 
         if not self._pw_ranges:
             # Nothing to apply

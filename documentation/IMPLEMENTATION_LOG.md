@@ -1,5 +1,113 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Join & Merge Overlay Audio Start Offset (Video+Audio Only) (2026-07-11) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+Users needed lyric lead-in timing for karaoke mux output: keep video from `00:00` but delay merged song cue by a small offset.
+
+### Fix
+- Added Join & Merge control: `Overlay Audio Start Offset (sec)` (QDoubleSpinBox, default `0.0s`).
+- Scope-limited behavior: applies only to mixed `video+audio` with `Overlay` behavior.
+- Command builder updates in `main.py`:
+   - when offset `> 0`, video+audio Overlay uses ffmpeg filter path with delayed replacement audio (`adelay=<ms>:all=1`)
+   - when offset `= 0`, existing strict mapping path is retained (`0:v:0` + `1:a:0`)
+- Status hint and task duration estimation now include offset-aware behavior for video+audio Overlay.
+
+### Result
+- Karaoke merges can start replacement audio later (for example `1.00s`) while lyrics/video begin immediately.
+- Existing projects remain unchanged by default (`0.0s`).
+
+# Change: Post-Completion Control Dead-End Fix (Ended-State Rebind) (2026-07-11) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/services/player_service.py`
+
+### Problem
+After natural completion, seek/play and +/-10 controls could remain unresponsive until user pressed Stop once.
+
+### Fix
+- Added `PlayerService.is_ended()` and `PlayerService.get_state()` helpers.
+- Updated `main.py::_ensure_media_loaded_for_playback()` to treat VLC `Ended` as a rebind-required state.
+- Playback controls now rebuild a playable media binding before seek/play operations in that state.
+
+### Result
+- Post-completion controls are immediately usable.
+- Stop workaround is no longer required.
+
+# Change: Post-End Seek-Then-Play Recovery + Playback Window Full-Range Guard (2026-07-11) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+After natural completion, seeking to the middle then pressing Play could still fail until the user pressed Stop+Play first.
+
+### Fix
+- Added deferred inactive seek handling:
+   - `on_slider_released()` stores `_pending_seek_ratio` when player is inactive.
+   - `handle_play()` invokes `_apply_pending_seek_after_play()` to apply target after playback starts and duration is available.
+- Added Playback Window guard:
+   - `apply_playback_window()` now treats a single full-track range (`00:00 -> duration`) as no active window to avoid forced rewind to start on Play.
+
+### Result
+- Seek-to-middle then Play now works directly after track completion.
+- No extra Stop+Play cycle is required.
+
+# Change: Playback End Replay Recovery + Duration Label End Clamp (2026-07-11) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/services/player_service.py`
+
+### Problem
+After a song completed naturally, replay flows could fail (seek-to-middle + Play, Pause->Play, or Stop->Play). The end-time display could also appear one second short (for example `4:40` shown for a `4:41` track) even though playback completed.
+
+### Fix
+- Added `PlayerService.has_media()` helper to detect whether VLC still has a bound media item.
+- Added `main.py::_ensure_media_loaded_for_playback()` and integrated it into play/seek paths:
+   - `handle_play()` now rebinds `video_path` when needed before playback.
+   - `on_slider_released()` now allows seek positioning even when player is inactive after end, as long as media can be rebound.
+   - `jump_time()` now rebinds when needed and no longer hard-clamps to `duration-1000ms`.
+- Updated `update_ui()` end behavior:
+   - Removed hard-stop/media-clear call from natural end path.
+   - Playback-window cutoff now rewinds without invoking hard stop media-clear.
+   - Final half-second now clamps display to full duration for accurate end label.
+
+### Result
+- Track replay works reliably after natural completion.
+- Seek then Play works after end state.
+- Pause/Stop/Play flows recover correctly after completion.
+- End label now reaches full track duration visually.
+
+# Change: Vocal Separator Local Runtime Preflight Fix + One-Time Offline Dialog (2026-07-11) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Vocal Separator enforced offline-model preflight for all runs, including source/local development runs. This blocked first-use model download even with internet available, and warning dialogs could appear repeatedly.
+
+### Fix
+- Added runtime-aware gating in `main.py`:
+   - Packaged runtime (`sys.frozen`/`_MEIPASS`) keeps offline preflight rules.
+   - Source/local runtime skips cached-model preflight so first-use model download can proceed.
+- Offline warning UI behavior updated:
+   - Banner visibility now follows packaged runtime only.
+   - Offline popup is shown once per app session instead of every separator launch.
+- Backend runtime availability preflight remains active for all runtimes (safe failure when required backend package is missing).
+
+### Result
+- Local source runs now proceed to backend/model download when internet is available.
+- Offline warning spam is removed.
+- Packaged team/offline behavior remains safe and explicit.
+
 # Change: Real-Time Pause/Resume Playback Fix (2026-07-10) - COMPLETE ✅
 
 **Status:** Implemented
@@ -477,6 +585,52 @@ After introducing Demucs Music Recovery, app runs could terminate near model-loa
 - Lower peak memory pressure during separation.
 - Demucs compute path remains unchanged while recovery blend stays available.
 
+# Change: Offline Team-Build Vocal Separator Warning + Safe Preflight (2026-07-10) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+The packaged team build does not bundle separator backends and model caches, so Vocal Separator could be misleading in an offline environment. The user wanted the feature to remain visible, but with a strong warning and a safe failure path instead of a crash risk.
+
+### Fix
+- Added a persistent warning banner in the Vocal Separator UI stating that the offline team build does not include separator backends/models.
+- Added a click-time warning dialog using the same wording before separator startup.
+- Added preflight checks in `main.py` for:
+   - required backend runtime availability (`demucs`, `soundfile`, or `audio-separator`)
+   - local cached model presence in `config/audio_separator_models`
+- If requirements are missing, separator launch is refused with a clear warning instead of starting the worker.
+
+### Result
+- Team users see a visible offline limitation message before using Vocal Separator.
+- Missing backend/model situations now fail safely at the UI layer instead of proceeding into a likely broken packaged/offline path.
+
+# Change: Demucs Fine Recovery Presets + Recovery Modes (2026-07-10) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`, `source_code/workers/audio_separator_thread.py`
+
+### Problem
+The previous Demucs recovery presets jumped directly from `0%` to `10%`, which made the user choose between over-removed accompaniment and obvious vocal residue. The recovery blend also treated stereo center and side information the same, which is suboptimal for karaoke because lead vocals are often center-heavy.
+
+### Fix
+- Expanded `Demucs Music Recovery` presets to `0%, 3%, 5%, 7%, 10%, 15%, 20%, 30%`.
+- Added a new `Recovery Mode` selector in the Vocal Separator UI:
+   - `Standard blend (legacy)`
+   - `Side-heavy recovery (less center vocal bleed)`
+   - `Center-aware recovery (guard center vocals)`
+- Wired the selected recovery mode through `main.py` into `AudioSeparatorThread`.
+- Updated the Demucs recovery blend implementation:
+   - `Standard` keeps the existing full-mix blend behavior.
+   - `Side-heavy` restores stereo side content more strongly than center content.
+   - `Center-aware` uses a guarded center blend derived from the separated vocals to restore accompaniment while suppressing center-vocal reintroduction.
+
+### Result
+- Users can now test the practical karaoke sweet spot around `3-7%` instead of jumping straight to `10%`.
+- New recovery modes provide better accompaniment restoration options for songs where `0%` feels hollow but `10%` reintroduces too much vocal.
+
 # Change: Demucs Music Recovery Control for Instrument Preservation (2026-07-08) - COMPLETE ✅
 
 **Status:** Implemented
@@ -487,7 +641,7 @@ After introducing Demucs Music Recovery, app runs could terminate near model-loa
 Demucs produced cleaner vocal removal than UVR, but some instruments that overlap vocals were also removed too aggressively.
 
 ### Fix
-- Added `Demucs Music Recovery` in the Vocal Separator UI (0%, 10%, 20%, 30%).
+- Added `Demucs Music Recovery` in the Vocal Separator UI (later expanded with finer low-end presets).
 - Wired selected value through `main.py` into `AudioSeparatorThread`.
 - In Demucs path, instrumental stem now optionally blends back a controlled amount of original mix:
    - `instrumental = (1-r)*instrumental + r*original_mix`, where `r` is 0.00-0.30.

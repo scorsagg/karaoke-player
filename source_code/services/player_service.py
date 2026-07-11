@@ -292,6 +292,27 @@ class PlayerService(QObject):
     def set_position(self, pos): # pos is float from 0.0 to 1.0
         self._player.set_position(pos)
 
+    def has_media(self):
+        """Return True when a media item is still bound/known by VLC."""
+        try:
+            return self._player.get_media() is not None or self._media is not None
+        except Exception:
+            return self._media is not None
+
+    def get_state(self):
+        """Return current VLC player state."""
+        try:
+            return self._player.get_state()
+        except Exception:
+            return None
+
+    def is_ended(self):
+        """Return True when VLC reached natural end-of-media state."""
+        try:
+            return self._player.get_state() == vlc.State.Ended
+        except Exception:
+            return False
+
     def set_volume(self, volume): # volume is int from 0 to 100
         self._player.audio_set_volume(volume)
         self.volume_changed.emit(volume)

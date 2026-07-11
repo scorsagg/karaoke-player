@@ -126,6 +126,17 @@ def create_convert_export_page():
     vocal_source_label.setWordWrap(True)
     vocal_layout.addWidget(vocal_source_label)
 
+    vocal_offline_warning_label = QLabel(
+        "Vocal Separator is not included in the offline team build. "
+        "This feature may require internet access and additional model/backend downloads on first use."
+    )
+    vocal_offline_warning_label.setStyleSheet(
+        "color: #f5c26b; font-size: 10px; font-weight: bold; "
+        "background-color: #3a2412; border: 1px solid #8a5a2b; padding: 8px; border-radius: 4px;"
+    )
+    vocal_offline_warning_label.setWordWrap(True)
+    vocal_layout.addWidget(vocal_offline_warning_label)
+
     model_row = QHBoxLayout()
     model_row.addWidget(QLabel("Backend / Model:"))
     vocal_model_combo = QComboBox()
@@ -167,16 +178,34 @@ def create_convert_export_page():
     vocal_recovery_combo = QComboBox()
     vocal_recovery_combo.addItems([
         "0% (Cleanest Vocal Removal)",
+        "3% (Very Light)",
+        "5% (Subtle)",
+        "7% (Light)",
         "10% (Balanced)",
+        "15% (Stronger)",
         "20% (More Music Under Vocals)",
         "30% (Maximum Music Recovery)",
     ])
-    vocal_recovery_combo.setCurrentIndex(1)
+    default_recovery_index = vocal_recovery_combo.findText("5% (Subtle)")
+    if default_recovery_index >= 0:
+        vocal_recovery_combo.setCurrentIndex(default_recovery_index)
     recovery_row.addWidget(vocal_recovery_combo)
     recovery_row.addStretch()
     vocal_layout.addLayout(recovery_row)
 
-    recovery_info = QLabel("Applies only to Demucs instrumental output. Higher values keep more music but may leave faint vocals.")
+    recovery_mode_row = QHBoxLayout()
+    recovery_mode_row.addWidget(QLabel("Recovery Mode:"))
+    vocal_recovery_mode_combo = QComboBox()
+    vocal_recovery_mode_combo.addItems([
+        "Standard blend (legacy)",
+        "Side-heavy recovery (less center vocal bleed)",
+        "Center-aware recovery (guard center vocals)",
+    ])
+    recovery_mode_row.addWidget(vocal_recovery_mode_combo)
+    recovery_mode_row.addStretch()
+    vocal_layout.addLayout(recovery_mode_row)
+
+    recovery_info = QLabel("Applies only to Demucs instrumental output. 3-7% is usually the sweet spot. Side-heavy and center-aware modes aim to keep accompaniment while reducing vocal bleed.")
     recovery_info.setStyleSheet("color: #888; font-size: 10px;")
     recovery_info.setWordWrap(True)
     vocal_layout.addWidget(recovery_info)
@@ -254,6 +283,26 @@ def create_convert_export_page():
     merge_mode_info.setStyleSheet("color: #888; font-size: 10px;")
     merge_mode_info.setWordWrap(True)
     merge_layout.addWidget(merge_mode_info)
+
+    merge_offset_row = QHBoxLayout()
+    merge_offset_row.addWidget(QLabel("Overlay Audio Start Offset (sec):"))
+    merge_audio_offset_spin = QDoubleSpinBox()
+    merge_audio_offset_spin.setDecimals(2)
+    merge_audio_offset_spin.setSingleStep(0.10)
+    merge_audio_offset_spin.setRange(0.0, 30.0)
+    merge_audio_offset_spin.setValue(0.0)
+    merge_audio_offset_spin.setSuffix(" s")
+    merge_audio_offset_spin.setToolTip("Used only for video+audio Overlay mode. Delays merged audio start.")
+    merge_offset_row.addWidget(merge_audio_offset_spin)
+    merge_offset_row.addStretch()
+    merge_layout.addLayout(merge_offset_row)
+
+    merge_offset_info = QLabel(
+        "Applies only to video+audio Overlay. Use this to delay song cue so lyrics appear first."
+    )
+    merge_offset_info.setStyleSheet("color: #888; font-size: 10px;")
+    merge_offset_info.setWordWrap(True)
+    merge_layout.addWidget(merge_offset_info)
 
     merge_execute_btn = QPushButton("Join / Merge Now")
     merge_execute_btn.setStyleSheet("background-color: #16a085; height: 35px; font-weight: bold; color: white;")
@@ -384,6 +433,8 @@ def create_convert_export_page():
         "vocal_output_format_combo": vocal_output_format_combo,
         "vocal_fast_cb": vocal_fast_cb,
         "vocal_recovery_combo": vocal_recovery_combo,
+        "vocal_recovery_mode_combo": vocal_recovery_mode_combo,
+        "vocal_offline_warning_label": vocal_offline_warning_label,
         "vocal_sep_btn": vocal_sep_btn,
         "vocal_status_label": vocal_status_label,
         "merge_input_a_btn": merge_input_a_btn,
@@ -392,6 +443,7 @@ def create_convert_export_page():
         "merge_input_b_label": merge_input_b_label,
         "merge_output_format_combo": merge_output_format_combo,
         "merge_mode_combo": merge_mode_combo,
+        "merge_audio_offset_spin": merge_audio_offset_spin,
         "merge_execute_btn": merge_execute_btn,
         "merge_status_label": merge_status_label,
         "amp_mode_group": amp_mode_group,

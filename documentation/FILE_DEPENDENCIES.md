@@ -202,7 +202,8 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Default backend/model is `Demucs: htdemucs_ft`
 - Faster alternative remains available via `audio-separator` UVR models
 - Fast mode applies backend-specific tuning: lower overlap and lighter Demucs chunk settings for quicker CPU inference
-- Demucs Music Recovery (0-30%) controls how much original mix is blended back into instrumental output to reduce over-erasure of voice-coupled instruments
+- Demucs Music Recovery now offers finer low-end presets (`0, 3, 5, 7, 10, 15, 20, 30%`) so users can recover accompaniment without jumping straight to 10%
+- Recovery mode selector offers `Standard blend`, `Side-heavy recovery`, and `Center-aware recovery`; the latter two reduce center-heavy vocal bleed while restoring accompaniment
 - Recovery blend is performed during numpy export to avoid extra large torch tensor copies that can destabilize long-track processing
 - Video inputs are pre-extracted to WAV with ffmpeg before separation
 - Requires the selected backend (`demucs` or `audio-separator`) to be installed in the active Python interpreter
@@ -211,6 +212,8 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Demucs tqdm output is parsed and emitted as Qt `progress` updates so splash progress stays active during subprocess separation
 - Demucs progress status text now distinguishes download phase vs separation pass (n/m), announces expected total passes up-front, and grows the denominator if additional pass loops are detected
 - Worker cleanup is deferred until `QThread.finished` so completion handling can load the output safely
+- Offline packaged builds now warn visibly (with one-time startup popup) and refuse to start separation if the selected backend package or cached model is unavailable locally
+- Source/local runtime does not enforce cached-model preflight; first-use backend/model download is allowed when internet is available
 
 **Join & Merge (Convert & Export) ✅ COMPLETE**
 - New `Join & Merge` tab in Convert & Export with two file selectors and output format chooser
@@ -221,6 +224,8 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - mixed video+audio also supports manual append mode (freeze-frame video extension + appended selected audio)
 - video+audio overlay replacement now explicitly drops source audio mapping to avoid original track retention
 - video+audio overlay replacement uses strict stream mapping (`0:v:0` + `1:a:0`) to mirror standard karaoke remux behavior
+- video+audio Overlay adds `Overlay Audio Start Offset (sec)` (default `0.0`) to delay replacement audio cue while video remains at `00:00`
+- Offset is applied only for mixed video+audio Overlay mode; other merge modes are unchanged
 - merge mode uses extension-first media typing to prevent audio-with-artwork misclassification as video
 - merge input UI now highlights selected A/B files on buttons and labels with full path tooltip for selection confidence
 - exact final ffmpeg command is shown before merge execution and logged for command parity verification
@@ -323,6 +328,11 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - Seekbar progress in `update_ui()` now uses elapsed-time ratio (`get_time()/get_length()`) instead of raw VLC position ratio.
 - End-of-track UI transition now keys off elapsed time near duration (`duration - 250ms`) to avoid early visual completion.
 - `load_video()` now auto-detects audio-only files so Media Loader direct audio loads get the same audio-overlay behavior as extracted/converted audio loads.
+- Playback handlers now auto-rebind media before play/seek when needed (`_ensure_media_loaded_for_playback`) so replay works after natural completion and after stop paths that clear VLC media binding.
+- End-of-track label rendering now clamps final half-second to full duration to avoid 1-second display underflow.
+- Inactive seek targets from slider release are deferred (`_pending_seek_ratio`) and applied after Play begins (`_apply_pending_seek_after_play`) so seek-then-play works after completion.
+- Playback Window full-range rows are treated as no active window in `apply_playback_window()` to avoid auto-rewind to start on every Play.
+- Playback media preflight now treats VLC `Ended` state as requiring rebind in `_ensure_media_loaded_for_playback()`, preventing post-completion dead-end controls where only Stop recovered behavior.
 
 **If modifying this area, also review:**
 - Playback update loop in `source_code/main.py::update_ui()`

@@ -14,7 +14,7 @@ class AudioSeparatorThread(QThread):
     line_output = Signal(str)
     separator_done = Signal(bool, str, str, str)
 
-    def __init__(self, input_path, ffmpeg_path, output_dir, backend_name, model_filename, output_format, target_mode, fast_mode, model_file_dir, demucs_music_recovery=10):
+    def __init__(self, input_path, ffmpeg_path, output_dir, backend_name, model_filename, output_format, target_mode, fast_mode, model_file_dir, demucs_music_recovery=10, demucs_recovery_mode="standard"):
         super().__init__()
         self.input_path = input_path
         self.ffmpeg_path = ffmpeg_path
@@ -26,6 +26,7 @@ class AudioSeparatorThread(QThread):
         self.fast_mode = fast_mode
         self.model_file_dir = model_file_dir
         self.demucs_music_recovery = max(0, min(30, int(demucs_music_recovery)))
+        self.demucs_recovery_mode = demucs_recovery_mode if demucs_recovery_mode in {"standard", "side_heavy", "center_aware"} else "standard"
         self.is_killed = False
         self.process = None
 
@@ -183,22 +184,24 @@ import os
 import sys
 import traceback
 
+import numpy as np
 import soundfile as sf
 import torch
 from demucs.apply import apply_model
 from demucs.pretrained import get_model
 
 def main():
-    if len(sys.argv) != 8:
-        raise RuntimeError("demucs_subprocess_runner expected 7 args")
+    if len(sys.argv) != 9:
+        raise RuntimeError("demucs_subprocess_runner expected 8 args")
 
     prepared_audio = sys.argv[1]
     model_name = sys.argv[2]
     fast_mode = sys.argv[3] == "1"
     recovery_percent = max(0, min(30, int(sys.argv[4])))
-    instrumental_path = sys.argv[5]
-    vocals_path = sys.argv[6]
-    status_hint_path = sys.argv[7]
+    recovery_mode = sys.argv[5]
+    instrumental_path = sys.argv[6]
+    vocals_path = sys.argv[7]
+    status_hint_path = sys.argv[8]
 
     with open(status_hint_path, "w", encoding="utf-8") as hint_file:
         hint_file.write("demucs_subprocess_started")
@@ -262,12 +265,56 @@ def main():
     vocals_np = vocals_tensor.detach().cpu().transpose(0, 1).numpy()
     sf.write(vocals_path, vocals_np, sr)
 
+    def ensure_stereo(arr):
+        if arr.ndim == 1:
+            arr = arr[:, None]
+        if arr.shape[1] == 1:
+            arr = np.repeat(arr, 2, axis=1)
+        return arr.astype("float32", copy=False)
+
+    def to_mid_side(arr):
+        stereo = ensure_stereo(arr)
+        left = stereo[:, 0]
+        right = stereo[:, 1]
+        mid = 0.5 * (left + right)
+        side = 0.5 * (left - right)
+        return mid, side
+
+    def from_mid_side(mid, side):
+        left = mid + side
+        right = mid - side
+        return np.stack([left, right], axis=1).astype("float32", copy=False)
+
     if instrumental_tensor is not None:
         instrumental_np = instrumental_tensor.detach().cpu().transpose(0, 1).numpy()
         recovery_ratio = float(recovery_percent) / 100.0
         if recovery_ratio > 0:
-            print(f"Applying Demucs music recovery blend: {recovery_percent}% original mix into instrumental", flush=True)
-            instrumental_np = ((1.0 - recovery_ratio) * instrumental_np) + (recovery_ratio * wav_np)
+            print(f"Applying Demucs music recovery blend: {recovery_percent}% mode={recovery_mode}", flush=True)
+            original_np = ensure_stereo(wav_np)
+            instrumental_np = ensure_stereo(instrumental_np)
+            vocals_np = ensure_stereo(vocals_np)
+
+            if recovery_mode == "side_heavy":
+                instrumental_mid, instrumental_side = to_mid_side(instrumental_np)
+                original_mid, original_side = to_mid_side(original_np)
+                mid_ratio = recovery_ratio * 0.35
+                side_ratio = recovery_ratio
+                blended_mid = ((1.0 - mid_ratio) * instrumental_mid) + (mid_ratio * original_mid)
+                blended_side = ((1.0 - side_ratio) * instrumental_side) + (side_ratio * original_side)
+                instrumental_np = from_mid_side(blended_mid, blended_side)
+            elif recovery_mode == "center_aware":
+                instrumental_mid, instrumental_side = to_mid_side(instrumental_np)
+                original_mid, original_side = to_mid_side(original_np)
+                vocals_mid, _ = to_mid_side(vocals_np)
+                guarded_mid = original_mid - (0.75 * vocals_mid)
+                mid_ratio = recovery_ratio * 0.20
+                side_ratio = recovery_ratio * 0.90
+                blended_mid = ((1.0 - mid_ratio) * instrumental_mid) + (mid_ratio * guarded_mid)
+                blended_side = ((1.0 - side_ratio) * instrumental_side) + (side_ratio * original_side)
+                instrumental_np = from_mid_side(blended_mid, blended_side)
+            else:
+                instrumental_np = ((1.0 - recovery_ratio) * instrumental_np) + (recovery_ratio * original_np)
+
             instrumental_np = instrumental_np.clip(-1.0, 1.0)
         sf.write(instrumental_path, instrumental_np, sr)
 
@@ -291,6 +338,7 @@ if __name__ == "__main__":
                 self.model_filename,
                 "1" if self.fast_mode else "0",
                 str(self.demucs_music_recovery),
+                self.demucs_recovery_mode,
                 instrumental_path,
                 vocals_path,
                 status_hint_path,
