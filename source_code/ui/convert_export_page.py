@@ -127,8 +127,8 @@ def create_convert_export_page():
     vocal_layout.addWidget(vocal_source_label)
 
     vocal_offline_warning_label = QLabel(
-        "Vocal Separator is not included in the offline team build. "
-        "This feature may require internet access and additional model/backend downloads on first use."
+        "Offline team build supports Demucs (htdemucs_ft) from bundled local models. "
+        "audio-separator UVR models require internet/manual setup and are not offline-guaranteed."
     )
     vocal_offline_warning_label.setStyleSheet(
         "color: #f5c26b; font-size: 10px; font-weight: bold; "
@@ -141,10 +141,10 @@ def create_convert_export_page():
     model_row.addWidget(QLabel("Backend / Model:"))
     vocal_model_combo = QComboBox()
     vocal_model_combo.addItems([
-        "Demucs: htdemucs_ft (High Quality Default)",
+        "Demucs: htdemucs_ft (Offline Team Build)",
         "Demucs: htdemucs (Faster)",
-        "audio-separator: UVR-MDX-NET-Voc_FT.onnx (Fast)",
-        "audio-separator: UVR_MDXNET_KARA_2.onnx",
+        "audio-separator: UVR-MDX-NET-Voc_FT.onnx (Internet Required)",
+        "audio-separator: UVR_MDXNET_KARA_2.onnx (Internet Required)",
     ])
     model_row.addWidget(vocal_model_combo)
     model_row.addStretch()

@@ -41,6 +41,8 @@ REQUIRED_DATA = {
 # Paths to resources
 RESOURCES_DIR = PROJECT_ROOT / "resources"
 SOURCE_DIR = PROJECT_ROOT / "source_code"
+OFFLINE_DEMUCS_DIR = RESOURCES_DIR / "offline_models" / "demucs"
+OFFLINE_DEMUCS_REQUIRED_TOKEN = "htdemucs_ft"
 
 # App metadata
 APP_NAME = "KaraokeStudioPro"
@@ -103,6 +105,25 @@ def validate_prerequisites():
         tool_path = RESOURCES_DIR / tool
         if not tool_path.exists():
             missing.append(f"{desc} (REQUIRED FOR BUNDLING): {tool_path}")
+
+    # Check offline Demucs model cache bundle for team/offline Vocal Separator.
+    if not OFFLINE_DEMUCS_DIR.exists():
+        missing.append(
+            f"Offline Demucs model folder (REQUIRED FOR TEAM OFFLINE BUILD): {OFFLINE_DEMUCS_DIR}"
+        )
+    else:
+        model_files = [p for p in OFFLINE_DEMUCS_DIR.rglob("*") if p.is_file()]
+        has_named_htdemucs = any(OFFLINE_DEMUCS_REQUIRED_TOKEN in p.name.lower() for p in model_files)
+        # Demucs commonly stores hashed checkpoint names under hub/checkpoints/*.th.
+        checkpoint_dir = OFFLINE_DEMUCS_DIR / "hub" / "checkpoints"
+        has_checkpoint_cache = checkpoint_dir.exists() and any(
+            p.is_file() and p.suffix.lower() == ".th" for p in checkpoint_dir.rglob("*.th")
+        )
+        if not has_named_htdemucs and not has_checkpoint_cache:
+            missing.append(
+                "Offline Demucs model cache is missing usable checkpoint files under "
+                f"{OFFLINE_DEMUCS_DIR}"
+            )
     
     if missing:
         log("[ERROR] Missing required files:", "ERROR")
