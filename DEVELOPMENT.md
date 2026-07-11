@@ -242,7 +242,7 @@ config/
 
 ### Feature: Vocal Separator (Demucs Default) ✅
 - **Convert & Export** includes a dedicated `Vocal Separator` tab
-- Default backend is `Demucs: htdemucs_ft` for higher quality separation on Python 3.13
+- Default backend is `Demucs: htdemucs_ft` for higher quality separation on Python 3.13 and offline team distribution
 - Faster fallback remains available via `audio-separator` UVR models
 - Default export target is instrumental-only for the common karaoke workflow
 - `Fast mode` applies backend-specific speed tuning
@@ -253,8 +253,9 @@ config/
 - Recovery blending is applied during stem export using numpy arrays to avoid additional large torch tensor allocations and reduce crash risk on long tracks
 - Demucs now executes inside an isolated subprocess worker script; if torch/demucs crashes natively, the main app process remains alive and shows a controlled task error
 - Splash status text is phase-aware for Demucs (`Downloading model files`, `Running separation pass n/m`, `Applying music recovery`) and now announces expected passes up-front while allowing the denominator to expand if additional pass loops are detected
-- Packaged runtime keeps the offline team-build warning path (banner + one-time popup) and refuses launch when required backend packages or cached models are missing locally
-- Source/local runtime now allows first-use backend/model downloads and does not block launch just because local model cache is empty
+- Packaged/team runtime is now Demucs-offline-first: `htdemucs_ft` runs from bundled local model cache with no internet requirement
+- In packaged/team runtime, non-offline models (UVR/audio-separator and non-bundled variants) are marked as internet/manual-setup-required via in-page status text (no modal popup)
+- Build pipeline now validates bundled Demucs offline model cache (`resources/offline_models/demucs`) before packaging
 - Thread lifetime is finalized on `QThread.finished` so output auto-load does not destroy the worker before it fully exits
 
 ### Feature: Join & Merge Tab ✅

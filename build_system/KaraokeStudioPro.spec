@@ -31,6 +31,7 @@ a = Analysis(
         ('../resources/plugins', 'plugins'),
         ('../resources/splash.png', '.'),
         ('../resources/Loading.png', '.'),
+        ('../resources/offline_models/demucs', 'config/audio_separator_models'),
     ],
     
     # Hidden imports (packages not automatically detected)
@@ -38,6 +39,11 @@ a = Analysis(
         'vlc',
         'PySide6',
         'numpy',
+        'torch',
+        'demucs',
+        'demucs.apply',
+        'demucs.pretrained',
+        'soundfile',
         'source_code.workers.audio_separator_thread',
         'source_code.services.file_loading_service',
         'source_code.services.realtime_pitch_service',

@@ -1,5 +1,31 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Demucs-Only Offline Team Packaging + Non-Modal Internet-Required Model Notice (2026-07-11) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/ui/convert_export_page.py`, `build_system/KaraokeStudioPro.spec`, `build_system/build.py`, `build_system/requirements-build.txt`, `documentation/requirements.txt`
+
+### Problem
+Team distribution required fully offline Vocal Separator operation. Previous packaged behavior relied on warning/refusal flow and could still imply first-run internet downloads.
+
+### Fix
+- Packaged/team runtime now supports Demucs offline path explicitly:
+   - allowed packaged model path: `Demucs: htdemucs_ft`
+   - runtime sets local torch cache root to app model directory (`TORCH_HOME=config/audio_separator_models`)
+- Non-offline model selections in packaged runtime (UVR/audio-separator and non-bundled variants) now show screen-level status guidance only; no modal popup is used for this requirement.
+- Updated Vocal Separator UI text/model labels to reflect offline-vs-internet expectations.
+- Packaging updates:
+   - `KaraokeStudioPro.spec` now bundles `resources/offline_models/demucs` into `config/audio_separator_models`
+   - hidden imports include demucs/torch/soundfile runtime modules
+   - `build.py` now fails fast if offline Demucs assets are missing (`htdemucs_ft` token check)
+   - build/runtime requirements updated with `torch`, `demucs`, `soundfile`
+
+### Result
+- Team packaged build can run Demucs `htdemucs_ft` offline with bundled model assets.
+- Internet-required alternatives are clearly marked in-page without modal interruptions.
+- Build process now validates offline model readiness before distribution.
+
 # Change: Join & Merge Overlay Audio Start Offset (Video+Audio Only) (2026-07-11) - COMPLETE ✅
 
 **Status:** Implemented

@@ -212,8 +212,9 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Demucs tqdm output is parsed and emitted as Qt `progress` updates so splash progress stays active during subprocess separation
 - Demucs progress status text now distinguishes download phase vs separation pass (n/m), announces expected total passes up-front, and grows the denominator if additional pass loops are detected
 - Worker cleanup is deferred until `QThread.finished` so completion handling can load the output safely
-- Offline packaged builds now warn visibly (with one-time startup popup) and refuse to start separation if the selected backend package or cached model is unavailable locally
-- Source/local runtime does not enforce cached-model preflight; first-use backend/model download is allowed when internet is available
+- Offline packaged/team builds now run Demucs `htdemucs_ft` from bundled local cache (no internet required for that path)
+- UVR/audio-separator selections in packaged/team builds are treated as internet/manual-setup-required and show in-page status guidance (no modal popup)
+- Build prerequisites now require offline Demucs cache assets in `resources/offline_models/demucs` (must include `htdemucs_ft` files)
 
 **Join & Merge (Convert & Export) ✅ COMPLETE**
 - New `Join & Merge` tab in Convert & Export with two file selectors and output format chooser

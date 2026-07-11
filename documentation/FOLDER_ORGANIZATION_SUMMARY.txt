@@ -219,7 +219,9 @@ Build Standalone Executable (v3):
        - Demucs path uses Python API + soundfile input loading to avoid torchaudio/torchcodec CLI failures
       - Demucs inference runs in an isolated subprocess so native crashes do not terminate the main app
        - Demucs tqdm output is parsed into worker progress signals so the splash bar updates continuously
-      - Offline team builds now show a visible warning + one-time popup and safe preflight refusal when separator backends/models are not available locally
+      - Team/offline package now supports Demucs `htdemucs_ft` via bundled local model cache (no internet for this path)
+      - UVR/audio-separator model options are marked as internet/manual-setup-required in packaged team build via in-page status messaging (no modal warning)
+      - Offline team builds now show visible in-page guidance and safe preflight refusal when non-offline models/backends are selected
       - Source/local runs allow first-use backend/model download and do not block separator start only because model cache is initially empty
       - Demucs status messaging now shows download phase with expected separation passes up-front and adaptive pass counters when extra loops are detected
 

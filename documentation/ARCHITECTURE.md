@@ -180,8 +180,9 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Demucs tqdm output is captured and translated into worker `progress` signals so the splash bar reflects active separation progress
 - Demucs status labels now expose phase context (model-file download vs separation pass counters) with an up-front expected pass total and adaptive denominator expansion if extra loops appear, so repeated percentage cycles are understandable
 - The worker stays referenced until `QThread.finished` fires, preventing thread-destroyed crashes during auto-load of the output stem
-- Packaged/offline runtime shows a persistent warning (plus one-time dialog) and enforces backend+model preflight checks before starting separation
-- Source/local runtime does not enforce cached-model preflight, allowing normal first-use model download when internet is available
+- Packaged/team runtime enforces Demucs offline mode (`htdemucs_ft`) using bundled local model cache under `config/audio_separator_models`
+- Packaged/team runtime marks UVR/audio-separator paths as internet/manual-setup required using in-page status messaging (no modal warning for this case)
+- Build-time validation ensures offline Demucs cache assets are present before team distribution packaging
 
 ### Convert & Export: Join & Merge Tab (updated 2026-07-08)
 

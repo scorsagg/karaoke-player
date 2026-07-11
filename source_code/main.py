@@ -437,6 +437,7 @@ class KaraokeApp(QWidget):
         convert_btn.clicked.connect(self.convert_audio_format)
         normalize_btn.clicked.connect(self.normalize_audio)
         self.vocal_sep_btn.clicked.connect(self.start_audio_separator)
+        self.vocal_model_combo.currentTextChanged.connect(lambda _v: self._update_vocal_separator_mode_notice())
         self.merge_input_a_btn.clicked.connect(self.select_merge_input_a)
         self.merge_input_b_btn.clicked.connect(self.select_merge_input_b)
         self.merge_execute_btn.clicked.connect(self.execute_join_merge)
@@ -448,6 +449,7 @@ class KaraokeApp(QWidget):
         self.merge_input_a_path = ""
         self.merge_input_b_path = ""
         self._last_merge_cmd_text = ""
+        self._update_vocal_separator_mode_notice()
         # Video Tools: Video Trimming (uses video loaded from Media Loader page)
         video_trim_btn.clicked.connect(self.trim_video)
         self.video_trim_clear_btn.clicked.connect(self.clear_video_trim_ranges)
@@ -1478,6 +1480,7 @@ class KaraokeApp(QWidget):
         self.vocal_recovery_combo.setCurrentIndex(default_recovery_index if default_recovery_index >= 0 else 0)
         self.vocal_recovery_mode_combo.setCurrentIndex(0)
         self.vocal_status_label.setText("Ready. Load a file, then separate with Demucs or the faster UVR path.")
+        self._update_vocal_separator_mode_notice()
 
         # Reset Join & Merge controls (requested behavior).
         self._reset_join_merge_controls()
@@ -3224,10 +3227,12 @@ class KaraokeApp(QWidget):
         model_dir = self._get_audio_separator_model_dir()
         enforce_offline_preflight = self._should_enforce_vocal_offline_preflight()
 
-        # Packaged team runtime keeps a one-time warning dialog; source runs use the page banner only.
-        if enforce_offline_preflight and not self._vocal_offline_dialog_shown:
-            QMessageBox.warning(self, "Vocal Separator", self._get_vocal_separator_offline_notice())
-            self._vocal_offline_dialog_shown = True
+        # Team/offline packaged builds support only the bundled Demucs offline model.
+        if enforce_offline_preflight and not self._is_packaged_offline_demucs_allowed(backend_name, model_filename):
+            self.vocal_status_label.setText(
+                "Internet required for this model in team build. Use Demucs: htdemucs_ft (Offline Team Build)."
+            )
+            return
 
         preflight_error = self._get_vocal_separator_preflight_error(
             backend_name,
@@ -3237,8 +3242,20 @@ class KaraokeApp(QWidget):
         )
         if preflight_error:
             self.vocal_status_label.setText("Vocal Separator unavailable in this build")
-            QMessageBox.warning(self, "Vocal Separator", preflight_error)
+            # For packaged team builds use in-page status only; avoid modal warning spam.
+            if enforce_offline_preflight:
+                self.vocal_status_label.setText(preflight_error.replace("\n", " "))
+            else:
+                QMessageBox.warning(self, "Vocal Separator", preflight_error)
             return
+
+        # Point Demucs cache at local bundled/offline model directory so subprocess inherits it.
+        if backend_name == "demucs":
+            try:
+                os.makedirs(model_dir, exist_ok=True)
+                os.environ["TORCH_HOME"] = model_dir
+            except Exception:
+                pass
 
         self.log_debug(
             f"[audio_separator_task] start | input={self.video_path} | backend={backend_name} | model={model_filename} | "
@@ -3284,8 +3301,8 @@ class KaraokeApp(QWidget):
 
     def _get_vocal_separator_offline_notice(self):
         return (
-            "Vocal Separator is not included in the offline team build. "
-            "This feature may require internet access and additional model/backend downloads on first use."
+            "Offline team build supports only Demucs htdemucs_ft from bundled local models. "
+            "Other separator models require internet/manual setup and are not offline-guaranteed."
         )
 
     def _get_audio_separator_model_dir(self):
@@ -3296,6 +3313,27 @@ class KaraokeApp(QWidget):
 
     def _should_enforce_vocal_offline_preflight(self):
         return self._is_packaged_runtime()
+
+    def _is_packaged_offline_demucs_allowed(self, backend_name, model_filename):
+        return backend_name == "demucs" and model_filename == "htdemucs_ft"
+
+    def _update_vocal_separator_mode_notice(self):
+        """Show non-modal guidance for model availability in packaged/offline team build."""
+        try:
+            selection = (self.vocal_model_combo.currentText() if self.vocal_model_combo else "").strip()
+        except Exception:
+            selection = ""
+
+        if not self._should_enforce_vocal_offline_preflight():
+            return
+
+        if selection.startswith("Demucs:") and "htdemucs_ft" in selection:
+            self.vocal_status_label.setText("Ready: Offline team build will run Demucs htdemucs_ft locally.")
+            return
+
+        self.vocal_status_label.setText(
+            "Selected model requires internet/manual setup in team build. Use Demucs: htdemucs_ft for offline operation."
+        )
 
     def _has_local_separator_model(self, model_filename, model_dir):
         if not os.path.isdir(model_dir):
