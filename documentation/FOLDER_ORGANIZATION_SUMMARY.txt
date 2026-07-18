@@ -157,6 +157,13 @@ Build Standalone Executable (v3):
     • Sidebar status now refreshes on file load start/success/failure (prevents stale auto-reduce text)
     • Splash progress bar now updates visibly during file preparation and loading stages
    • Task cancellation now waits for worker shutdown (`stop()+wait()`) to prevent QThread-destroyed crashes during conversion/separation
+   • Media Loader download actions are now locked during active download/load; repeated clicks no longer spawn overlapping download threads
+   • DownloadService now enforces single active `ProcessThread` and rejects concurrent starts to prevent thread-destroyed crashes
+   • yt-dlp output parser regexes now use escaped bracket patterns, removing Python FutureWarning spam during downloads
+    • Real-time Pitch Mode now has neutral passthrough at 0 semitones, so enabling checkbox no longer alters pitch/tempo unexpectedly
+    • Real-time speed updates now sync VLC + shifted stream together (debounced restart), so speed changes continue working while realtime mode is ON
+    • Realtime FFmpeg tempo chain now combines pitch compensation and playback speed safely across valid atempo ranges
+    • Hidden live amplification now applies multiplicative gain consistently across repeated adjustments (not just first perceived change)
    • Persistent debug log added at config/app_debug.log (task lifecycle + worker subprocess output)
    • PlayerService auto-configures Windows VLC runtime paths for source runs
      (PATH + VLC_PLUGIN_PATH + add_dll_directory)

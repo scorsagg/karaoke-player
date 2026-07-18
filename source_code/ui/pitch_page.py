@@ -194,7 +194,7 @@ def create_pitch_page():
     rt_row.addWidget(realtime_pitch_status)
     rt_row.addStretch()
 
-    export_btn = QPushButton("Export Unified Master Render File")
+    export_btn = QPushButton("Export and load with changes")
     export_btn.setStyleSheet("background-color: #0e639c; height: 45px; font-weight: bold; color: white;")
 
     layout.addLayout(p_row)

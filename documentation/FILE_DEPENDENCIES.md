@@ -297,6 +297,24 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 2. User double-clicks file in history → calls `load_history_item()`
 3. User loads file on another page, then navigates to Audio Tools → `handle_navigation_change()` detects and updates
 
+### 11. DOWNLOAD PIPELINE THREAD SAFETY (2026-07-17) ✅ COMPLETE
+**Status:** Fixed - Media Loader now blocks repeated starts during active download/load
+
+**Related files:**
+- `source_code/main.py`
+  - Stores Media Loader/Audio Studio download button refs
+  - Adds `_set_download_ui_busy(is_busy)` helper to disable/re-enable URL download actions during active task
+  - Applies busy lock in `download_video()` and `download_audio()`
+  - Releases lock in `_on_download_finished()` and `_on_download_error()` (including cancel/error paths)
+- `source_code/services/download_service.py`
+  - Adds `is_downloading()` helper
+  - Adds hard guard in `download_video()` to reject concurrent starts when prior thread is still running
+  - Fixes yt-dlp parser regexes to escaped-bracket patterns (no FutureWarning)
+
+**Why this matters:**
+- Prevents `QThread: Destroyed while thread '' is still running` triggered by double-clicking download while a prior thread is active.
+- Keeps UI and service-level safety in sync so accidental repeat clicks cannot orphan worker threads.
+
 ### 12. WIDEN VIDEO FIXES (2026-06-23) ✅ COMPLETE
 **Files changed:** `source_code/main.py` only
 
@@ -422,6 +440,34 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - `source_code/services/realtime_pitch_service.py`
 - `build_system/KaraokeStudioPro.spec` hiddenimports
 - `documentation/requirements.txt` runtime dependencies
+
+### 22. PLAYBACK PAGE REALTIME SYNC + PASSTHROUGH FIX (2026-07-17) ✅ COMPLETE
+**Files changed:** `source_code/main.py`, `source_code/services/realtime_pitch_service.py`, `source_code/ui/pitch_page.py`
+
+**What changed:**
+- Realtime neutral passthrough behavior:
+  - If realtime toggle is ON and pitch is `0.0`, shifted engine is bypassed and original VLC audio path is preserved.
+  - Prevents checkbox ON from introducing unintended pitch/tempo drift at neutral settings.
+- Realtime speed synchronization:
+  - `speed_input` now routes through `set_playback_speed()` in `main.py`.
+  - Speed updates are applied to both VLC and realtime engine state (`RealtimePitchService.set_speed()`).
+  - Active realtime (non-neutral) speed changes trigger debounced stream restart from current timeline for consistent audible response.
+- Realtime engine tempo chain update:
+  - Added `_build_atempo_chain()` in `realtime_pitch_service.py` so tempo factors remain valid for FFmpeg while combining pitch compensation and playback speed.
+- Hidden live amplification follow-up:
+  - Effective output now uses multiplicative gain factor (`_live_amplify_factor`) for consistent repeated adjustments.
+  - Reset status text now reflects current neutral output value dynamically.
+- Playback page wording:
+  - Export button text on Pitch page updated to `Export and load with changes`.
+
+**If modifying this area, also review:**
+- `source_code/main.py::set_playback_speed()`
+- `source_code/main.py::set_pitch()`
+- `source_code/main.py::play_shifted()`
+- `source_code/main.py::on_realtime_pitch_toggled()`
+- `source_code/services/realtime_pitch_service.py::set_speed()`
+- `source_code/services/realtime_pitch_service.py::_build_atempo_chain()`
+- `source_code/ui/pitch_page.py`
 
 ### 13. VIDEO TOOLS - RANGE-ROW VIDEO TRIMMING (2026-06-29) ✅ COMPLETE
 **Files changed:** `source_code/ui/video_tools_page.py`, `source_code/main.py`

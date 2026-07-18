@@ -50,7 +50,16 @@ class DownloadService(QObject):
         elif d['status'] == 'error':
             self.download_error.emit(f"Download error: {d.get('error')}")
 
+    def is_downloading(self):
+        """Return True while a download process thread is active."""
+        return bool(self.download_thread and self.download_thread.isRunning())
+
     def download_video(self, url, download_dir, preferred_format='bv[vcodec^=avc1]+ba[acodec^=mp4a]/b'):
+        # Hard guard against concurrent starts (also protected in UI) to avoid QThread lifetime crashes.
+        if self.is_downloading():
+            self.download_error.emit("Download already in progress. Please wait for completion before starting another.")
+            return False
+
         self.download_url = url
         self.last_download_error = None
         self.error_emitted = False
@@ -75,13 +84,12 @@ class DownloadService(QObject):
         self.download_thread.line_output.connect(self._parse_download_status)
         self.download_thread.finished.connect(self._download_process_finished)
         self.download_thread.start()
+        return True
 
     def _parse_download_status(self, status_line):
         line = status_line.strip()
 
-        # Use character classes for literal square brackets to avoid SyntaxWarning
-        # Changed \s to [ ] to avoid SyntaxWarning with raw strings
-        progress_match = re.search(r'[[]download[]].*?([0-9]+\.?[0-9]*)%', line)
+        progress_match = re.search(r'\[download\].*?([0-9]+\.?[0-9]*)%', line)
         if progress_match:
             percent = int(float(progress_match.group(1)))
             message = f"Downloading: {percent}%"
@@ -96,20 +104,20 @@ class DownloadService(QObject):
 
         # Final file name when download is finished
         # yt-dlp prints the final file path like: '[download] Destination: /path/to/file.mp4'
-        destination_match = re.search(r'[[]download[]] Destination:[ ]+(.*)', line)
+        destination_match = re.search(r'\[download\] Destination:\s+(.*)', line)
         if destination_match:
             self.current_download_filename = destination_match.group(1).strip()
             self.download_progress.emit(100, "Download complete.")
             return
 
         # Handle final path lines for post-processed outputs
-        final_file_match = re.search(r'[[]Merger[]] Merging formats into "(.*)"', line)
+        final_file_match = re.search(r'\[Merger\] Merging formats into "(.*)"', line)
         if final_file_match:
             self.current_download_filename = final_file_match.group(1).strip()
             self.download_progress.emit(100, "Download complete.")
             return
 
-        extracted_audio_match = re.search(r'[[]ExtractAudio[]] Destination:[ ]+(.*)', line)
+        extracted_audio_match = re.search(r'\[ExtractAudio\] Destination:\s+(.*)', line)
         if extracted_audio_match:
             self.current_download_filename = extracted_audio_match.group(1).strip()
             self.download_progress.emit(100, "Download complete.")
