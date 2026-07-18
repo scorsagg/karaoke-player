@@ -89,6 +89,7 @@ def create_main_layout(settings):
     video_tools_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
     video_tools_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
     stack.addWidget(video_tools_scroll)
+    components["video_tools_scroll"] = video_tools_scroll
     components["video_tools_page_components"] = video_tools_page_components
 
     # Index 4: Convert & Export page

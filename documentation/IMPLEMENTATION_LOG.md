@@ -1,5 +1,56 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Realtime Pitch Rubberband Verification (2026-07-18) - COMPLETE ✅
+
+**Status:** Verified
+
+**Files Checked:** `source_code/services/realtime_pitch_service.py`, `resources/ffmpeg.exe`
+
+### Result
+- Current bundled FFmpeg exposes `rubberband` (`A->A Apply time-stretching and pitch-shifting`).
+- Smoke test passed with `rubberband=pitch=1.05946309:tempo=1.0` on a generated sine wave.
+- Realtime service now uses `rubberband=pitch=<factor>:tempo=<speed>` for independent pitch and speed control.
+
+# Change: Playback Realtime Pitch Toggle State Fix (2026-07-18) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+- Pitch changes with Real-time Pitch Mode OFF could leave playback state/rate inconsistent if a shifted stream was active from a prior realtime session.
+- Turning Real-time Pitch Mode OFF during active shifted playback immediately restored original audio pitch, even though the selected pitch value remained non-neutral.
+
+### Fix
+- `set_pitch()` now treats realtime-OFF pitch changes as playback-neutral: it stops any stray shifted stream, unmutes VLC, and reapplies the visible Speed control as VLC rate.
+- `on_realtime_pitch_toggled(False)` now preserves an active non-neutral shifted stream instead of immediately reverting audio to original pitch.
+- Realtime status now displays retained shifted playback when the checkbox is off but the shifted stream is still active.
+
+### Result
+- Pitch spinner changes with realtime OFF no longer affect live playback speed.
+- Unchecking realtime during active shifted playback keeps the current audible pitch until normal playback is restarted.
+
+# Change: Widen Video Crop/Zoom Command Restore + Larger Widen Preview (2026-07-18) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Plain padding made the output 1920x1080 but did not visually widen the active karaoke video content. A later blur-fill attempt was not desired. The Widen page also had unused vertical space while the video preview was capped at 350px.
+
+### Fix
+- Restored the user-provided crop/zoom command style in `widen_active_video_canvas()` with the working crop-height multiplier (`0.3`):
+   `crop=in_w:in_h*0.3:0:in_h*<top_offset>,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`
+- Added a Widen tab `Top crop offset` numeric input so the vertical crop start can be adjusted per video.
+- Increased only the Audio Extraction and Widen tab preview frames to min=420/max=460 and hides their vertical scrollbar; other Video Studio tabs keep their compact 160px frame cap and scroll as needed.
+- Corrected the Widen tab index in `_on_video_tools_tab_changed()` from `4` to `3` so the larger preview branch actually runs.
+- Added `_return_to_widen_video_tab()` so completion of `widen_task` returns to the Widen tab after the output file auto-loads.
+
+### Result
+- Widen Video produces a true crop/zoom 16:9 output with no padding-only or blurred-fill layout.
+- The Widen page uses more available vertical space without changing the sizing of other pages/tabs.
+
 # Change: Playback Page Realtime Tempo/Speed Sync + Neutral Passthrough + Live Amplification Follow-up (2026-07-17) - COMPLETE ✅
 
 **Status:** Implemented
@@ -21,8 +72,7 @@
    - In active realtime (non-neutral), speed changes trigger a short debounced realtime stream restart from current timeline position.
 - Realtime engine tempo pipeline update in `realtime_pitch_service.py`:
    - Added `playback_speed` state + `set_speed()`.
-   - Added robust `_build_atempo_chain()` to support FFmpeg tempo constraints while preserving pitch compensation.
-   - Filter path now applies pitch compensation and user speed together consistently.
+   - Uses bundled FFmpeg's verified `rubberband` filter so pitch and tempo are controlled independently.
 - Hidden live amplification follow-up in `main.py`:
    - Effective output now uses multiplicative `_live_amplify_factor`.
    - Reset status text now reflects current neutral output instead of hardcoded `80/100`.
@@ -1470,14 +1520,9 @@ the frame could never grow beyond 350px despite the window being full-screen.
 - **Exit fullscreen** → `handle_navigation_change(self.stack.currentIndex())` restores the correct  
   per-page height constraints cleanly
 
-### 2. FFmpeg filter (reverted to confirmed-working original)
-Multiple filter variants were tried and rejected:
-- `decrease + pad` (pillarbox) → content appeared smaller ❌
-- `increase + crop` (fill+trim) → cropped top of video ❌  
-- **Restored original:** `crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`  ✅
-
-This filter crops the centre strip of the source, scales it up 10% beyond 1920×1080, then  
-center-crops to exactly 1920×1080 — the user-verified approach for their karaoke video format.
+### 2. FFmpeg filter history (updated 2026-07-18)
+Current Widen Video behavior uses the user-verified crop/zoom command style with a reduced crop-height multiplier:
+`crop=in_w:in_h*0.3:0:in_h*<top_offset>,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`
 
 **Speed improvement:** Added `-preset ultrafast` (no `-c:v`, no `-threads 0`, no `-pix_fmt`).
 - `-threads 0` was removed because multi-threaded encoding produced a bitstream that caused  

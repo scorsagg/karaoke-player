@@ -1,35 +1,35 @@
-Karaoke Studio Pro v3 — Feature List
+Karaoke Studio Pro v3 ï¿½ Feature List
 ======================================
 
 
 PLAYBACK & NAVIGATION
 ---------------------
-- Play / Pause / Seek — Full playback controls with a seek slider and live time display
-- Skip buttons — Jump back or forward 10 seconds
-- Volume control — Slider with mute toggle; volume percentage shown
-- Fullscreen mode — Dedicated fullscreen video view with auto-hiding controls
+- Play / Pause / Seek ï¿½ Full playback controls with a seek slider and live time display
+- Skip buttons ï¿½ Jump back or forward 10 seconds
+- Volume control ï¿½ Slider with mute toggle; volume percentage shown
+- Fullscreen mode ï¿½ Dedicated fullscreen video view with auto-hiding controls
 
 
 LOADING MEDIA
 -------------
-- Open local files — Load any audio or video file via the file browser
-- Drag & drop — Drop a file directly onto the video area to load it instantly
-- YouTube / Stream download — Paste any YouTube or stream URL to download and load automatically
-- Recent files history — Sidebar history list; click any entry to reload it; one-click clear
+- Open local files ï¿½ Load any audio or video file via the file browser
+- Drag & drop ï¿½ Drop a file directly onto the video area to load it instantly
+- YouTube / Stream download ï¿½ Paste any YouTube or stream URL to download and load automatically
+- Recent files history ï¿½ Sidebar history list; click any entry to reload it; one-click clear
 
 
 PITCH & SPEED  (Pitch & Speed page)
 ------------------------------------
-- Pitch shifter — Adjust pitch from -12 to +12 semitones in 0.5-step increments with +/- buttons and a reset
-- Playback speed — Adjust tempo from 0.5x to 2.0x (5% steps) independently of pitch
-- Export rendered file — Export a new file with the selected pitch and speed applied permanently
+- Pitch shifter ï¿½ Adjust pitch from -12 to +12 semitones in 0.5-step increments with +/- buttons and a reset
+- Playback speed ï¿½ Adjust tempo from 0.5x to 2.0x (5% steps) independently of pitch
+- Export rendered file ï¿½ Export a new file with the selected pitch and speed applied permanently
 
 
 REAL-TIME AUDIO METER  (always visible in playback bar)
 --------------------------------------------------------
-- Live level display — Color-coded bar: green (safe) -> orange (moderate) -> red (clipping risk)
-- Two measurement modes — Switch between dB Output (dBFS) and SPL Estimate (Room dB)
-- Auto-reduce protection — Automatically lowers volume when the level exceeds a configurable threshold
+- Live level display ï¿½ Color-coded bar: green (safe) -> orange (moderate) -> red (clipping risk)
+- Two measurement modes ï¿½ Switch between dB Output (dBFS) and SPL Estimate (Room dB)
+- Auto-reduce protection ï¿½ Automatically lowers volume when the level exceeds a configurable threshold
 
 
 AUDIO TOOLS  (Extra Tools -> Audio Tools)
@@ -58,9 +58,9 @@ AUDIO TOOLS  (Extra Tools -> Audio Tools)
   Loudness Normalization
   ----------------------
   - Normalize audio to a consistent loudness target:
-      -14 LUFS — Streaming platforms (Spotify, Apple Music)
-      -16 LUFS — Broadcast standard (TV, Radio)
-      -18 LUFS — Louder output
+      -14 LUFS ï¿½ Streaming platforms (Spotify, Apple Music)
+      -16 LUFS ï¿½ Broadcast standard (TV, Radio)
+      -18 LUFS ï¿½ Louder output
   - Uses industry-standard two-pass EBU R128 analysis via FFmpeg
 
   container / messaging app File Converter
@@ -85,12 +85,12 @@ VIDEO TOOLS  (Extra Tools -> Video Tools)
 
   Widen Video (Aspect-Ratio Pad)
   -------------------------------
-  - Scale a non-widescreen video to a 16:9 canvas by adding padding — no cropping
+  - Scale a non-widescreen video to a 16:9 canvas using the crop/zoom widen command
 
 
 SETTINGS  (Settings button in sidebar)
 ---------------------------------------
-- Paths & Storage — Set the base workspace folder and media download directory
-- System Binaries — Configure paths to FFmpeg, FFprobe, and yt-dlp executables
-- Audio Settings — Choose measurement display mode (dBFS vs SPL);
+- Paths & Storage ï¿½ Set the base workspace folder and media download directory
+- System Binaries ï¿½ Configure paths to FFmpeg, FFprobe, and yt-dlp executables
+- Audio Settings ï¿½ Choose measurement display mode (dBFS vs SPL);
                    set the auto-reduce volume threshold

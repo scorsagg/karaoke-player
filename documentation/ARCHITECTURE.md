@@ -75,7 +75,7 @@ source_code/
 │   ├── download_service.py        # YouTube/stream download service
 │   ├── file_loading_service.py    # Safe load lifecycle + cleanup coordination
 │   ├── audio_service.py           # Audio analysis integration + helper commands
-│   └── realtime_pitch_service.py  # FFmpeg->SoundTouch->sounddevice live pitch pipeline
+│   └── realtime_pitch_service.py  # FFmpeg rubberband->sounddevice live pitch pipeline
 │
 ├── ui/
 │   ├── __init__.py
@@ -119,8 +119,9 @@ Module mapping:
 Video frame height is controlled per-page in `handle_navigation_change()`:
 - Pages 0/1: min=420px, no max — large video area
 - Page 2 (Audio Studio): min=80px, max=100px (audio-only) / 220px (video)
-- Page 3 (Video Studio): min=80px, max=220px, and max=350px on Widen tab
+- Page 3 (Video Studio): min=80px, max=220px, and min=420px/max=460px on Audio Extraction and Widen tabs with the vertical scrollbar hidden
 - Page 4 (Convert & Export): min=80px, max=220px
+- Video Studio tab sizing is handled by `_on_video_tools_tab_changed()`; Widen Video is tab index 3.
 
 **Fullscreen:** `toggle_video_fullscreen()` removes the height cap on enter (sets max=unlimited),
 then calls `handle_navigation_change(current_idx)` on exit to restore page-correct constraints.
@@ -211,6 +212,15 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - The fullscreen/full-video button is available across all Video Studio tabs.
 - This keeps video inspection consistent while trimming, setting playback windows, extracting audio, or widening.
 
+### Video Studio: Widen Video Crop/Zoom (updated 2026-07-18)
+
+- Widen Video exports a 1920x1080 canvas using the user-verified crop/zoom command style.
+- The FFmpeg filter is `crop=in_w:in_h*0.3:0:in_h*<top_offset>,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`.
+- The Widen tab exposes `Top crop offset` because different karaoke videos place lyrics at different vertical positions.
+- Only the Widen tab expands the preview area; leaving that tab restores compact Video Studio sizing.
+- Widen task completion auto-loads the output and then returns to Video Studio tab index 3.
+- Do not replace this with plain padding or blurred background fill.
+
 ### UI Visibility Modes (updated 2026-07-06)
 
 - Pitch page live analyzer panel can be hidden without removing underlying widgets.
@@ -254,7 +264,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Added `RealtimePitchService` (`source_code/services/realtime_pitch_service.py`) for low-latency live pitch-shift playback.
 - Pipeline:
     - input decode through FFmpeg to float32 PCM frames,
-    - real-time pitch/tempo transform via FFmpeg filter chain (`asetrate + aresample + atempo`),
+    - real-time pitch/tempo transform via FFmpeg `rubberband=pitch=<factor>:tempo=<speed>`,
     - stream output via `sounddevice`.
 - `main.py` exposes integration methods:
     - `load_file(path)`
@@ -269,7 +279,10 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Pause/Play in realtime mode now resumes from current timeline position instead of restarting from beginning.
 - Neutral passthrough guard: when realtime toggle is ON but pitch is effectively `0.0`, audio stays on original VLC path (no shifted stream), preventing unintended tempo/pitch drift on toggle.
 - Realtime speed synchronization now updates both VLC and realtime engine state; speed changes in active realtime mode trigger a short debounced stream restart at current timeline position for consistent tempo response.
-- Realtime engine now builds valid FFmpeg `atempo` chains for combined pitch-compensation and playback-speed targets (including edge cases near bounds).
+- Realtime engine uses the bundled FFmpeg `rubberband` filter so pitch and tempo are controlled independently.
+- Bundled `resources/ffmpeg.exe` was verified to expose and execute the `rubberband` filter on 2026-07-18.
+- Pitch spinner changes with realtime OFF are playback-neutral and keep VLC rate pinned to the Speed control value.
+- Turning realtime OFF during active non-neutral shifted playback preserves the current shifted stream; normal VLC playback resumes on the next Play path with realtime OFF.
 
 ---
 

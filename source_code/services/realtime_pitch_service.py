@@ -92,9 +92,7 @@ class RealtimePitchService:
 
         pf = float(2 ** (self.pitch_semitones / 12.0))
         speed = float(self.playback_speed)
-        # Preserve pitch via 1/pf compensation, then apply requested playback speed.
-        tempo_target = (1.0 / pf) * speed
-        atempo_chain = self._build_atempo_chain(tempo_target)
+        audio_filter = f"rubberband=pitch={pf:.8f}:tempo={speed:.8f}"
 
         cmd = [
             self.ffmpeg_path,
@@ -111,7 +109,7 @@ class RealtimePitchService:
             "-ar",
             str(self._sample_rate),
             "-af",
-            f"asetrate={self._sample_rate}*{pf:.8f},aresample={self._sample_rate},{atempo_chain}",
+            audio_filter,
             "-f",
             "f32le",
             "pipe:1",

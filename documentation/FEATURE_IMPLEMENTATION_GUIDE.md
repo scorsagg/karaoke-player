@@ -411,11 +411,14 @@ ffmpeg -i input.mp4 -vf subtitles=transliterated_lyrics.srt -c:a copy output.mp4
 **FFmpeg Command:**
 ```bash
 ffmpeg -i vertical_input.mp4 \
-  -vf "crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080" \
+  -vf "crop=in_w:in_h*0.3:0:in_h*<top_offset>,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080" \
   -c:a copy horizontal_output.mp4
 ```
 
-**Better Approaches:**
+**Implementation Note:**
+Use the user-verified crop/zoom command style for Widen Video. The crop-height multiplier is currently `0.3`, and `<top_offset>` is supplied by the Widen tab's `Top crop offset` control; do not replace this path with plain padding or blurred background fill.
+
+**Alternative Approaches:**
 
 **Option A: Center Crop with Blur Background**
 ```bash

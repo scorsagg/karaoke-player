@@ -4,7 +4,7 @@
 video_length_getter = lambda: 0
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                               QComboBox, QTabWidget)
+                               QComboBox, QTabWidget, QDoubleSpinBox)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from source_code.ui.extra_page import TimePickerWidget
@@ -289,7 +289,7 @@ def create_video_tools_page():
     widen_layout = QVBoxLayout(widen_tab)
     widen_layout.setContentsMargins(6, 8, 6, 6)
 
-    widen_title = QLabel("<b>📐 ASPECT-RATIO LAYOUT PAD ENGINE</b>")
+    widen_title = QLabel("<b>📐 ASPECT-RATIO CROP/ZOOM ENGINE</b>")
     widen_title.setFont(QFont("Segoe UI", 11, QFont.Bold))
     widen_layout.addWidget(widen_title)
 
@@ -297,6 +297,19 @@ def create_video_tools_page():
     widen_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
     widen_layout.addWidget(widen_current_file_label)
     widen_layout.addSpacing(10)
+
+    widen_crop_row = QHBoxLayout()
+    widen_crop_row.addWidget(QLabel("Top crop offset:"))
+    widen_crop_y_spin = QDoubleSpinBox()
+    widen_crop_y_spin.setRange(0.0, 0.7)
+    widen_crop_y_spin.setSingleStep(0.05)
+    widen_crop_y_spin.setDecimals(2)
+    widen_crop_y_spin.setValue(0.10)
+    widen_crop_y_spin.setMaximumWidth(100)
+    widen_crop_row.addWidget(widen_crop_y_spin)
+    widen_crop_row.addWidget(QLabel("x video height"))
+    widen_crop_row.addStretch()
+    widen_layout.addLayout(widen_crop_row)
 
     widen_exec_btn = QPushButton("Scale Active Video to Wide 16:9 Canvas")
     widen_exec_btn.setStyleSheet("background-color: #e67e22; height: 45px; font-weight: bold; font-size: 13px; color: white; border-radius: 4px;")
@@ -311,6 +324,7 @@ def create_video_tools_page():
         "video_current_file_label": video_current_file_label,
         # Widen Video tab
         "widen_current_file_label": widen_current_file_label,
+        "widen_crop_y_spin": widen_crop_y_spin,
         "widen_exec_btn": widen_exec_btn,
         # Trim tab
         "trim_ranges_container": trim_ranges_container,

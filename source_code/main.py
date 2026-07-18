@@ -329,9 +329,11 @@ class KaraokeApp(QWidget):
         # Extract video tools page components
         video_tools_page_components = components["video_tools_page_components"]
         self.video_tools_page_components = video_tools_page_components
+        self.video_tools_scroll = components.get("video_tools_scroll")
         self.video_tools_tabs = video_tools_page_components["tabs"]
         self.video_current_file_label = video_tools_page_components["video_current_file_label"]
         self.widen_current_file_label = video_tools_page_components["widen_current_file_label"]
+        self.widen_crop_y_spin = video_tools_page_components["widen_crop_y_spin"]
         self.widen_exec_btn = video_tools_page_components["widen_exec_btn"]
         self.video_trim_ranges_container = video_tools_page_components["trim_ranges_container"]
         self.video_trim_add_range_btn = video_tools_page_components["trim_add_range_btn"]
@@ -602,14 +604,18 @@ class KaraokeApp(QWidget):
 
     def _on_video_tools_tab_changed(self, tab_idx):
         """Adjust video frame height and fullscreen button based on active Video Tools tab."""
-        if tab_idx == 4:  # Widen Video tab - large frame
-            self.video_frame.setMinimumHeight(80)
-            self.video_frame.setMaximumHeight(350)
+        if tab_idx in (2, 3):  # Audio Extraction / Widen Video tabs - large frame
+            self.video_frame.setMinimumHeight(420)
+            self.video_frame.setMaximumHeight(460)
             self.fullscreen_btn.setVisible(True)
+            if self.video_tools_scroll:
+                self.video_tools_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         else:  # Trimming / Playback Window - compact frame
             self.video_frame.setMinimumHeight(80)
             self.video_frame.setMaximumHeight(160)
             self.fullscreen_btn.setVisible(True)
+            if self.video_tools_scroll:
+                self.video_tools_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.video_frame.updateGeometry()
         if self.layout():
             self.layout().invalidate()
@@ -1466,6 +1472,7 @@ class KaraokeApp(QWidget):
         self.trim_format_combo.setCurrentIndex(0)
         self.video_trim_format_combo.setCurrentIndex(0)
         self.extract_format_combo.setCurrentIndex(0)
+        self.widen_crop_y_spin.setValue(0.10)
 
         # Reset Convert & Export controls.
         self.convert_source_combo.setCurrentIndex(0)
@@ -1979,7 +1986,7 @@ class KaraokeApp(QWidget):
                                 # Very close to 16:9 — warn and ask
                                 reply = QMessageBox.question(self, "Already 16:9?",
                                                              f"Detected resolution: {int(w)}x{int(h)} (ratio {ratio:.3f}).\n"
-                                                             "This appears to already be near 16:9. Running widen may undesirably crop/zoom. Continue?",
+                                                             "This appears to already be near 16:9. Running widen may add padding. Continue?",
                                                              QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                                 if reply != QMessageBox.Yes:
                                     return
@@ -2016,8 +2023,8 @@ class KaraokeApp(QWidget):
         abs_in = os.path.abspath(target_input).replace("\\", "/")
         abs_out = os.path.abspath(out).replace("\\", "/")
 
-        # Original working filter confirmed by user — ultrafast preset for speed, no -threads flag (causes VLC h264 decoder warnings)
-        filter_str = "crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080"
+        crop_y = self.widen_crop_y_spin.value()
+        filter_str = f"crop=in_w:in_h*0.3:0:in_h*{crop_y:.2f},scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080"
         cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-vf", filter_str,
                "-preset", "ultrafast", "-c:a", "copy", abs_out]
 
@@ -2176,6 +2183,13 @@ class KaraokeApp(QWidget):
         if self.realtime_pitch_status is None:
             return
         if not self._is_realtime_pitch_enabled():
+            try:
+                if self.realtime_pitch.is_active():
+                    self.realtime_pitch_status.setText(f"Real-time pitch: retained ({self.pitch_input.value():+.1f} st)")
+                    self.realtime_pitch_status.setStyleSheet("color: #8bc34a; font-size: 10px;")
+                    return
+            except Exception:
+                pass
             self.realtime_pitch_status.setText("Real-time pitch: OFF")
             self.realtime_pitch_status.setStyleSheet("color: #888; font-size: 10px;")
             return
@@ -2202,6 +2216,25 @@ class KaraokeApp(QWidget):
 
     def on_realtime_pitch_toggled(self, enabled):
         if not enabled:
+            keep_shifted_playback = False
+            try:
+                keep_shifted_playback = (
+                    self.realtime_pitch.is_active()
+                    and self.player.is_active()
+                    and not self._is_realtime_neutral()
+                )
+            except Exception:
+                keep_shifted_playback = False
+
+            if keep_shifted_playback:
+                try:
+                    self.player.set_mute(True)
+                    self.player.set_rate(float(self.speed_input.value()))
+                except Exception:
+                    pass
+                self._refresh_realtime_pitch_status()
+                return
+
             try:
                 if self.realtime_pitch.is_active():
                     self.realtime_pitch.stop()
@@ -2210,6 +2243,7 @@ class KaraokeApp(QWidget):
 
             try:
                 self.player.set_mute(False)
+                self.player.set_rate(float(self.speed_input.value()))
             except Exception:
                 pass
 
@@ -2262,6 +2296,20 @@ class KaraokeApp(QWidget):
             self.pitch_input.blockSignals(False)
 
         self.realtime_pitch.set_pitch(semitones)
+
+        if not self._is_realtime_pitch_enabled():
+            try:
+                if self.realtime_pitch.is_active():
+                    self.realtime_pitch.stop()
+            except Exception:
+                pass
+            try:
+                self.player.set_mute(False)
+                self.player.set_rate(float(self.speed_input.value()))
+            except Exception:
+                pass
+            self._refresh_realtime_pitch_status()
+            return
 
         # In toggle-enabled mode, apply updated pitch during active playback within ~1s.
         if self._is_realtime_pitch_enabled() and self.video_path and self.player.is_active():
@@ -3914,7 +3962,13 @@ class KaraokeApp(QWidget):
 
             # Navigate back to Video Tools page after widening
             if task_key == "widen_task":
-                QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_VIDEO_STUDIO))
+                QTimer.singleShot(100, self._return_to_widen_video_tab)
+
+    def _return_to_widen_video_tab(self):
+        """Return to Video Studio's Widen tab after a widen export reloads."""
+        self.handle_navigation_change(PAGE_VIDEO_STUDIO)
+        self.video_tools_tabs.setCurrentIndex(3)
+        self._on_video_tools_tab_changed(3)
 
     def update_ui(self):
         try:
