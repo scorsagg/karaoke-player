@@ -139,7 +139,7 @@ config/
 
 ### Feature 4: Video Aspect Ratio Control ✅
 - Scale videos to 16:9 aspect ratio
-- Maintains video quality with FFmpeg padding
+- Uses the user-verified FFmpeg crop/zoom widen command; current crop-height multiplier is `0.3`
 
 ### Feature 5: Audio Extraction ✅
 - Extract audio from video files to WAV format
@@ -204,7 +204,7 @@ config/
 
 ### Real-Time Pitch Shift Playback ✅ (updated 2026-07-09)
 - Added low-latency real-time pitch-shift playback pipeline:
-   - FFmpeg decode + filter pipeline (`asetrate + aresample + atempo`)
+   - FFmpeg decode + filter pipeline (`rubberband=pitch=<factor>:tempo=<speed>`)
    - Audio output via `sounddevice`
 - New app-level methods in `source_code/main.py`:
    - `load_file(path)`
@@ -229,7 +229,7 @@ config/
 - Real-time toggle now has a neutral passthrough guard: when pitch is `0.0`, checkbox ON keeps original VLC audio path (no shifted stream), preventing unintended pitch/tempo change.
 - Speed control is now centralized through `set_playback_speed()` and synchronizes both VLC rate and realtime engine speed.
 - In active realtime mode (non-neutral), speed changes trigger a short debounced stream restart from current timeline position so tempo updates immediately.
-- `RealtimePitchService` now supports explicit playback speed and builds valid FFmpeg `atempo` chains for combined pitch compensation + speed targets.
+- `RealtimePitchService` now supports explicit playback speed and uses bundled FFmpeg's verified `rubberband` filter for independent pitch + tempo targets.
 - Hidden live amplification follow-up: effective output now uses multiplicative `_live_amplify_factor`, and reset status reflects actual current neutral output value.
 - Playback page wording update: button label changed from `Export Unified Master Render File` to `Export and load with changes`.
 

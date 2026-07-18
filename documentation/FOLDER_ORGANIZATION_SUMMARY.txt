@@ -24,7 +24,7 @@
 │  │  ├─ download_service.py      (YouTube/stream downloads)
 │  │  ├─ audio_service.py         (Audio analyzer management & coordination)
 │  │  ├─ file_loading_service.py  (Thread-safe file loading with state coordination)
-│  │  └─ realtime_pitch_service.py (FFmpeg->SoundTouch->sounddevice real-time pitch playback)
+│  │  └─ realtime_pitch_service.py (FFmpeg rubberband->sounddevice real-time pitch playback)
 │  │
 │  ├─ 📁 ui/ (NEW - Modularized UI Components)
 │  │  ├─ __init__.py              (UI package exports)
@@ -162,7 +162,7 @@ Build Standalone Executable (v3):
    • yt-dlp output parser regexes now use escaped bracket patterns, removing Python FutureWarning spam during downloads
     • Real-time Pitch Mode now has neutral passthrough at 0 semitones, so enabling checkbox no longer alters pitch/tempo unexpectedly
     • Real-time speed updates now sync VLC + shifted stream together (debounced restart), so speed changes continue working while realtime mode is ON
-    • Realtime FFmpeg tempo chain now combines pitch compensation and playback speed safely across valid atempo ranges
+   • Realtime FFmpeg path now uses rubberband for independent pitch and tempo control
     • Hidden live amplification now applies multiplicative gain consistently across repeated adjustments (not just first perceived change)
    • Persistent debug log added at config/app_debug.log (task lifecycle + worker subprocess output)
    • PlayerService auto-configures Windows VLC runtime paths for source runs
@@ -295,6 +295,11 @@ Build Standalone Executable (v3):
 ✅ Video Studio Fullscreen Access (2026-07-06):
    • Full video/fullscreen button is now visible across all Video Studio tabs
    • Improves frame inspection during trimming, playback window setup, extraction, and widen workflows
+
+✅ Widen Video Crop/Zoom Command (2026-07-18):
+   • Widen exports use the user-verified crop/zoom FFmpeg command style
+   • Current crop-height multiplier is 0.3; no plain padding or blurred fill
+   • Widen tab alone uses a larger preview frame; other Video Studio tabs stay compact
 
 ✅ UI Visibility Toggles (2026-07-06):
    • Pitch page live analyzer panel hidden from UI (widgets kept for compatibility)

@@ -51,8 +51,9 @@
 **Video Frame Height Rules (handle_navigation_change in main.py):**
 - idx 0/1 (Media Loader, Playback): min=420, max=unlimited
 - idx 2 (Audio Studio): min=80, max=100 (audio-only) or max=220
-- idx 3 (Video Studio): min=80, max=220 (Widen tab uses max=350)
+- idx 3 (Video Studio): min=80, max=220 (Audio Extraction and Widen tabs use min=420, max=460, vertical scrollbar hidden)
 - idx 4 (Convert & Export): min=80, max=220
+- Video Studio tab indexes: Trimming=0, Playback Window=1, Audio Extraction=2, Widen Video=3
 
 **Navigation Signal (IMPORTANT):**
 - Use `nav_list.itemClicked` NOT `nav_list.currentRowChanged`
@@ -197,6 +198,11 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Exported result auto-loads after processing, then resets the control back to the neutral baseline (`1.00x`)
 - Output naming uses readable suffixes such as `amp_up_5_times` and `amp_down_5_times`
 
+**Playback Pitch/Speed State (2026-07-18)**
+- With Real-time Pitch Mode OFF, pitch spinner changes must not alter live VLC playback speed; VLC rate is kept at the Speed control value.
+- Turning Real-time Pitch Mode OFF during active non-neutral shifted playback preserves the current shifted stream instead of immediately reverting audible pitch to original.
+- Pressing Play with Real-time Pitch Mode OFF still returns to normal VLC playback.
+
 **Vocal Separator (Demucs Default + UVR Fast Alternative) ✅ COMPLETE**
 - Dedicated `Vocal Separator` tab is present in Convert & Export
 - Default backend/model is `Demucs: htdemucs_ft`
@@ -315,12 +321,16 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - Prevents `QThread: Destroyed while thread '' is still running` triggered by double-clicking download while a prior thread is active.
 - Keeps UI and service-level safety in sync so accidental repeat clicks cannot orphan worker threads.
 
-### 12. WIDEN VIDEO FIXES (2026-06-23) ✅ COMPLETE
+### 12. WIDEN VIDEO CROP/ZOOM COMMAND (2026-07-18) ✅ COMPLETE
 **Files changed:** `source_code/main.py` only
 
 **What changed:**
-- `widen_active_video_canvas()` → restored original working FFmpeg filter + added `-preset ultrafast`
-  - Filter: `crop=in_w:in_h*0.3:0:in_h*0.2,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`
+- `widen_active_video_canvas()` uses the crop/zoom FFmpeg command style verified by the user.
+  - Filter: `crop=in_w:in_h*0.3:0:in_h*<top_offset>,scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080`
+- Widen tab exposes `Top crop offset` so users can set the vertical crop start per video (for example `0.10` or `0.20`).
+- Widen tab preview uses a larger page-specific video frame cap (min=420, max=520); other Video Studio tabs stay compact.
+- After `widen_task` completes and auto-loads the output, the app returns to Video Studio's Widen tab (tab index 3).
+- Do not switch this path to plain padding or blurred background fill.
 
 ### 15. VIDEO STUDIO FULLSCREEN ACCESS (2026-07-06) ✅ COMPLETE
 **Files changed:** `source_code/main.py` only
@@ -405,7 +415,7 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 
 **What changed:**
 - Added real-time pitch pipeline service using FFmpeg audio filters and `sounddevice` output:
-  - FFmpeg decode + pitch/tempo filter chain (`asetrate + aresample + atempo`)
+  - FFmpeg decode + pitch/tempo filter chain (`rubberband=pitch=<factor>:tempo=<speed>`)
   - low-latency playback (`sounddevice`)
 - Compatibility update:
   - Removed `pysoundtouch` and `ffmpeg-python` from runtime requirements due package availability constraints.
@@ -453,7 +463,7 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
   - Speed updates are applied to both VLC and realtime engine state (`RealtimePitchService.set_speed()`).
   - Active realtime (non-neutral) speed changes trigger debounced stream restart from current timeline for consistent audible response.
 - Realtime engine tempo chain update:
-  - Added `_build_atempo_chain()` in `realtime_pitch_service.py` so tempo factors remain valid for FFmpeg while combining pitch compensation and playback speed.
+  - `realtime_pitch_service.py` now uses bundled FFmpeg's verified `rubberband` filter so pitch and tempo remain independent.
 - Hidden live amplification follow-up:
   - Effective output now uses multiplicative gain factor (`_live_amplify_factor`) for consistent repeated adjustments.
   - Reset status text now reflects current neutral output value dynamically.
