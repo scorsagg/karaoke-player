@@ -219,6 +219,20 @@ config/
 - Added service module: `source_code/services/realtime_pitch_service.py`
 - Runtime requirements remain installable without `pysoundtouch`/`ffmpeg-python` dependencies.
 
+### Media Loader Download Concurrency Guard ✅ (updated 2026-07-17)
+- Media Loader `Download and Load` is now disabled while a download/load pipeline is active.
+- `DownloadService` now rejects concurrent `download_video()` starts when a thread is already running.
+- This prevents `QThread: Destroyed while thread is still running` when users click download repeatedly.
+- yt-dlp parser regex strings now use escaped bracket syntax (for example `\[download\]`) to avoid Python `FutureWarning` messages.
+
+### Playback Realtime Tempo/Speed Sync ✅ (updated 2026-07-17)
+- Real-time toggle now has a neutral passthrough guard: when pitch is `0.0`, checkbox ON keeps original VLC audio path (no shifted stream), preventing unintended pitch/tempo change.
+- Speed control is now centralized through `set_playback_speed()` and synchronizes both VLC rate and realtime engine speed.
+- In active realtime mode (non-neutral), speed changes trigger a short debounced stream restart from current timeline position so tempo updates immediately.
+- `RealtimePitchService` now supports explicit playback speed and builds valid FFmpeg `atempo` chains for combined pitch compensation + speed targets.
+- Hidden live amplification follow-up: effective output now uses multiplicative `_live_amplify_factor`, and reset status reflects actual current neutral output value.
+- Playback page wording update: button label changed from `Export Unified Master Render File` to `Export and load with changes`.
+
 ### Feature: Playback Stop / Detach ✅
 - The playback bar includes a dedicated Stop button next to Play and Pause
 - Stop rewinds playback to time zero, detaches VLC from the widget, and marks playback inactive

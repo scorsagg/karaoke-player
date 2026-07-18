@@ -10,7 +10,8 @@ class RealtimePitchService:
     def __init__(self, ffmpeg_path: str = "ffmpeg"):
         self.ffmpeg_path = ffmpeg_path
         self.current_path: str = ""
-        self.pitch_semitones: float = -2.0
+        self.pitch_semitones: float = 0.0
+        self.playback_speed: float = 1.0
 
         self._sample_rate = 48000
         self._channels = 2
@@ -28,6 +29,29 @@ class RealtimePitchService:
 
     def set_pitch(self, semitones: float):
         self.pitch_semitones = float(semitones)
+
+    def set_speed(self, speed: float):
+        try:
+            value = float(speed)
+        except Exception:
+            value = 1.0
+        self.playback_speed = max(0.5, min(2.0, value))
+
+    def _build_atempo_chain(self, target: float) -> str:
+        """Build an ffmpeg atempo chain that supports values outside [0.5, 2.0]."""
+        factors = []
+        value = max(0.01, float(target))
+
+        while value > 2.0:
+            factors.append(2.0)
+            value /= 2.0
+
+        while value < 0.5:
+            factors.append(0.5)
+            value /= 0.5
+
+        factors.append(value)
+        return ",".join(f"atempo={f:.6f}" for f in factors)
 
     def is_active(self) -> bool:
         return self._active
@@ -67,7 +91,10 @@ class RealtimePitchService:
             return
 
         pf = float(2 ** (self.pitch_semitones / 12.0))
-        pitch_comp = max(0.5, min(2.0, 1.0 / pf))
+        speed = float(self.playback_speed)
+        # Preserve pitch via 1/pf compensation, then apply requested playback speed.
+        tempo_target = (1.0 / pf) * speed
+        atempo_chain = self._build_atempo_chain(tempo_target)
 
         cmd = [
             self.ffmpeg_path,
@@ -84,7 +111,7 @@ class RealtimePitchService:
             "-ar",
             str(self._sample_rate),
             "-af",
-            f"asetrate={self._sample_rate}*{pf:.8f},aresample={self._sample_rate},atempo={pitch_comp:.6f}",
+            f"asetrate={self._sample_rate}*{pf:.8f},aresample={self._sample_rate},{atempo_chain}",
             "-f",
             "f32le",
             "pipe:1",

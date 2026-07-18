@@ -249,7 +249,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Lowering pitch no longer implies slower tempo unless speed control is intentionally changed.
 - The export path now probes source audio sample rate and uses it for `asetrate/aresample` to avoid duration drift on 48 kHz or other non-44.1 kHz inputs.
 
-### Real-Time Pitch Shift Playback (updated 2026-07-09)
+### Real-Time Pitch Shift Playback (updated 2026-07-17)
 
 - Added `RealtimePitchService` (`source_code/services/realtime_pitch_service.py`) for low-latency live pitch-shift playback.
 - Pipeline:
@@ -267,6 +267,9 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Retune path preserves VLC timeline state (no media rebind when already active), so seekbar/time display remains continuous during pitch changes.
 - Slider seeks and +/-10s jump controls also trigger shifted-audio resync so realtime audio remains aligned with VLC timeline after seeking.
 - Pause/Play in realtime mode now resumes from current timeline position instead of restarting from beginning.
+- Neutral passthrough guard: when realtime toggle is ON but pitch is effectively `0.0`, audio stays on original VLC path (no shifted stream), preventing unintended tempo/pitch drift on toggle.
+- Realtime speed synchronization now updates both VLC and realtime engine state; speed changes in active realtime mode trigger a short debounced stream restart at current timeline position for consistent tempo response.
+- Realtime engine now builds valid FFmpeg `atempo` chains for combined pitch-compensation and playback-speed targets (including edge cases near bounds).
 
 ---
 
@@ -348,6 +351,8 @@ When Stop is invoked, the player pauses, rewinds to the beginning, detaches from
 - Show download progress
 - Handle download errors
 - Integrate with ProcessThread for background execution
+- Enforce a single active download thread to avoid QThread lifecycle crashes on repeated clicks
+- Parse yt-dlp output with escaped bracket regex patterns (no Python FutureWarning noise)
 
 **Public Interface:**
 ```python

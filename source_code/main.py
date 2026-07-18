@@ -48,6 +48,7 @@ class KaraokeApp(QWidget):
         self.is_video_fullscreen = False
         self.download_splash = None
         self.export_splash = None
+        self._download_ui_busy = False
         self._download_from_audio_tools = False
         self._vocal_offline_dialog_shown = False
 
@@ -247,7 +248,7 @@ class KaraokeApp(QWidget):
         media_loader_page_components = components.get("media_loader_page_components", components["download_page_components"])
         self.load_btn = media_loader_page_components["load_btn"]
         self.url_input = media_loader_page_components["url_input"]
-        media_loader_download_btn = media_loader_page_components["dl_btn"]
+        self.media_loader_download_btn = media_loader_page_components["dl_btn"]
         
         pitch_page_components = components["pitch_page_components"]
         self.pitch_minus = pitch_page_components["pitch_minus"]
@@ -276,7 +277,7 @@ class KaraokeApp(QWidget):
         audio_file_btn = extra_page_components["audio_file_btn"]
         self.audio_file_status = extra_page_components["audio_file_status"]
         audio_url_input = extra_page_components["audio_url_input"]
-        audio_dl_btn = extra_page_components["audio_dl_btn"]
+        self.audio_dl_btn = extra_page_components["audio_dl_btn"]
         # Audio Trimming controls (row-based ranges)
         self.audio_trim_ranges_container = extra_page_components["trim_ranges_container"]
         self.audio_trim_add_range_btn = extra_page_components["trim_add_range_btn"]
@@ -394,7 +395,7 @@ class KaraokeApp(QWidget):
         self.clear_hist_btn.clicked.connect(self.clear_history)
         self.settings_btn.clicked.connect(self.open_settings)
         self.load_btn.clicked.connect(lambda: self.load_video())
-        media_loader_download_btn.clicked.connect(lambda: self.download_video())
+        self.media_loader_download_btn.clicked.connect(lambda: self.download_video())
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
         self.play_btn.clicked.connect(self.handle_play)
         self.pause_btn.clicked.connect(self.handle_pause)
@@ -405,14 +406,14 @@ class KaraokeApp(QWidget):
         self.vol_slider.valueChanged.connect(self.set_volume)
         self.seek_slider.sliderPressed.connect(self.on_slider_pressed)
         self.seek_slider.sliderReleased.connect(self.on_slider_released)
-        self.speed_input.valueChanged.connect(lambda v: self.player.set_rate(v))
+        self.speed_input.valueChanged.connect(self.set_playback_speed)
         self.pitch_input.valueChanged.connect(self.set_pitch)
         if self.realtime_pitch_toggle is not None:
             self.realtime_pitch_toggle.toggled.connect(self.on_realtime_pitch_toggled)
         self.export_btn.clicked.connect(self.export_video)
         self.widen_exec_btn.clicked.connect(self.widen_active_video_canvas)
         audio_file_btn.clicked.connect(self.load_audio_tools_file)
-        audio_dl_btn.clicked.connect(lambda: self.download_audio(audio_url_input))
+        self.audio_dl_btn.clicked.connect(lambda: self.download_audio(audio_url_input))
         self.extract_btn.clicked.connect(self.extract_audio_from_video)
         if self.audio_amp_gain_slider is not None:
             self.audio_amp_gain_slider.valueChanged.connect(lambda _v: self.apply_live_amplification("audio"))
@@ -665,10 +666,10 @@ class KaraokeApp(QWidget):
     def _effective_output_volume(self, base_value):
         """Compute effective output volume after live amplification with VLC-safe clamp.
 
-        This uses an additive step offset so changes stay audible across the full range.
+        Apply multiplicative gain so every step change has a consistent audible effect.
         """
-        step = int(getattr(self, '_live_amplify_step', 0) or 0)
-        return max(0, min(100, int(round(float(base_value) + (step * 2)))))
+        factor = float(getattr(self, '_live_amplify_factor', 1.0) or 1.0)
+        return max(0, min(100, int(round(float(base_value) * factor))))
 
     def _factor_from_gain_percent(self, gain_percent):
         """Convert discrete step to a display factor based on the resulting output volume."""
@@ -780,7 +781,8 @@ class KaraokeApp(QWidget):
         self._pre_amplify_base_volume = None
 
         self.set_volume(self.vol_slider.value())
-        self._set_amplify_status_text("Loudness: Normal, Step: 0, Output: 80/100")
+        neutral_output = self._effective_output_volume(self.vol_slider.value())
+        self._set_amplify_status_text(f"Loudness: Normal, Step: 0, Output: {neutral_output}/100")
 
     def toggle_mute(self):
         m = not self.player.get_mute(); self.player.set_mute(m)
@@ -1636,7 +1638,27 @@ class KaraokeApp(QWidget):
             self.audio_overlay.hide()
             self.audio_overlay.setFixedSize(300, 150)  # Reset to default size when hidden
 
+    def _set_download_ui_busy(self, is_busy):
+        """Disable download triggers while a download/load pipeline is active."""
+        self._download_ui_busy = bool(is_busy)
+
+        # Media Loader button + URL field
+        if hasattr(self, 'media_loader_download_btn') and self.media_loader_download_btn is not None:
+            self.media_loader_download_btn.setEnabled(not is_busy)
+            self.media_loader_download_btn.setText("Downloading..." if is_busy else "Download and Load")
+        if hasattr(self, 'url_input') and self.url_input is not None:
+            self.url_input.setEnabled(not is_busy)
+
+        # Keep Audio Studio URL download trigger in sync to prevent overlapping service calls.
+        if hasattr(self, 'audio_dl_btn') and self.audio_dl_btn is not None:
+            self.audio_dl_btn.setEnabled(not is_busy)
+
     def download_video(self):
+        if self.download_service.is_downloading():
+            QMessageBox.information(self, "Download Busy", "A download is already in progress. Please wait until it finishes.")
+            self._set_download_ui_busy(True)
+            return
+
         input_widget = self.url_input
         url = input_widget.text().strip()
         if not url.startswith("http"):
@@ -1654,10 +1676,22 @@ class KaraokeApp(QWidget):
         self.download_splash.set_progress(2, "Initializing download...")
         QApplication.processEvents()
 
-        self.download_service.download_video(url, self.settings["download_directory"])
+        if self.download_service.download_video(url, self.settings["download_directory"]):
+            self._set_download_ui_busy(True)
+        else:
+            if self.download_splash:
+                self.download_splash.close()
+                self.download_splash = None
+            self.status_label.setText("Status: Ready")
+            self._set_download_ui_busy(False)
 
     def download_audio(self, audio_url_input):
         """Download audio from URL for audio tools page"""
+        if self.download_service.is_downloading():
+            QMessageBox.information(self, "Download Busy", "A download is already in progress. Please wait until it finishes.")
+            self._set_download_ui_busy(True)
+            return
+
         url = audio_url_input.text().strip()
         if not url.startswith("http"):
             QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
@@ -1675,11 +1709,19 @@ class KaraokeApp(QWidget):
         QApplication.processEvents()
 
         self._download_from_audio_tools = True
-        self.download_service.download_video(
+        if self.download_service.download_video(
             url,
             self.settings["download_directory"],
             preferred_format="bestaudio/b"
-        )
+        ):
+            self._set_download_ui_busy(True)
+        else:
+            self._download_from_audio_tools = False
+            if self.download_splash:
+                self.download_splash.close()
+                self.download_splash = None
+            self.status_label.setText("Status: Ready")
+            self._set_download_ui_busy(False)
 
     def _on_download_progress(self, percent, message):
         if self.download_splash:
@@ -1724,6 +1766,7 @@ class KaraokeApp(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "File Capture Error", f"Failed capturing downloaded file: {e}")
         finally:
+            self._set_download_ui_busy(False)
             self._download_from_audio_tools = False
 
     def _wait_for_file_ready(self, file_path, max_wait=15, stability_threshold=1.0):
@@ -1788,6 +1831,7 @@ class KaraokeApp(QWidget):
             self.download_splash.close()
             self.download_splash = None
         self.status_label.setText("Status: Ready")
+        self._set_download_ui_busy(self.download_service.is_downloading())
         if "cancelled" in message.lower():
             return
 
@@ -2121,6 +2165,13 @@ class KaraokeApp(QWidget):
     def _is_realtime_pitch_enabled(self):
         return bool(self.realtime_pitch_toggle is not None and self.realtime_pitch_toggle.isChecked())
 
+    def _is_realtime_neutral(self):
+        """True when realtime mode should behave as passthrough (no pitch shift)."""
+        try:
+            return abs(float(self.pitch_input.value())) < 0.01
+        except Exception:
+            return True
+
     def _refresh_realtime_pitch_status(self):
         if self.realtime_pitch_status is None:
             return
@@ -2132,6 +2183,14 @@ class KaraokeApp(QWidget):
         if not self.video_path:
             self.realtime_pitch_status.setText("Real-time pitch: ON (load a file)")
             self.realtime_pitch_status.setStyleSheet("color: #f1c40f; font-size: 10px;")
+            return
+
+        if self._is_realtime_neutral():
+            if self.player.is_active():
+                self.realtime_pitch_status.setText("Real-time pitch: ON (neutral passthrough)")
+            else:
+                self.realtime_pitch_status.setText("Real-time pitch: ON (neutral)")
+            self.realtime_pitch_status.setStyleSheet("color: #8bc34a; font-size: 10px;")
             return
 
         if self.realtime_pitch.is_active():
@@ -2160,10 +2219,30 @@ class KaraokeApp(QWidget):
         if self.video_path:
             self.realtime_pitch.load_file(self.video_path)
 
+        # Sync engine state to visible UI values so toggling ON is neutral at defaults.
+        try:
+            self.realtime_pitch.set_pitch(float(self.pitch_input.value()))
+        except Exception:
+            self.realtime_pitch.set_pitch(0.0)
+
+        try:
+            self.player.set_rate(float(self.speed_input.value()))
+        except Exception:
+            pass
+        try:
+            self.realtime_pitch.set_speed(float(self.speed_input.value()))
+        except Exception:
+            self.realtime_pitch.set_speed(1.0)
+
         # If media is already playing, start shifted stream from current position.
         if self.player.is_active() and self.video_path:
             try:
-                self.play_shifted(start_from_current=True)
+                if self._is_realtime_neutral():
+                    # Keep original VLC audio untouched at neutral pitch.
+                    self.realtime_pitch.stop()
+                    self.player.set_mute(False)
+                else:
+                    self.play_shifted(start_from_current=True)
             except Exception:
                 pass
 
@@ -2196,6 +2275,37 @@ class KaraokeApp(QWidget):
 
         self._refresh_realtime_pitch_status()
 
+    def set_playback_speed(self, speed_value):
+        """Keep VLC and realtime audio speed aligned with the Speed control."""
+        try:
+            speed = float(speed_value)
+        except Exception:
+            speed = 1.0
+
+        speed = max(0.5, min(2.0, speed))
+
+        try:
+            self.player.set_rate(speed)
+        except Exception:
+            pass
+
+        try:
+            self.realtime_pitch.set_speed(speed)
+        except Exception:
+            pass
+
+        # In realtime + active + non-neutral mode, speed change requires stream restart.
+        if self._is_realtime_pitch_enabled() and self.video_path and self.player.is_active() and not self._is_realtime_neutral():
+            if self._realtime_pitch_apply_timer is None:
+                self._realtime_pitch_apply_timer = QTimer(self)
+                self._realtime_pitch_apply_timer.setSingleShot(True)
+                self._realtime_pitch_apply_timer.timeout.connect(
+                    lambda: self.play_shifted(start_from_current=True)
+                )
+            self._realtime_pitch_apply_timer.start(180)
+
+        self._refresh_realtime_pitch_status()
+
     def play_shifted(self, start_from_current=False):
         """Public API: play current media with real-time pitch-shifted audio.
 
@@ -2204,6 +2314,33 @@ class KaraokeApp(QWidget):
         """
         if not self.video_path:
             QMessageBox.warning(self, "No File", "Load a file first")
+            return
+
+        # Always apply currently shown controls before launching shifted stream.
+        try:
+            self.realtime_pitch.set_pitch(float(self.pitch_input.value()))
+        except Exception:
+            self.realtime_pitch.set_pitch(0.0)
+
+        try:
+            self.player.set_rate(float(self.speed_input.value()))
+        except Exception:
+            pass
+        try:
+            self.realtime_pitch.set_speed(float(self.speed_input.value()))
+        except Exception:
+            self.realtime_pitch.set_speed(1.0)
+
+        # At neutral pitch, do not route through shifted engine; preserve original playback.
+        if self._is_realtime_neutral():
+            try:
+                self.realtime_pitch.stop()
+                self.player.set_mute(False)
+            except Exception:
+                pass
+            if self.video_path:
+                self.status_label.setText(f"Status: Playing {os.path.basename(self.video_path)}")
+            self._refresh_realtime_pitch_status()
             return
 
         self.realtime_pitch.load_file(self.video_path)

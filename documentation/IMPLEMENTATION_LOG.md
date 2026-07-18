@@ -1,5 +1,67 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Playback Page Realtime Tempo/Speed Sync + Neutral Passthrough + Live Amplification Follow-up (2026-07-17) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/services/realtime_pitch_service.py`, `source_code/ui/pitch_page.py`
+
+### Problem
+- Realtime toggle could still alter pitch/tempo unexpectedly at neutral settings in some flows.
+- In realtime mode, pitch changes could influence perceived tempo behavior and make speed changes appear stuck until toggle OFF.
+- Hidden live amplification behavior was inconsistent after the first change because effective output used an additive step path instead of the maintained gain factor.
+
+### Fix
+- Realtime neutral passthrough guard in `main.py`:
+   - When realtime is ON and pitch is effectively `0.0`, audio stays on original VLC path (no shifted engine routing).
+   - Prevents checkbox ON from changing pitch/tempo at neutral values.
+- Realtime speed synchronization:
+   - Added centralized `set_playback_speed()` in `main.py` and wired `speed_input` to it.
+   - Speed now updates both VLC playback rate and realtime engine speed.
+   - In active realtime (non-neutral), speed changes trigger a short debounced realtime stream restart from current timeline position.
+- Realtime engine tempo pipeline update in `realtime_pitch_service.py`:
+   - Added `playback_speed` state + `set_speed()`.
+   - Added robust `_build_atempo_chain()` to support FFmpeg tempo constraints while preserving pitch compensation.
+   - Filter path now applies pitch compensation and user speed together consistently.
+- Hidden live amplification follow-up in `main.py`:
+   - Effective output now uses multiplicative `_live_amplify_factor`.
+   - Reset status text now reflects current neutral output instead of hardcoded `80/100`.
+- Playback page wording update:
+   - Pitch page export button text changed to `Export and load with changes`.
+
+### Result
+- Realtime checkbox ON at neutral pitch no longer introduces unintended pitch/tempo change.
+- Realtime pitch and speed now remain synchronized while toggle is ON.
+- Speed changes continue to work in realtime mode without requiring toggle OFF.
+- Hidden live amplification adjustments now continue to apply consistently after initial change.
+
+# Change: Media Loader Download Re-Click Crash Fix + Regex Warning Cleanup (2026-07-17) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/services/download_service.py`
+
+### Problem
+Clicking `Download and Load` repeatedly before completion could start overlapping download threads and produce:
+`QThread: Destroyed while thread '' is still running`.
+
+yt-dlp status parser regexes also produced Python `FutureWarning` noise due to bracket pattern syntax.
+
+### Fix
+- Added UI busy-lock helper in `main.py`:
+   - Disables Media Loader and Audio Studio URL download buttons while active.
+   - Disables Media Loader URL input during active download.
+   - Re-enables controls on finish, cancel, or error.
+- Added service-level concurrency guard in `DownloadService`:
+   - New `is_downloading()` helper.
+   - `download_video()` now rejects concurrent starts if an existing download thread is running.
+- Replaced bracket-matching regexes with escaped forms (`\[download\]`, `\[Merger\]`, `\[ExtractAudio\]`) to remove `FutureWarning` output.
+
+### Result
+- Repeated clicks no longer create overlapping download worker threads.
+- Download trigger remains disabled until the download/load pipeline completes.
+- Warning spam from download regex parsing is removed.
+
 # Change: Demucs-Only Offline Team Packaging + Non-Modal Internet-Required Model Notice (2026-07-11) - COMPLETE ✅
 
 **Status:** Implemented
