@@ -19,6 +19,9 @@ Complete development and contribution guide for Karaoke Studio Pro.
 **Karaoke Studio Pro v3** is a Python-based karaoke application with:
 - Real-time audio monitoring (SPL & dBFS modes)
 - YouTube video downloading and playback
+- Live FFmpeg/sounddevice preview for Convert & Export amplification
+- Page guards keep realtime pitch and live amplification preview from running across each other's workflows
+- Amplify & Export initializes to neutral state on each new audio/video load
 - Configurable room-specific audio calibration
 - Modularized UI architecture
 - Standalone executable (zero external dependencies for end users)

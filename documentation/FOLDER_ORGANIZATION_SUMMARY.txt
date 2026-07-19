@@ -284,6 +284,9 @@ Build Standalone Executable (v3):
        - Signed mode buttons: Amplification + / Reduce amplification -
        - Positive-only amount spinner with 0.25-step increments
       - Boost exports above 1.0x now include a tuned peak limiter to reduce clipping while preserving audible gain
+         - Live Preview auditions the same factor through RealtimePitchService without exporting; default realtime gain remains 1.0
+      - Realtime Pitch Mode and Live Preview are page-guarded so users must stop the active realtime mode before switching between Pitch and Amplify
+         - New file loads reset Amplify to neutral state and keep both audio/video inputs supported
       - Meter dB Output mode now shows true dBFS with approximate SPL context
        - Auto-loads exported result and resets to 1.00x baseline
     • UI Location: Audio Studio + Video Studio + Convert & Export
@@ -301,9 +304,9 @@ Build Standalone Executable (v3):
    • Current crop-height multiplier is 0.3; no plain padding or blurred fill
    • Widen tab alone uses a larger preview frame; other Video Studio tabs stay compact
 
-✅ UI Visibility Toggles (2026-07-06):
+✅ UI Visibility Toggles (2026-07-06, updated 2026-07-19):
    • Pitch page live analyzer panel hidden from UI (widgets kept for compatibility)
-   • Convert & Export Amplify tab hidden from tab bar (backend controls retained)
+   • Convert & Export Amplify tab visible again for export-time gain workflow review
 
 ═══════════════════════════════════════════════════════════════════════════════
 

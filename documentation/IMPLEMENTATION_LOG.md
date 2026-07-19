@@ -1,5 +1,104 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Amplify Initializes on New File Load (2026-07-19) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+Amplify & Export needed to reset predictably whenever a new audio or video file was loaded, including after any live preview state.
+
+### Fix
+- Returned Amplify mode buttons and preview label to `main.py` for explicit reset.
+- New-file load resets Amplify & Export to `Amplification + 1.00x`, clears Live Preview buttons/state, resets realtime gain to `1.0`, and unmutes VLC playback.
+- Status now indicates whether the loaded file is ready as audio or video.
+
+### Result
+Amplify starts from a clean neutral state for every loaded file and remains valid for both audio and video workflows.
+
+# Change: Realtime Pitch / Amplify Page Guard (2026-07-19) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Realtime pitch and live amplify preview share the realtime audio engine, so switching directly between those pages could make the active processing state ambiguous.
+
+### Fix
+- Real-time Pitch Mode now blocks opening the Amplify & Export tab and shows an explicit message.
+- Active Live Preview now blocks switching to Playback / Real-time Pitch and asks the user to stop preview first.
+- Convert & Export tab switching falls back to the last non-Amplify tab when Amplify is blocked.
+
+### Result
+Users can move between Pitch and Amplify only after turning off the active realtime mode on the current page.
+
+# Change: Live Amplify Preview Added Safely (2026-07-19) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/services/realtime_pitch_service.py`, `source_code/ui/convert_export_page.py`, `source_code/main.py`
+
+### Problem
+Amplify & Export worked, but users had to export a file to hear the selected gain.
+
+### Fix
+- Added neutral-by-default gain support to `RealtimePitchService` (`1.0` unless Live Preview starts).
+- Added `Live Preview` and `Stop Preview` buttons to the Amplify & Export tab.
+- Live Preview uses the same signed amount selection as export and applies `volume=<factor>` plus limiter for boosts.
+- Stop Preview resets realtime gain to `1.0`; if realtime pitch is enabled and non-neutral, it restores the pitch stream from the current position.
+
+### Result
+Users can audition amplification in realtime without creating a file, while the existing realtime pitch path remains unchanged until Live Preview explicitly sets gain.
+
+# Change: Amplify Export Returns to Amplify Tab (2026-07-19) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+After an Amplify & Export operation completed, the exported file auto-loaded and the Convert & Export tabs reset to the first tab.
+
+### Fix
+- Added `_return_to_amplify_export_tab()` to navigate back to Convert & Export and select the Amplify & Export tab.
+- Routed `amplify_task` completion through that helper while leaving conversion and normalization behavior unchanged.
+
+### Result
+Amplify & Export stays focused after the exported file is loaded.
+
+# Change: Re-show Convert & Export Amplify Tab (2026-07-19) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/ui/convert_export_page.py`
+
+### Problem
+Amplify & Export controls still existed but the tab was hidden from the Convert & Export tab bar.
+
+### Fix
+- Removed the `tabs.setTabVisible(..., False)` call for the Amplify & Export tab.
+
+### Result
+Amplify & Export is visible again in Convert & Export so the workflow can be reviewed and corrected.
+
+# Change: Playback Window Clear Restores Single Initial Row (2026-07-19) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`
+
+### Problem
+Playback Window Clear set all existing range values to zero but left every added range row in place.
+
+### Fix
+- `clear_playback_window()` now removes all active Playback Window rows and recreates one initial range row.
+- The restored row defaults to `00:00` through the current media duration.
+
+### Result
+Clear returns Playback Window to its initial one-row state after multiple ranges have been added.
+
 # Change: FFprobe Bundling Requirement (2026-07-18) - COMPLETE ✅
 
 **Status:** Implemented

@@ -12,6 +12,7 @@ class RealtimePitchService:
         self.current_path: str = ""
         self.pitch_semitones: float = 0.0
         self.playback_speed: float = 1.0
+        self.gain_factor: float = 1.0
 
         self._sample_rate = 48000
         self._channels = 2
@@ -36,6 +37,13 @@ class RealtimePitchService:
         except Exception:
             value = 1.0
         self.playback_speed = max(0.5, min(2.0, value))
+
+    def set_gain(self, factor: float):
+        try:
+            value = float(factor)
+        except Exception:
+            value = 1.0
+        self.gain_factor = max(0.01, min(10.0, value))
 
     def _build_atempo_chain(self, target: float) -> str:
         """Build an ffmpeg atempo chain that supports values outside [0.5, 2.0]."""
@@ -92,7 +100,13 @@ class RealtimePitchService:
 
         pf = float(2 ** (self.pitch_semitones / 12.0))
         speed = float(self.playback_speed)
-        audio_filter = f"rubberband=pitch={pf:.8f}:tempo={speed:.8f}"
+        audio_filters = [f"rubberband=pitch={pf:.8f}:tempo={speed:.8f}"]
+        gain = float(self.gain_factor)
+        if abs(gain - 1.0) > 0.001:
+            audio_filters.append(f"volume={gain:.4f}")
+            if gain > 1.0:
+                audio_filters.append("alimiter=limit=0.98:attack=5:release=50")
+        audio_filter = ",".join(audio_filters)
 
         cmd = [
             self.ffmpeg_path,

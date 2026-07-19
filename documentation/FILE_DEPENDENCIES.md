@@ -201,14 +201,19 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - container → MP3: `ffmpeg -i input.media -vn -acodec libmp3lame -b:a 192k output.mp3`
 - MP4 → M4A: `ffmpeg -i input.mp4 -vn -acodec aac -b:a 192k output.m4a`
 
-**Amplify & Export (Export-Time ffmpeg Gain) ✅ COMPLETE**
+**Amplify & Export (Export-Time + Live Preview ffmpeg Gain) ✅ COMPLETE**
 - Uses the Convert & Export page, not the studio pages
 - Signed mode selector:
   - `Amplification + ▲` exports with the entered positive amount directly
   - `Reduce amplification - ▼` exports with the reciprocal factor
 - Anti-clipping protection: when boost factor is above `1.0x`, export applies a peak limiter after gain (`volume + alimiter`) to reduce clipping while keeping boost audible
+- Live Preview applies the same selected factor through `RealtimePitchService` without exporting, with service gain defaulting to `1.0` so normal realtime pitch remains unchanged
+- Real-time Pitch Mode blocks opening the Amplify & Export tab; active Live Preview blocks switching to Playback / Real-time Pitch until preview is stopped
+- New-file load initializes Amplify & Export to neutral state: `Amplification +`, `1.00x`, Live Preview stopped, realtime gain reset, and VLC unmuted
+- Works for both audio and video files; audio exports keep supported audio containers, video exports copy video and rewrite amplified AAC audio
 - Amount spinner stays positive-only and uses 0.25 steps
 - Exported result auto-loads after processing, then resets the control back to the neutral baseline (`1.00x`)
+- After exported output auto-loads, the UI returns to the Amplify & Export tab instead of the first Convert & Export tab
 - Output naming uses readable suffixes such as `amp_up_5_times` and `amp_down_5_times`
 
 **Playback Pitch/Speed State (2026-07-18)**
@@ -352,12 +357,12 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - Full video/fullscreen button remains visible across all Video Studio tabs (Trimming, Playback Window, Audio Extraction, Widen Video).
 - Previously it was shown only on the Widen tab, which blocked quick full-frame inspection on other video workflows.
 
-### 16. UI VISIBILITY TOGGLES (2026-07-06) ✅ COMPLETE
+### 16. UI VISIBILITY TOGGLES (2026-07-06, updated 2026-07-19) ✅ COMPLETE
 **Files changed:** `source_code/ui/pitch_page.py`, `source_code/ui/convert_export_page.py`
 
 **What changed:**
 - Pitch page live analyzer panel is hidden from the UI while retaining widget instances for runtime signal safety.
-- Convert & Export Amplify tab is hidden from the tab bar while retaining controls to avoid breaking existing `main.py` wiring.
+- Convert & Export Amplify tab is visible again for export-time amplification review/correction.
 
 ### 17. PLAYBACK TIMER RESET + SEEKBAR VISUAL SYNC (2026-07-09) ✅ COMPLETE
 **Files changed:** `source_code/main.py`
@@ -374,6 +379,7 @@ is_video = os.path.splitext(file_path)[1].lower() in video_exts
 - End-of-track label rendering now clamps final half-second to full duration to avoid 1-second display underflow.
 - Inactive seek targets from slider release are deferred (`_pending_seek_ratio`) and applied after Play begins (`_apply_pending_seek_after_play`) so seek-then-play works after completion.
 - Playback Window full-range rows are treated as no active window in `apply_playback_window()` to avoid auto-rewind to start on every Play.
+- Playback Window Clear removes all extra range rows and recreates one initial row (`00:00` to current media duration).
 - Playback media preflight now treats VLC `Ended` state as requiring rebind in `_ensure_media_loaded_for_playback()`, preventing post-completion dead-end controls where only Stop recovered behavior.
 
 **If modifying this area, also review:**
