@@ -327,6 +327,11 @@ class KaraokeApp(QWidget):
         self.merge_status_label = convert_export_components["merge_status_label"]
         self.amp_factor_spin = convert_export_components["amp_factor_spin"]
         self.amp_mode_group = convert_export_components.get("amp_mode_group")
+        self.amp_plus_btn = convert_export_components.get("amp_plus_btn")
+        self.amp_minus_btn = convert_export_components.get("amp_minus_btn")
+        self.amp_preview_label = convert_export_components.get("amp_preview_label")
+        self.amp_live_btn = convert_export_components.get("amp_live_btn")
+        self.amp_live_stop_btn = convert_export_components.get("amp_live_stop_btn")
         self.amp_btn = convert_export_components["amp_btn"]
         self.amp_source_label = convert_export_components["amp_source_label"]
         self.amp_status_label = convert_export_components["amp_status_label"]
@@ -397,6 +402,8 @@ class KaraokeApp(QWidget):
         self.video_tools_btn.clicked.connect(lambda: self.handle_navigation_change(PAGE_VIDEO_STUDIO))
         self.convert_export_btn.clicked.connect(lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
         self.video_tools_tabs.currentChanged.connect(self._on_video_tools_tab_changed)
+        if self.convert_export_tabs is not None:
+            self.convert_export_tabs.currentChanged.connect(self._on_convert_export_tab_changed)
         self.extra_tools_toggle_btn.clicked.connect(self.toggle_extra_tools)
         self.history_toggle_btn.clicked.connect(self.toggle_history)
         self.clear_hist_btn.clicked.connect(self.clear_history)
@@ -452,6 +459,10 @@ class KaraokeApp(QWidget):
         self.merge_mode_combo.currentTextChanged.connect(lambda _v: self._update_merge_status_hint())
         self.merge_audio_offset_spin.valueChanged.connect(lambda _v: self._update_merge_status_hint())
         self.amp_btn.clicked.connect(self.amplify_export_media)
+        if self.amp_live_btn is not None:
+            self.amp_live_btn.clicked.connect(self.start_live_amplify_preview)
+        if self.amp_live_stop_btn is not None:
+            self.amp_live_stop_btn.clicked.connect(self.stop_live_amplify_preview)
         self.convert_source_combo.currentTextChanged.connect(lambda _v: self.refresh_conversion_targets())
 
         self.merge_input_a_path = ""
@@ -484,6 +495,8 @@ class KaraokeApp(QWidget):
         self._live_amplify_factor = 1.0
         self._pre_amplify_base_volume = None
         self._live_amplify_step = 0
+        self._live_amp_preview_active = False
+        self._last_non_amplify_convert_export_tab_index = 0
         self._update_amplify_reset_buttons(0)
         self._update_amplify_step_button_styles(0)
 
@@ -529,6 +542,27 @@ class KaraokeApp(QWidget):
                 "An audio-only file is currently loaded. Use Audio Studio for audio workflows."
             )
             return
+
+        if idx == PAGE_PLAYBACK and getattr(self, '_live_amp_preview_active', False):
+            QMessageBox.information(
+                self,
+                "Live Amplify Preview Active",
+                "Stop Live Preview on the Amplify & Export tab before switching to Playback / Real-time Pitch."
+            )
+            if hasattr(self, 'amp_status_label') and self.amp_status_label is not None:
+                self.amp_status_label.setText("Stop Live Preview before switching to Playback / Real-time Pitch")
+            return
+
+        if idx == PAGE_CONVERT_EXPORT and self._is_realtime_pitch_enabled():
+            target_tab = self.convert_export_tabs.currentIndex() if self.convert_export_tabs is not None else 0
+            if target_tab == 4:
+                QMessageBox.information(
+                    self,
+                    "Real-time Pitch Active",
+                    "Turn Real-time Pitch Mode OFF before opening Amplify & Export."
+                )
+                self._refresh_realtime_pitch_status()
+                return
 
         if idx in (PAGE_AUDIO_STUDIO, PAGE_VIDEO_STUDIO, PAGE_CONVERT_EXPORT):
             self.nav_list.blockSignals(True)
@@ -626,6 +660,24 @@ class KaraokeApp(QWidget):
             self.layout().invalidate()
             self.layout().activate()
 
+    def _on_convert_export_tab_changed(self, tab_idx):
+        """Prevent realtime pitch and realtime amplify preview pages from crossing while active."""
+        if tab_idx == 4 and self._is_realtime_pitch_enabled():
+            QMessageBox.information(
+                self,
+                "Real-time Pitch Active",
+                "Turn Real-time Pitch Mode OFF before opening Amplify & Export."
+            )
+            if self.convert_export_tabs is not None:
+                self.convert_export_tabs.blockSignals(True)
+                self.convert_export_tabs.setCurrentIndex(getattr(self, '_last_non_amplify_convert_export_tab_index', 0))
+                self.convert_export_tabs.blockSignals(False)
+            self._refresh_realtime_pitch_status()
+            return
+
+        if tab_idx != 4:
+            self._last_non_amplify_convert_export_tab_index = tab_idx
+
     def open_settings(self):
         # Pause audio analyzer while settings dialog is open to prevent conflicts
         was_playing = self.audio_service.pause_analyzer()
@@ -656,23 +708,51 @@ class KaraokeApp(QWidget):
 
     def _reset_export_amplify_factor(self, loaded_file_label=None):
         """Reset the export amplify UI to neutral so the loaded file is treated as the new baseline."""
+        self._clear_live_amplify_preview_state()
+
         if hasattr(self, 'amp_factor_spin') and self.amp_factor_spin is not None:
             self.amp_factor_spin.blockSignals(True)
             self.amp_factor_spin.setValue(1.0)
             self.amp_factor_spin.blockSignals(False)
 
-        if hasattr(self, 'amp_mode_group') and self.amp_mode_group is not None:
-            button = self.amp_mode_group.button(0)
-            if button is not None:
-                button.blockSignals(True)
-                button.setChecked(True)
-                button.blockSignals(False)
+        if hasattr(self, 'amp_plus_btn') and self.amp_plus_btn is not None:
+            self.amp_plus_btn.blockSignals(True)
+            self.amp_plus_btn.setChecked(True)
+            self.amp_plus_btn.setStyleSheet("background-color: #0e639c; color: white; font-weight: bold; min-width: 140px;")
+            self.amp_plus_btn.blockSignals(False)
+
+        if hasattr(self, 'amp_minus_btn') and self.amp_minus_btn is not None:
+            self.amp_minus_btn.blockSignals(True)
+            self.amp_minus_btn.setChecked(False)
+            self.amp_minus_btn.setStyleSheet("background-color: #2f2f2f; color: #ddd; min-width: 160px;")
+            self.amp_minus_btn.blockSignals(False)
+
+        if hasattr(self, 'amp_preview_label') and self.amp_preview_label is not None:
+            self.amp_preview_label.setText("Selected export: Amplification + 1.00x")
 
         if hasattr(self, 'amp_source_label') and self.amp_source_label is not None:
             if loaded_file_label:
                 self.amp_source_label.setText(f"Loaded file ready: {loaded_file_label} (Amplification + 1.00x)")
             else:
                 self.amp_source_label.setText("Loaded file ready: Amplification + 1.00x")
+
+    def _get_export_amplify_selection(self):
+        amount = float(self.amp_factor_spin.value())
+        mode_button = self.amp_mode_group.checkedButton() if hasattr(self, 'amp_mode_group') else None
+        mode = mode_button.property("amp_mode") if mode_button is not None else "amplify"
+        factor = amount if mode == "amplify" else 1.0 / max(amount, 0.01)
+        return mode, amount, factor
+
+    def _clear_live_amplify_preview_state(self):
+        self._live_amp_preview_active = False
+        try:
+            self.realtime_pitch.set_gain(1.0)
+        except Exception:
+            pass
+        if hasattr(self, 'amp_live_btn') and self.amp_live_btn is not None:
+            self.amp_live_btn.setEnabled(True)
+        if hasattr(self, 'amp_live_stop_btn') and self.amp_live_stop_btn is not None:
+            self.amp_live_stop_btn.setEnabled(False)
 
     def _effective_output_volume(self, base_value):
         """Compute effective output volume after live amplification with VLC-safe clamp.
@@ -1227,6 +1307,9 @@ class KaraokeApp(QWidget):
         try:
             if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
                 self.realtime_pitch.stop()
+            if hasattr(self, '_clear_live_amplify_preview_state'):
+                self._clear_live_amplify_preview_state()
+            self.player.set_mute(False)
         except Exception:
             pass
         
@@ -1501,7 +1584,8 @@ class KaraokeApp(QWidget):
 
         # Reset amplify export controls/status.
         self._reset_export_amplify_factor(os.path.basename(self.video_path) if self.video_path else None)
-        self.amp_status_label.setText("Ready to amplify")
+        media_kind = self.classify_media_type(self.video_path) if self.video_path else "media"
+        self.amp_status_label.setText(f"Ready to amplify {media_kind}")
 
         # Reset Audio Studio file status so stale operation tags are cleared.
         if is_audio_only and self.video_path:
@@ -2221,6 +2305,10 @@ class KaraokeApp(QWidget):
 
     def on_realtime_pitch_toggled(self, enabled):
         if not enabled:
+            if getattr(self, '_live_amp_preview_active', False):
+                self.stop_live_amplify_preview()
+                return
+
             keep_shifted_playback = False
             try:
                 keep_shifted_playback = (
@@ -2765,9 +2853,7 @@ class KaraokeApp(QWidget):
             QMessageBox.warning(self, "Invalid Amount", "Amplification amount must be greater than 0")
             return
 
-        mode_button = self.amp_mode_group.checkedButton() if hasattr(self, 'amp_mode_group') else None
-        mode = mode_button.property("amp_mode") if mode_button is not None else "amplify"
-        factor = amount if mode == "amplify" else 1.0 / amount
+        mode, amount, factor = self._get_export_amplify_selection()
 
         media_kind = self.classify_media_type(self.video_path)
         self._current_export_media_kind = media_kind
@@ -2800,6 +2886,101 @@ class KaraokeApp(QWidget):
         else:
             self.amp_status_label.setText(f"Amplifying {os.path.basename(self.video_path)} by {amount:.2f}x with anti-clipping limiter...")
         self.launch_async_task(cmd, abs_out, "amplify_task", override_duration=duration)
+
+    def start_live_amplify_preview(self):
+        """Preview the Amplify & Export settings in real time without writing a file."""
+        if not self.video_path:
+            QMessageBox.warning(self, "No File", "Load an audio or video file first")
+            return
+
+        if self._is_realtime_pitch_enabled():
+            QMessageBox.information(
+                self,
+                "Real-time Pitch Active",
+                "Turn Real-time Pitch Mode OFF on the Playback page before using Live Preview here."
+            )
+            self.amp_status_label.setText("Real-time Pitch Mode is ON; turn it OFF before Live Preview")
+            return
+
+        mode, amount, factor = self._get_export_amplify_selection()
+        try:
+            self.realtime_pitch.set_gain(factor)
+            self.realtime_pitch.set_pitch(float(self.pitch_input.value()))
+        except Exception:
+            self.realtime_pitch.set_pitch(0.0)
+        try:
+            speed = float(self.speed_input.value())
+            self.player.set_rate(speed)
+            self.realtime_pitch.set_speed(speed)
+        except Exception:
+            self.realtime_pitch.set_speed(1.0)
+
+        self.realtime_pitch.load_file(self.video_path)
+
+        player_was_active = False
+        start_seconds = 0.0
+        try:
+            player_was_active = bool(self.player.is_active())
+            if player_was_active:
+                start_seconds = max(0.0, float(self.player.get_time() / 1000.0))
+        except Exception:
+            player_was_active = False
+            start_seconds = 0.0
+
+        try:
+            if player_was_active:
+                self.player.set_mute(True)
+            else:
+                self.player.set_media(os.path.abspath(self.video_path))
+                self.player.set_video_widget(int(self.video_frame.winId()))
+                self.player.set_mute(True)
+                self.player.play()
+        except Exception as exc:
+            self._clear_live_amplify_preview_state()
+            QMessageBox.warning(self, "Live Preview", f"Could not start media timeline: {exc}")
+            return
+
+        try:
+            self.realtime_pitch.play_shifted(start_seconds=start_seconds)
+            self.audio_service.start_audio_monitoring()
+        except Exception as exc:
+            self._clear_live_amplify_preview_state()
+            try:
+                self.player.set_mute(False)
+            except Exception:
+                pass
+            QMessageBox.warning(self, "Live Preview", str(exc))
+            return
+
+        self._live_amp_preview_active = True
+        if self.amp_live_btn is not None:
+            self.amp_live_btn.setEnabled(False)
+        if self.amp_live_stop_btn is not None:
+            self.amp_live_stop_btn.setEnabled(True)
+        direction = "reduced" if mode == "reduce" else "amplified"
+        self.amp_status_label.setText(f"Live preview active: {direction} by {amount:.2f}x (no export)")
+        self.status_label.setText(f"Status: Live amplification preview ({factor:.2f}x)")
+        self._refresh_realtime_pitch_status()
+
+    def stop_live_amplify_preview(self):
+        """Stop live amplification preview and restore the normal realtime audio state."""
+        self._clear_live_amplify_preview_state()
+
+        if self._is_realtime_pitch_enabled() and not self._is_realtime_neutral() and self.player.is_active():
+            self.play_shifted(start_from_current=True)
+            self.amp_status_label.setText("Live preview stopped; real-time pitch restored")
+            return
+
+        try:
+            if self.realtime_pitch.is_active():
+                self.realtime_pitch.stop()
+            self.player.set_mute(False)
+        except Exception:
+            pass
+
+        self.amp_status_label.setText("Live preview stopped")
+        self.status_label.setText("Status: Ready")
+        self._refresh_realtime_pitch_status()
 
     def build_amplify_export_cmd(self, input_file, output_file, factor, media_kind, src_ext):
         """Build FFmpeg command to amplify audio or video and preserve the appropriate container."""
@@ -3960,8 +4141,10 @@ class KaraokeApp(QWidget):
             # Navigate back to Audio Tools page for audio operations
             if task_key in ["extract_task", "trim_task"]:
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_AUDIO_STUDIO))
-            if task_key in ["convert_task", "normalize_task", "amplify_task"]:
+            if task_key in ["convert_task", "normalize_task"]:
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
+            if task_key == "amplify_task":
+                QTimer.singleShot(100, self._return_to_amplify_export_tab)
             if task_key == "merge_task":
                 QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
 
@@ -3974,6 +4157,12 @@ class KaraokeApp(QWidget):
         self.handle_navigation_change(PAGE_VIDEO_STUDIO)
         self.video_tools_tabs.setCurrentIndex(3)
         self._on_video_tools_tab_changed(3)
+
+    def _return_to_amplify_export_tab(self):
+        """Return to Convert & Export's Amplify tab after an amplify export reloads."""
+        self.handle_navigation_change(PAGE_CONVERT_EXPORT)
+        if self.convert_export_tabs is not None:
+            self.convert_export_tabs.setCurrentIndex(4)
 
     def update_ui(self):
         try:
@@ -4077,6 +4266,7 @@ class KaraokeApp(QWidget):
         self.apply_playback_window()
         try:
             if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
+                self._clear_live_amplify_preview_state()
                 self.realtime_pitch.stop()
         except Exception:
             pass
@@ -4093,6 +4283,7 @@ class KaraokeApp(QWidget):
         self.player.pause()
         try:
             if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
+                self._clear_live_amplify_preview_state()
                 self.realtime_pitch.stop()
         except Exception:
             pass
@@ -4102,6 +4293,7 @@ class KaraokeApp(QWidget):
         """Stop button handler — rewinds to the start and detaches VLC output."""
         try:
             if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
+                self._clear_live_amplify_preview_state()
                 self.realtime_pitch.stop()
         except Exception:
             pass
@@ -4177,27 +4369,22 @@ class KaraokeApp(QWidget):
         self.pw_status_label.setStyleSheet("color: #2ecc71; font-size: 10px;")
 
     def clear_playback_window(self):
-        """Reset all Playback Window controls to zero/unchecked."""
+        """Reset Playback Window to a single initial range row."""
         self._pw_end_ms = None
         self._pw_ranges = []
         self._pw_range_idx = 0
-        # Reset all range rows to zero (keep rows present)
+
         try:
-            container = getattr(self, 'pw_ranges_container', None)
-            layout = container.layout()
-            for i in range(layout.count()):
-                row = layout.itemAt(i).widget()
-                if not row:
-                    continue
-                pickers = row.findChildren(TimePickerWidget)
-                for picker in pickers:
-                    for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
-                        sp.blockSignals(True)
-                    picker.set_total_seconds(0)
-                    for sp in (picker.hour_spin, picker.min_spin, picker.sec_spin):
-                        sp.blockSignals(False)
+            total_s = self._get_current_video_duration_seconds()
+            self._reset_rows_to_single_range(
+                getattr(self, 'pw_ranges_container', None),
+                getattr(self, 'pw_add_range', None),
+                0,
+                total_s,
+            )
         except Exception:
             pass
+
         self.pw_status_label.setText("No playback window active")
         self.pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
 

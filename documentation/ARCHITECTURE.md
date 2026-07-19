@@ -153,15 +153,19 @@ The Pitch page now includes a live note readout for playback audio:
 - The Pitch page shows a large note label plus frequency/confidence details
 - Playback loopback is the first supported source; microphone input can reuse the same display path later
 
-### Convert & Export: Amplify & Export (updated 2026-06-30)
+### Convert & Export: Amplify & Export (updated 2026-07-19)
 
-Convert & Export owns export-time amplification instead of the studio pages:
+Convert & Export owns amplification instead of the studio pages:
 - Signed mode buttons select the export direction:
     - `Amplification + ▲` applies the entered positive amount directly
     - `Reduce amplification - ▼` applies the reciprocal factor
 - The amount spinner stays positive-only and uses 0.25-step increments
 - `main.py` builds FFmpeg commands with `volume=<factor>` and auto-loads the exported result
 - For boost factors above `1.0x`, the export pipeline appends `alimiter` after gain to reduce peak clipping distortion while preserving louder output
+- Live Preview uses `RealtimePitchService` with an explicit gain factor to audition the same setting without creating a file; default service gain is `1.0`, preserving existing realtime pitch behavior until preview is started
+- Navigation guards keep Real-time Pitch Mode and Live Amplify Preview from crossing pages: pitch mode must be OFF before opening Amplify & Export, and live preview must be stopped before switching to Playback / Real-time Pitch
+- Each new media load resets Amplify & Export to neutral `Amplification + 1.00x`, clears Live Preview state, resets realtime gain, and unmutes VLC playback
+- Amplify supports both audio and video inputs; video exports preserve video stream and encode amplified audio to AAC
 - The audio meter dB Output mode displays true `dBFS` with approximate SPL context for clearer verification of gain changes
 - After load, the control resets to the neutral `1.00x` baseline so the new file becomes the reference point
 
@@ -221,10 +225,10 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Widen task completion auto-loads the output and then returns to Video Studio tab index 3.
 - Do not replace this with plain padding or blurred background fill.
 
-### UI Visibility Modes (updated 2026-07-06)
+### UI Visibility Modes (updated 2026-07-19)
 
 - Pitch page live analyzer panel can be hidden without removing underlying widgets.
-- Convert & Export can hide the Amplify tab while preserving backend control references for compatibility.
+- Convert & Export shows the Amplify & Export tab for export-time gain workflows.
 
 ### Playback Timing Consistency (updated 2026-07-09)
 

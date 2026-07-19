@@ -242,7 +242,7 @@ def create_video_tools_page():
     pw_apply_btn = QPushButton("▶  Apply & Play")
     pw_apply_btn.setStyleSheet("background-color: #2ecc71; color: black; font-weight: bold; height: 32px;")
     pw_clear_btn = QPushButton("Clear")
-    pw_clear_btn.setStyleSheet("background-color: #555; color: white; height: 32px; min-width: 80px;")
+    pw_clear_btn.setStyleSheet("QPushButton { background-color: #c0392b; color: white; height: 32px; min-width: 80px; font-weight: bold; } QPushButton:disabled { background-color: #555; color: #aaa; }")
     btn_row.addWidget(pw_apply_btn)
     btn_row.addWidget(pw_clear_btn)
     pw_layout.addLayout(btn_row)

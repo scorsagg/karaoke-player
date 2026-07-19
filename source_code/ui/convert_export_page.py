@@ -406,16 +406,23 @@ def create_convert_export_page():
 
     amp_btn = QPushButton("Export Amplified")
     amp_btn.setStyleSheet("background-color: #f39c12; height: 35px; font-weight: bold; color: white;")
-    amp_layout.addWidget(amp_btn)
+    amp_action_row = QHBoxLayout()
+    amp_live_btn = QPushButton("Live Preview")
+    amp_live_btn.setStyleSheet("background-color: #2ecc71; height: 35px; font-weight: bold; color: black;")
+    amp_live_stop_btn = QPushButton("Stop Preview")
+    amp_live_stop_btn.setEnabled(False)
+    amp_live_stop_btn.setStyleSheet("QPushButton { background-color: #c0392b; height: 35px; font-weight: bold; color: white; } QPushButton:disabled { background-color: #555; color: #aaa; }")
+    amp_action_row.addWidget(amp_live_btn)
+    amp_action_row.addWidget(amp_live_stop_btn)
+    amp_action_row.addWidget(amp_btn)
+    amp_layout.addLayout(amp_action_row)
 
     amp_status_label = QLabel("Ready to amplify")
     amp_status_label.setStyleSheet("color: #888; font-size: 10px;")
     amp_layout.addWidget(amp_status_label)
     amp_layout.addStretch()
 
-    # Keep Amplify controls alive for existing wiring, but hide tab from the UI.
-    amp_tab_index = tabs.addTab(amp_tab, "🔊 Amplify & Export")
-    tabs.setTabVisible(amp_tab_index, False)
+    tabs.addTab(amp_tab, "🔊 Amplify & Export")
 
     return {
         "page": page,
@@ -447,7 +454,12 @@ def create_convert_export_page():
         "merge_execute_btn": merge_execute_btn,
         "merge_status_label": merge_status_label,
         "amp_mode_group": amp_mode_group,
+        "amp_plus_btn": amp_plus_btn,
+        "amp_minus_btn": amp_minus_btn,
         "amp_factor_spin": amp_factor_spin,
+        "amp_preview_label": amp_preview_label,
+        "amp_live_btn": amp_live_btn,
+        "amp_live_stop_btn": amp_live_stop_btn,
         "amp_btn": amp_btn,
         "amp_source_label": amp_source_label,
         "amp_status_label": amp_status_label,
