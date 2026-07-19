@@ -1,7 +1,7 @@
 # Karaoke Studio Pro v3 - Build Guide
 
 ## Overview
-This guide explains how to build a **complete standalone executable** of Karaoke Studio Pro v3 that includes all required tools (FFmpeg, yt-dlp, VLC libraries) so team members need **zero external dependencies**.
+This guide explains how to build a **complete standalone executable** of Karaoke Studio Pro v3 that includes all required tools (FFmpeg, FFprobe, yt-dlp, VLC libraries) so team members need **zero external dependencies**.
 
 ## Prerequisites
 
@@ -14,6 +14,7 @@ This guide explains how to build a **complete standalone executable** of Karaoke
 
 3. **All bundled tools present** in `resources/` folder:
    - ⚠️ `ffmpeg.exe` - Video processing
+   - ⚠️ `ffprobe.exe` - Media metadata/duration probing
    - ⚠️ `yt-dlp.exe` - YouTube/stream downloading
    - ⚠️ `libvlc.dll` - VLC video library
    - ⚠️ `libvlccore.dll` - VLC core library
@@ -32,7 +33,7 @@ Contact your team lead to get the `resources/` folder with all files already inc
 1. **Download FFmpeg**
    - Go to: https://ffmpeg.org/download.html
    - Download Windows build (static)
-   - Extract and copy `ffmpeg.exe` to `resources/`
+   - Extract and copy `ffmpeg.exe` and `ffprobe.exe` to `resources/`
 
 2. **Download yt-dlp**
    - Go to: https://github.com/yt-dlp/yt-dlp/releases
@@ -50,7 +51,7 @@ Contact your team lead to get the `resources/` folder with all files already inc
 **Verify setup:**
 ```powershell
 ls resources/
-# Should show: ffmpeg.exe, yt-dlp.exe, libvlc.dll, libvlccore.dll, plugins/, splash.png, Loading.png
+# Should show: ffmpeg.exe, ffprobe.exe, yt-dlp.exe, libvlc.dll, libvlccore.dll, plugins/, splash.png, Loading.png
 ```
 
 ## Building the Executable

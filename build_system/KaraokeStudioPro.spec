@@ -7,7 +7,7 @@ Build with: python build_system/build.py (from project root)
 OR: cd build_system && python build.py
 
 All required tools are bundled:
-- ffmpeg.exe, yt-dlp.exe 
+- ffmpeg.exe, ffprobe.exe, yt-dlp.exe 
 - VLC libraries (libvlc.dll, libvlccore.dll, plugins/)
 Team members need ZERO external dependencies!
 """
@@ -18,9 +18,10 @@ a = Analysis(
     ['../source_code/main.py'],  # Point to source_code folder
     pathex=[],
     
-    # Binaries to include (FFmpeg and yt-dlp from resources folder)
+    # Binaries to include (FFmpeg, FFprobe, and yt-dlp from resources folder)
     binaries=[
         ('../resources/ffmpeg.exe', '.'),
+        ('../resources/ffprobe.exe', '.'),
         ('../resources/yt-dlp.exe', '.'),
     ],
     

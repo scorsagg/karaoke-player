@@ -29,6 +29,19 @@
 - Creating new dialog: `source_code.dialogs.new_dialog`
 - Creating new worker: `source_code.workers.new_worker`
 
+### 3b. BUNDLED TOOL BINARIES
+**Files to update when adding/removing bundled executables:**
+- `resources/` → must contain required executable
+- `build_system/build.py` → prerequisite validation and summary text
+- `build_system/KaraokeStudioPro.spec` → `binaries=[]` bundle list
+- `source_code/main.py` → default settings and legacy path migration
+- `documentation/INSTALLATION.txt` → bundled component list/settings descriptions
+
+**Required bundled tools:**
+- `ffmpeg.exe` → encoding/transcoding/filter execution
+- `ffprobe.exe` → media duration, stream type, and sample-rate probing
+- `yt-dlp.exe` → URL downloads
+
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:
 - main_layout.py, sidebar.py, playback_bar.py, media_loader_page.py, pitch_page.py, audio_studio_page.py, video_tools_page.py, convert_export_page.py

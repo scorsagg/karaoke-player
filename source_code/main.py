@@ -126,13 +126,14 @@ class KaraokeApp(QWidget):
         self._setup_debug_logger()
 
         bundled_ffmpeg = get_resource_path("ffmpeg.exe")
+        bundled_ffprobe = get_resource_path("ffprobe.exe")
         bundled_ytdlp = get_resource_path("yt-dlp.exe")
 
         self.settings = {
             "base_directory": str(app_dir),
             "download_directory": str(app_dir),
             "ffmpeg_path": bundled_ffmpeg if os.path.exists(bundled_ffmpeg) else "ffmpeg",
-            "ffprobe_path": "ffprobe",
+            "ffprobe_path": bundled_ffprobe if os.path.exists(bundled_ffprobe) else "ffprobe",
             "ytdlp_path": bundled_ytdlp if os.path.exists(bundled_ytdlp) else "yt-dlp",
             "measurement_mode": "dB Output (dBFS)",
             "auto_reduce_threshold": 90
@@ -147,6 +148,10 @@ class KaraokeApp(QWidget):
             ffmpeg_path = str(self.settings.get("ffmpeg_path", "")).strip().lower()
             if ffmpeg_path in {"ffmpeg", "ffmpeg.exe"} and os.path.exists(bundled_ffmpeg):
                 self.settings["ffmpeg_path"] = bundled_ffmpeg
+
+            ffprobe_path = str(self.settings.get("ffprobe_path", "")).strip().lower()
+            if ffprobe_path in {"ffprobe", "ffprobe.exe"} and os.path.exists(bundled_ffprobe):
+                self.settings["ffprobe_path"] = bundled_ffprobe
 
             ytdlp_path = str(self.settings.get("ytdlp_path", "")).strip().lower()
             if ytdlp_path in {"yt-dlp", "yt-dlp.exe"} and os.path.exists(bundled_ytdlp):

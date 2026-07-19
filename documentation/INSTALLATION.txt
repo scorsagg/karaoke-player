@@ -87,6 +87,7 @@ FEATURES
 
 Click "Settings" button to configure:
 ├─ FFmpeg Path          - Location of FFmpeg executable (usually auto-detected)
+├─ FFprobe Path         - Location of FFprobe executable (usually auto-detected)
 ├─ yt-dlp Path          - Location of yt-dlp (usually auto-detected)
 ├─ Download Directory   - Where to save downloaded videos
 ├─ Measurement Mode    - Switch between dB Output (dBFS) or SPL Estimate
@@ -165,6 +166,7 @@ NOTE: Auto-reduce prevents excessive audio spikes and hearing damage!
 This package includes all necessary components:
 
 ✓ FFmpeg               - Video encoding/transcoding engine
+✓ FFprobe              - Media metadata/duration analysis engine
 ✓ yt-dlp              - YouTube content downloader
 ✓ VLC Libraries       - Media playback engine (libvlc.dll + plugins)
 ✓ PySide6             - Qt6 GUI framework

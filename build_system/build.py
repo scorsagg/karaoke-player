@@ -29,6 +29,7 @@ TEMP_DIR = PROJECT_ROOT / ".build_temp"
 # Required binaries and data files (now in RESOURCES folder)
 REQUIRED_BINARIES = {
     "ffmpeg.exe": "FFmpeg executable",
+    "ffprobe.exe": "FFprobe executable",
     "yt-dlp.exe": "yt-dlp executable",
 }
 
@@ -95,6 +96,7 @@ def validate_prerequisites():
     # Check for bundled tools (ALL REQUIRED NOW)
     bundled_tools = {
         "ffmpeg.exe": "FFmpeg executable",
+        "ffprobe.exe": "FFprobe executable",
         "yt-dlp.exe": "yt-dlp executable",
         "libvlc.dll": "VLC library",
         "libvlccore.dll": "VLC core library",
@@ -353,7 +355,7 @@ def print_summary():
     print("  1. TEST: dist/KaraokeStudioPro/KaraokeStudioPro.exe")
     print("  2. DISTRIBUTE: dist/ folder contains standalone executable")
     print("  3. NO INSTALLATION NEEDED: Team members just run the .exe")
-    print("     - All tools (FFmpeg, yt-dlp, VLC) are bundled")
+    print("     - All tools (FFmpeg, FFprobe, yt-dlp, VLC) are bundled")
     print("     - Zero external dependencies required!")
     print("="*70 + "\n")
 

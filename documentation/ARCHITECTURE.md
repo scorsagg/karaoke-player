@@ -610,6 +610,7 @@ audio_analyzer.level_updated.connect(audio_meter.set_level)
 - Display current settings
 - Allow user to configure:
   - FFmpeg executable path
+    - FFprobe executable path
   - yt-dlp executable path
   - Download directory
   - Video output options
@@ -620,6 +621,7 @@ audio_analyzer.level_updated.connect(audio_meter.set_level)
 ```json
 {
   "ffmpeg_path": "path/to/ffmpeg.exe",
+    "ffprobe_path": "path/to/ffprobe.exe",
   "yt_dlp_path": "path/to/yt-dlp.exe",
   "download_dir": "path/to/downloads",
   "video_output": "auto"
@@ -660,7 +662,7 @@ level_updated = pyqtSignal(float)  # Emits dB values (-80 to 0)
 **Purpose:** Generic background subprocess executor
 
 **Responsibilities:**
-- Execute external commands (FFmpeg, yt-dlp)
+- Execute external commands (FFmpeg, FFprobe, yt-dlp)
 - Capture and parse process output
 - Stream progress updates
 - Handle process errors
