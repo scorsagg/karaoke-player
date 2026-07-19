@@ -1,5 +1,23 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: FFprobe Bundling Requirement (2026-07-18) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `build_system/build.py`, `build_system/KaraokeStudioPro.spec`, `source_code/main.py`, `documentation/INSTALLATION.txt`
+
+### Problem
+The app uses `ffprobe` for duration, stream classification, and sample-rate probing, but packaged builds only validated/bundled `ffmpeg.exe` and `yt-dlp.exe`.
+
+### Fix
+- Added `ffprobe.exe` to build prerequisite validation.
+- Added `ffprobe.exe` to PyInstaller bundled binaries.
+- Added bundled `ffprobe.exe` auto-detection and legacy setting migration in `main.py`.
+- Updated installation documentation to list FFprobe as a bundled component.
+
+### Result
+Future distribution builds require `resources/ffprobe.exe` and include it in the standalone package.
+
 # Change: Realtime Pitch Rubberband Verification (2026-07-18) - COMPLETE ✅
 
 **Status:** Verified
