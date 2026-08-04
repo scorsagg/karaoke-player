@@ -55,8 +55,10 @@ when `resources/libvlc.dll` and `resources/plugins/` are present. Manual PATH or
 ### Building Standalone Executable
 ```powershell
 cd d:\Srikanth\Academics\Python\karaoke-player
-python build_system\build.py
-# Output: build_system/dist/KaraokeStudioProV3/KaraokeStudioProV3.exe
+# Use the runtime that already has the package toolchain installed
+C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe build_system\build.py
+# Or set KARAOKE_BUILD_PYTHON to the same interpreter before running the build script
+# Output: build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe
 ```
 
 ---
@@ -65,7 +67,14 @@ python build_system\build.py
 
 ```
 source_code/
-├── main.py                    # App orchestrator & event handler
+├── main.py                    # App orchestrator & event handler with thin compatibility façade
+├── models/
+│   └── app_state.py          # Shared runtime state and window-field compatibility map
+├── controllers/
+│   ├── playback_controller.py # Playback lifecycle extraction
+│   ├── media_controller.py    # Media load/history extraction
+│   ├── processing_controller.py # FFmpeg command builders + async task orchestration
+│   └── navigation_controller.py # Page-switch and tab-guard navigation orchestration
 ├── ui/                        # Modularized UI components
 │   ├── main_layout.py        # Orchestrator assembling all UI
 │   ├── sidebar.py            # Navigation & settings

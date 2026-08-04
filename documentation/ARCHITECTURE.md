@@ -22,6 +22,10 @@ Karaoke Studio Pro v3 is a feature-rich cross-platform karaoke application built
 ```
 ┌─────────────────────────────────────────────┐
 │      KaraokeApp (Main Window)               │
+│      ├─ Controllers                         │
+│      │  ├─ PlaybackController              │
+│      │  ├─ MediaController                 │
+│      │  └─ ProcessingController            │
 │      ├─ MenuBar                             │
 │      ├─ VideoFrame (Video Display)          │
 │      ├─ AudioLevelMeter (Audio Visualization)
@@ -67,7 +71,15 @@ source_code/
 │   └── settings_dialog.py         # Application settings UI
 │
 ├── models/
-│   └── __init__.py                # Data models (placeholder)
+│   ├── __init__.py                # Data models (placeholder)
+│   └── app_state.py               # Central runtime state container for window-level attributes
+│
+├── controllers/
+│   ├── __init__.py                # Controller package exports
+│   ├── playback_controller.py      # Playback lifecycle extraction
+│   ├── media_controller.py         # Media load/history extraction
+│   ├── processing_controller.py    # FFmpeg command builders + task lifecycle orchestration
+│   └── navigation_controller.py    # page-switch and tab-guard navigation orchestration
 │
 ├── services/
 │   ├── __init__.py

@@ -60,18 +60,25 @@ ls resources/
 ```powershell
 cd D:\Srikanth\Academics\Python\karaoke-player
 
-pip install -r build_system\requirements-build.txt
+C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe -m pip install -r build_system\requirements-build.txt
 
-python build_system\build.py
+C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe build_system\build.py
 ```
 
 ### Method 2: From Build System Folder
 ```powershell
 cd D:\Srikanth\Academics\Python\karaoke-player\build_system
 
-pip install -r requirements-build.txt
+C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe -m pip install -r requirements-build.txt
 
-python build.py
+C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe build.py
+```
+
+### Build Interpreter Override
+If your shell is resolving a different Python, force the verified build runtime with:
+```powershell
+$env:KARAOKE_BUILD_PYTHON = "C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe"
+python build_system\build.py
 ```
 
 ## Build Output
