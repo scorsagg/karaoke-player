@@ -31,6 +31,11 @@ from source_code.services.file_loading_service import FileLoadingService
 from source_code.services.realtime_pitch_service import RealtimePitchService
 from source_code.ui.main_layout import create_main_layout
 from source_code.ui.extra_page import TimePickerWidget
+from source_code.models.app_state import AppState
+from source_code.controllers.playback_controller import PlaybackController
+from source_code.controllers.media_controller import MediaController
+from source_code.controllers.processing_controller import ProcessingController
+from source_code.controllers.navigation_controller import NavigationController
 
 # Main stack page indices
 PAGE_MEDIA_LOADER = 0
@@ -40,17 +45,34 @@ PAGE_VIDEO_STUDIO = 3
 PAGE_CONVERT_EXPORT = 4
 
 class KaraokeApp(QWidget):
+    _state_field_names = set(AppState.__dataclass_fields__.keys())
+    _page_constant_names = {
+        "PAGE_MEDIA_LOADER",
+        "PAGE_PLAYBACK",
+        "PAGE_AUDIO_STUDIO",
+        "PAGE_VIDEO_STUDIO",
+        "PAGE_CONVERT_EXPORT",
+    }
+
+    def __getattr__(self, name):
+        if hasattr(self, "state") and name in self._state_field_names:
+            return getattr(self.state, name)
+        if name in self._page_constant_names:
+            return globals().get(name)
+        raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        if name == "state":
+            super().__setattr__(name, value)
+            return
+        if hasattr(self, "state") and name in self._state_field_names:
+            setattr(self.state, name, value)
+            return
+        super().__setattr__(name, value)
+
     def __init__(self):
         super().__init__()
-        self.video_path = ""
-        self.audio_tools_file_path = ""  # For audio tools file loader
-        self.active_tasks = {}
-        self.is_video_fullscreen = False
-        self.download_splash = None
-        self.export_splash = None
-        self._download_ui_busy = False
-        self._download_from_audio_tools = False
-        self._vocal_offline_dialog_shown = False
+        self.state = AppState()
 
         self.init_settings_manager()
 
@@ -59,6 +81,11 @@ class KaraokeApp(QWidget):
         self.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: 'Segoe UI';")
 
         self.player = PlayerService(parent=self)
+
+        self.playback_controller = PlaybackController()
+        self.media_controller = MediaController()
+        self.processing_controller = ProcessingController()
+        self.navigation_controller = NavigationController()
 
         self.setup_ui()
         self.nav_list.setCurrentRow(0)
@@ -113,9 +140,9 @@ class KaraokeApp(QWidget):
         self.download_service.download_error.connect(self._on_download_error)
 
         # Auto-reduce tracking
-        self.auto_reduce_active = False
-        self._player_was_active = False
-        self._pending_seek_ratio = None
+        self.state.auto_reduce_active = False
+        self.state._player_was_active = False
+        self.state._pending_seek_ratio = None
 
     def init_settings_manager(self):
         app_dir = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(__file__).parent.parent
@@ -397,25 +424,25 @@ class KaraokeApp(QWidget):
         self.video_frame.set_resize_callback(self._reposition_audio_overlay)
         
         # Connect signals for button events
-        self.nav_list.itemClicked.connect(lambda item: self.handle_navigation_change(self.nav_list.row(item)))
-        self.audio_tools_btn.clicked.connect(lambda: self.handle_navigation_change(PAGE_AUDIO_STUDIO))
-        self.video_tools_btn.clicked.connect(lambda: self.handle_navigation_change(PAGE_VIDEO_STUDIO))
-        self.convert_export_btn.clicked.connect(lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
-        self.video_tools_tabs.currentChanged.connect(self._on_video_tools_tab_changed)
+        self.nav_list.itemClicked.connect(lambda item: self.navigation_controller.handle_navigation_change(self, self.nav_list.row(item)))
+        self.audio_tools_btn.clicked.connect(lambda: self.navigation_controller.handle_navigation_change(self, PAGE_AUDIO_STUDIO))
+        self.video_tools_btn.clicked.connect(lambda: self.navigation_controller.handle_navigation_change(self, PAGE_VIDEO_STUDIO))
+        self.convert_export_btn.clicked.connect(lambda: self.navigation_controller.handle_navigation_change(self, PAGE_CONVERT_EXPORT))
+        self.video_tools_tabs.currentChanged.connect(lambda tab_idx: self.navigation_controller._on_video_tools_tab_changed(self, tab_idx))
         if self.convert_export_tabs is not None:
-            self.convert_export_tabs.currentChanged.connect(self._on_convert_export_tab_changed)
-        self.extra_tools_toggle_btn.clicked.connect(self.toggle_extra_tools)
-        self.history_toggle_btn.clicked.connect(self.toggle_history)
-        self.clear_hist_btn.clicked.connect(self.clear_history)
+            self.convert_export_tabs.currentChanged.connect(lambda tab_idx: self.navigation_controller._on_convert_export_tab_changed(self, tab_idx))
+        self.extra_tools_toggle_btn.clicked.connect(lambda: self.media_controller.toggle_extra_tools(self))
+        self.history_toggle_btn.clicked.connect(lambda: self.media_controller.toggle_history(self))
+        self.clear_hist_btn.clicked.connect(lambda: self.media_controller.clear_history(self))
         self.settings_btn.clicked.connect(self.open_settings)
-        self.load_btn.clicked.connect(lambda: self.load_video())
+        self.load_btn.clicked.connect(lambda: self.media_controller.load_video(self))
         self.media_loader_download_btn.clicked.connect(lambda: self.download_video())
         self.fullscreen_btn.clicked.connect(self.toggle_video_fullscreen)
-        self.play_btn.clicked.connect(self.handle_play)
-        self.pause_btn.clicked.connect(self.handle_pause)
-        self.stop_btn.clicked.connect(self.handle_stop)
-        self.back_btn.clicked.connect(lambda: self.jump_time(-10000))
-        self.fwd_btn.clicked.connect(lambda: self.jump_time(10000))
+        self.play_btn.clicked.connect(lambda: self.playback_controller.handle_play(self))
+        self.pause_btn.clicked.connect(lambda: self.playback_controller.handle_pause(self))
+        self.stop_btn.clicked.connect(lambda: self.playback_controller.handle_stop(self))
+        self.back_btn.clicked.connect(lambda: self.playback_controller.jump_time(self, -10000))
+        self.fwd_btn.clicked.connect(lambda: self.playback_controller.jump_time(self, 10000))
         self.mute_btn.clicked.connect(self.toggle_mute)
         self.vol_slider.valueChanged.connect(self.set_volume)
         self.seek_slider.sliderPressed.connect(self.on_slider_pressed)
@@ -476,207 +503,56 @@ class KaraokeApp(QWidget):
             self.video_trim_add_range_btn.clicked.connect(self._on_video_trim_add_range)
         except Exception:
             pass
-        self.video_pw_apply_btn.clicked.connect(self.handle_play)
-        self.video_pw_clear_btn.clicked.connect(self.clear_playback_window)
+        self.video_pw_apply_btn.clicked.connect(lambda: self.playback_controller.handle_play(self))
+        self.video_pw_clear_btn.clicked.connect(lambda: self.playback_controller.clear_playback_window(self))
         if self.audio_pw_apply_btn is not None:
-            self.audio_pw_apply_btn.clicked.connect(self.handle_play)
+            self.audio_pw_apply_btn.clicked.connect(lambda: self.playback_controller.handle_play(self))
         if self.audio_pw_clear_btn is not None:
-            self.audio_pw_clear_btn.clicked.connect(self.clear_playback_window)
+            self.audio_pw_clear_btn.clicked.connect(lambda: self.playback_controller.clear_playback_window(self))
         # Connect Add Range button to a handler that computes sensible defaults
         try:
-            self.video_pw_add_range_btn.clicked.connect(self._on_pw_add_range)
+            self.video_pw_add_range_btn.clicked.connect(lambda: self.playback_controller._on_pw_add_range(self))
             if self.audio_pw_add_range_btn is not None:
-                self.audio_pw_add_range_btn.clicked.connect(self._on_pw_add_range)
+                self.audio_pw_add_range_btn.clicked.connect(lambda: self.playback_controller._on_pw_add_range(self))
         except Exception:
             pass
-        self.history_list.itemDoubleClicked.connect(lambda item: self.load_history_item(item.toolTip()))
+        self.history_list.itemDoubleClicked.connect(lambda item: self.media_controller.load_history_item(self, item.toolTip()))
 
         # Live amplification state (1.0 = no boost)
-        self._live_amplify_factor = 1.0
-        self._pre_amplify_base_volume = None
-        self._live_amplify_step = 0
-        self._live_amp_preview_active = False
-        self._last_non_amplify_convert_export_tab_index = 0
+        self.state._live_amplify_factor = 1.0
+        self.state._pre_amplify_base_volume = None
+        self.state._live_amplify_step = 0
+        self.state._live_amp_preview_active = False
+        self.state._last_non_amplify_convert_export_tab_index = 0
         self._update_amplify_reset_buttons(0)
         self._update_amplify_step_button_styles(0)
 
-        self._current_export_media_kind = "unknown"
-        self._smoothed_pitch_hz = None
-        self._last_pitch_confidence = 0.0
-        self._realtime_pitch_apply_timer = None
+        self.state._current_export_media_kind = "unknown"
+        self.state._smoothed_pitch_hz = None
+        self.state._last_pitch_confidence = 0.0
+        self.state._realtime_pitch_apply_timer = None
         self._refresh_realtime_pitch_status()
         # Tonic detection accumulator
-        self._tonic_note_counts = {}   # note_class (0-11) -> count
-        self._tonic_frames_collected = 0
-        self._tonic_locked = False
-        self._tonic_note_class = None  # 0-11 once locked
+        self.state._tonic_note_counts = {}   # note_class (0-11) -> count
+        self.state._tonic_frames_collected = 0
+        self.state._tonic_locked = False
+        self.state._tonic_note_class = None  # 0-11 once locked
         
         # Initialize state flags
-        self.extra_tools_is_expanded = False
-        self.history_is_expanded = False
+        self.state.extra_tools_is_expanded = False
+        self.state.history_is_expanded = False
         
         # Load history from disk
         self.load_history_from_disk()
 
     def handle_navigation_change(self, idx, is_audio_only=None):
-        # Guard studio navigation by currently loaded media type.
-        current_media_type = "unknown"
-        if getattr(self, 'video_path', None):
-            try:
-                current_media_type = self.classify_media_type(self.video_path)
-            except Exception:
-                current_media_type = "unknown"
-
-        if idx == PAGE_AUDIO_STUDIO and current_media_type == "video":
-            QMessageBox.information(
-                self,
-                "Audio Studio Restricted",
-                "A video file is currently loaded. Use Video Studio for video workflows."
-            )
-            return
-
-        if idx == PAGE_VIDEO_STUDIO and current_media_type == "audio":
-            QMessageBox.information(
-                self,
-                "Video Studio Restricted",
-                "An audio-only file is currently loaded. Use Audio Studio for audio workflows."
-            )
-            return
-
-        if idx == PAGE_PLAYBACK and getattr(self, '_live_amp_preview_active', False):
-            QMessageBox.information(
-                self,
-                "Live Amplify Preview Active",
-                "Stop Live Preview on the Amplify & Export tab before switching to Playback / Real-time Pitch."
-            )
-            if hasattr(self, 'amp_status_label') and self.amp_status_label is not None:
-                self.amp_status_label.setText("Stop Live Preview before switching to Playback / Real-time Pitch")
-            return
-
-        if idx == PAGE_CONVERT_EXPORT and self._is_realtime_pitch_enabled():
-            target_tab = self.convert_export_tabs.currentIndex() if self.convert_export_tabs is not None else 0
-            if target_tab == 4:
-                QMessageBox.information(
-                    self,
-                    "Real-time Pitch Active",
-                    "Turn Real-time Pitch Mode OFF before opening Amplify & Export."
-                )
-                self._refresh_realtime_pitch_status()
-                return
-
-        if idx in (PAGE_AUDIO_STUDIO, PAGE_VIDEO_STUDIO, PAGE_CONVERT_EXPORT):
-            self.nav_list.blockSignals(True)
-            self.nav_list.clearSelection()
-            self.nav_list.setCurrentRow(-1)
-            self.nav_list.blockSignals(False)
-        else:
-            self.nav_list.blockSignals(True)
-            self.nav_list.setCurrentRow(idx)
-            self.nav_list.blockSignals(False)
-
-        # Switch playback-window references based on current page.
-        self._set_active_playback_window_controls(idx)
-        
-        # Use provided is_audio_only or fall back to stored flag
-        if is_audio_only is None:
-            is_audio_only = getattr(self, '_current_is_audio_only', False)
-        
-        # Adjust video frame height based on page
-        if idx == PAGE_AUDIO_STUDIO:  # Audio Studio - shrink video frame
-            if is_audio_only:
-                self.video_frame.setMinimumHeight(80)
-                self.video_frame.setMaximumHeight(100)
-            else:
-                self.video_frame.setMinimumHeight(80)
-                self.video_frame.setMaximumHeight(220)
-            self.fullscreen_btn.setVisible(False)
-        elif idx == PAGE_VIDEO_STUDIO:  # Video Studio (includes Widen Video tab)
-            self.fullscreen_btn.setVisible(True)
-            # Update the "currently working on" labels for both Video Tools and Widen tab
-            if self.video_path:
-                fname = os.path.basename(self.video_path)
-                self.video_current_file_label.setText(f"✅ Working on: {fname}")
-                self.video_current_file_label.setStyleSheet("color: #2ecc71; font-size: 10px; font-style: normal; padding: 2px 5px;")
-                self.widen_current_file_label.setText(f"✅ Working on: {fname}")
-                self.widen_current_file_label.setStyleSheet("color: #2ecc71; font-size: 10px; font-style: normal; padding: 2px 5px;")
-                self.update_extraction_ui(self.classify_media_type(self.video_path) == "video")
-            else:
-                self.video_current_file_label.setText("No video loaded — use the Media Loader page to load a video")
-                self.video_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
-                self.widen_current_file_label.setText("No video loaded — use the Media Loader page to load a video")
-                self.widen_current_file_label.setStyleSheet("color: #e67e22; font-style: italic; padding: 2px 5px; font-size: 10px;")
-                self.update_extraction_ui(False)
-        elif idx == PAGE_CONVERT_EXPORT:
-            self.video_frame.setMinimumHeight(80)
-            self.video_frame.setMaximumHeight(220)
-            self.fullscreen_btn.setVisible(False)
-            self.refresh_conversion_targets()
-        else:
-            self.video_frame.setMinimumHeight(420)
-            self.video_frame.setMaximumHeight(16777215)
-            self.fullscreen_btn.setVisible(True)
-        
-        # Change page
-        self.stack.setCurrentIndex(idx)
-        
-        # Force layout recalculation
-        if self.layout():
-            self.layout().invalidate()
-        
-        # Schedule scroll reset and layout activation for next event loop iteration
-        from PySide6.QtCore import QTimer
-        
-        def reset_scroll_and_activate():
-            # Activate layout
-            if self.layout():
-                self.layout().activate()
-            
-            # Apply Video Tools tab-specific frame sizing after stack has switched
-            if idx == PAGE_VIDEO_STUDIO:
-                self._on_video_tools_tab_changed(self.video_tools_tabs.currentIndex())
-            
-            # Reposition audio overlay after video frame has resized
-            if getattr(self, '_current_is_audio_only', False):
-                self.show_audio_visualization()
-        
-        QTimer.singleShot(10, reset_scroll_and_activate)
+        return self.navigation_controller.handle_navigation_change(self, idx, is_audio_only=is_audio_only)
 
     def _on_video_tools_tab_changed(self, tab_idx):
-        """Adjust video frame height and fullscreen button based on active Video Tools tab."""
-        if tab_idx in (2, 3):  # Audio Extraction / Widen Video tabs - large frame
-            self.video_frame.setMinimumHeight(420)
-            self.video_frame.setMaximumHeight(460)
-            self.fullscreen_btn.setVisible(True)
-            if self.video_tools_scroll:
-                self.video_tools_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        else:  # Trimming / Playback Window - compact frame
-            self.video_frame.setMinimumHeight(80)
-            self.video_frame.setMaximumHeight(160)
-            self.fullscreen_btn.setVisible(True)
-            if self.video_tools_scroll:
-                self.video_tools_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.video_frame.updateGeometry()
-        if self.layout():
-            self.layout().invalidate()
-            self.layout().activate()
+        return self.navigation_controller._on_video_tools_tab_changed(self, tab_idx)
 
     def _on_convert_export_tab_changed(self, tab_idx):
-        """Prevent realtime pitch and realtime amplify preview pages from crossing while active."""
-        if tab_idx == 4 and self._is_realtime_pitch_enabled():
-            QMessageBox.information(
-                self,
-                "Real-time Pitch Active",
-                "Turn Real-time Pitch Mode OFF before opening Amplify & Export."
-            )
-            if self.convert_export_tabs is not None:
-                self.convert_export_tabs.blockSignals(True)
-                self.convert_export_tabs.setCurrentIndex(getattr(self, '_last_non_amplify_convert_export_tab_index', 0))
-                self.convert_export_tabs.blockSignals(False)
-            self._refresh_realtime_pitch_status()
-            return
-
-        if tab_idx != 4:
-            self._last_non_amplify_convert_export_tab_index = tab_idx
+        return self.navigation_controller._on_convert_export_tab_changed(self, tab_idx)
 
     def open_settings(self):
         # Pause audio analyzer while settings dialog is open to prevent conflicts
@@ -1253,214 +1129,28 @@ class KaraokeApp(QWidget):
         QTimer.singleShot(120, lambda: self.play_shifted(start_from_current=True))
 
     def add_to_history(self, file_path):
-        if not file_path or not os.path.exists(file_path): return
-        filename = os.path.basename(file_path)
-        for i in range(self.history_list.count()):
-            if self.history_list.item(i).toolTip() == file_path:
-                self.history_list.takeItem(i)
-                break
-        self.history_list.insertItem(0, filename)
-        self.history_list.item(0).setToolTip(file_path)
-        while self.history_list.count() > 10: self.history_list.takeItem(self.history_list.count() - 1)
-        self.save_history_to_disk()
+        return self.media_controller.add_to_history(self, file_path)
 
     def save_history_to_disk(self):
-        paths = [self.history_list.item(i).toolTip() for i in range(self.history_list.count())]
-        history_file = Path(self.settings_file.parent) / "history.json"
-        try:
-            with open(history_file, "w", encoding="utf-8") as f: json.dump(paths, f, indent=2)
-        except: pass
+        return self.media_controller.save_history_to_disk(self)
 
     def load_history_from_disk(self):
-        history_file = Path(self.settings_file.parent) / "history.json"
-        if history_file.exists():
-            try:
-                with open(history_file, "r", encoding="utf-8") as f:
-                    paths = json.load(f)
-                    for path in reversed(paths):
-                        if os.path.exists(path):
-                            filename = os.path.basename(path)
-                            self.history_list.insertItem(0, filename)
-                            self.history_list.item(0).setToolTip(path)
-            except: pass
+        return self.media_controller.load_history_from_disk(self)
 
     def clear_history(self):
-        self.history_list.clear()
-        history_file = Path(self.settings_file.parent) / "history.json"
-        if history_file.exists(): history_file.unlink()
+        return self.media_controller.clear_history(self)
 
     def toggle_history(self):
-        self.history_is_expanded = not self.history_is_expanded
-        self.history_container.setVisible(self.history_is_expanded)
-        self.history_toggle_btn.setText(f"{'▼' if self.history_is_expanded else '▶'} History")
+        return self.media_controller.toggle_history(self)
 
     def toggle_extra_tools(self):
-        self.extra_tools_is_expanded = not self.extra_tools_is_expanded
-        self.extra_tools_container.setVisible(self.extra_tools_is_expanded)
-        self.extra_tools_toggle_btn.setText(f"{'▼' if self.extra_tools_is_expanded else '▶'} 🧭 Studios")
+        return self.media_controller.toggle_extra_tools(self)
 
     def load_video(self, file_path=None, splash_screen=None, is_audio_only=None):
-        print(f"\n\n{'='*80}")
-        print(f"[main.load_video] 🎬 ENTRY (file_path={file_path})")
-
-        # Loading a new file always terminates any active real-time shifted playback.
-        try:
-            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
-                self.realtime_pitch.stop()
-            if hasattr(self, '_clear_live_amplify_preview_state'):
-                self._clear_live_amplify_preview_state()
-            self.player.set_mute(False)
-        except Exception:
-            pass
-        
-        if not file_path:
-            print(f"[main.load_video] 📂 No file path provided, opening dialog...")
-            f, _ = QFileDialog.getOpenFileName(
-                self, "Open Audio/Video Track Resource", self.settings["base_directory"],
-                "Media Feeds (*.mp4 *.avi *.mkv *.mov *.mp3 *.wav *.aac *.m4a *.webm);;All System Inputs (*.*)"
-            )
-            if not f: 
-                print(f"[main.load_video] ❌ Dialog cancelled")
-                return
-            file_path = f
-            print(f"[main.load_video] ✓ File selected: {file_path}")
-
-        # Keep audio-only UI behavior consistent regardless of load entry point.
-        detected_audio_only = self.classify_media_type(file_path) == "audio"
-        if is_audio_only is None:
-            is_audio_only = detected_audio_only
-        elif detected_audio_only and not is_audio_only:
-            is_audio_only = True
-
-        # Create/show splash as early as possible so users can see progress during preparation.
-        if splash_screen is None:
-            loading_path = get_resource_path("Loading.png")
-            pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-            if not os.path.exists(loading_path):
-                pix.fill(QColor("#1e1e1e"))
-            loader = ModernSplashScreen(pix)
-            loader.show()
-        else:
-            loader = splash_screen
-
-        loader.set_progress(10, "Preparing Media Loader...")
-        QApplication.processEvents()
-
-        # Prepare for loading using file loading service
-        print(f"[main.load_video] Calling file_loading_service.prepare_for_loading()...")
-        was_playing = self.file_loading_service.prepare_for_loading()
-        print(f"[main.load_video] ✓ prepare_for_loading returned (was_playing={was_playing})")
-
-        loader.set_progress(25, "Preparing Playback Resources...")
-
-        QApplication.processEvents()
-        self._pending_video_path = file_path
-        self.add_to_history(file_path)
-        self.status_label.setText(f"Status: Loading {os.path.basename(file_path)}...")
-        self._reset_pitch_display()
-
-        try:
-            # Core loading logic
-            print(f"[main.load_video] 🎯 Starting core loading logic...")
-            loader.set_progress(40, "Mapping Core Encoders...")
-            self.video_path = self._pending_video_path
-            print(f"[main.load_video] 📝 Setting video_path: {self.video_path}")
-            
-            print(f"[main.load_video] 🎬 Calling player.set_media({os.path.abspath(self.video_path)})...")
-            self.player.set_media(os.path.abspath(self.video_path))
-            print(f"[main.load_video] ✓ player.set_media() complete")
-
-            print(f"[main.load_video] 🖥️  Calling player.set_video_widget()...")
-            self.player.set_video_widget(int(self.video_frame.winId()))
-            print(f"[main.load_video] ✓ Video widget set")
-
-            loader.set_progress(70, "Synchronizing Canvas Matrix Pipeline...")
-
-            time.sleep(0.1)  # Small delay before playing to ensure media is properly loaded
-            print(f"[main.load_video] ⏱️  Waited 0.1s before playback...")
-            
-            print(f"[main.load_video] ▶️  Calling player.play()...")
-            self.player.play()
-            print(f"[main.load_video] ✓ player.play() called")
-            
-            self.time_label.setText("00:00")
-
-            print(f"[main.load_video] 🔊 Waiting for audio track (retries up to 20)...")
-            retries = 0
-            while self.player.get_audio_track() == -1 and retries < 20:
-                time.sleep(0.05)
-                QApplication.processEvents()
-                retries += 1
-            print(f"[main.load_video] ✓ Audio track detected after {retries} retries")
-
-            print(f"[main.load_video] 🔉 Setting volume to {self.vol_slider.value()}...")
-            self.set_volume(self.vol_slider.value())
-            print(f"[main.load_video] ✓ Volume set")
-
-            # Start audio monitoring after playback begins
-            print(f"[main.load_video] 🎙️  Starting audio analyzer (via audio_service)...")
-            self.audio_service.start_audio_monitoring()
-            print(f"[main.load_video] ✓ Audio analyzer started")
-
-            print(f"[main.load_video] 📊 Calling finish_loading(loader)...")
-            self.finish_loading(loader, is_audio_only)
-            print(f"[main.load_video] ✓ finish_loading() complete")
-
-            self.status_label.setText(f"Status: Playing {os.path.basename(self.video_path)}")
-            self._refresh_realtime_pitch_status()
-
-        except Exception as e:
-            self.log_exception("main.load_video", e)
-            loader.close()
-            self.status_label.setText("Status: Load failed")
-            self._refresh_realtime_pitch_status()
-        finally:
-            # Ensure file loading service is notified of completion
-            print(f"[main.load_video] 🔚 Calling file_loading_service.finish_loading(resume_audio={was_playing})...")
-            self.file_loading_service.finish_loading(resume_audio=was_playing)
-            self._refresh_realtime_pitch_status()
-            print(f"[main.load_video] ✓ file_loading_service.finish_loading() complete")
-            print(f"{'='*80}\n")
+        return self.media_controller.load_video(self, file_path=file_path, splash_screen=splash_screen, is_audio_only=is_audio_only)
 
     def finish_loading(self, loader, is_audio_only=False):
-        self.pitch_input.setValue(0.0)
-        self.speed_input.setValue(1.0)
-        self._reset_pitch_display()
-        # Reset all time-picker based controls on every new file load.
-        self._reset_all_page_timers_on_load()
-        # Reset all page-specific controls/statuses on every new file load.
-        self._reset_all_page_controls_on_load(is_audio_only)
-        if self.video_path: self.filename_label.setText(f"Playing: {os.path.basename(self.video_path)}")
-
-        loader.set_progress(100, "Ready")
-        loader.finish(self)
-        
-        # Store audio-only flag for height adjustment in Audio Tools page
-        self._current_is_audio_only = is_audio_only
-        
-        # If we're on Audio Studio page, adjust video frame height based on file type
-        current_page = self.stack.currentIndex()
-        if current_page == PAGE_AUDIO_STUDIO:  # Audio Studio page
-            if is_audio_only:
-                # For audio-only, minimize video frame to give more space to tabs
-                self.video_frame.setMinimumHeight(80)
-                self.video_frame.setMaximumHeight(100)
-            else:
-                # For video content, give more space
-                self.video_frame.setMinimumHeight(280)
-                self.video_frame.setMaximumHeight(320)
-        elif current_page == PAGE_VIDEO_STUDIO:
-            self.update_extraction_ui(self.classify_media_type(self.video_path) == "video")
-        
-        # Show/hide audio visualization overlay
-        if is_audio_only:
-            # Show immediately; resize callback will reposition if frame size changes later
-            self.show_audio_visualization()
-        else:
-            self.hide_audio_visualization()
-
-        # Ensure timer rows match currently loaded media duration.
-        self._sync_all_page_timer_defaults_from_media()
+        return self.media_controller.finish_loading(self, loader, is_audio_only=is_audio_only)
 
     def _reset_rows_to_single_range(self, container, add_row_fn, default_start=0, default_end=0):
         """Reset a range-row container to one row with provided defaults."""
@@ -2121,81 +1811,13 @@ class KaraokeApp(QWidget):
         self.launch_async_task(cmd, abs_out, "widen_task", override_duration=duration)
 
     def update_extraction_ui(self, is_video):
-        """Update Video Studio extraction controls based on whether a video file is loaded."""
-        if is_video and self.video_path:
-            filename = os.path.basename(self.video_path)
-            self.video_extract_status_label.setText(f"✅ Ready to extract from: {filename}")
-            self.video_extract_status_label.setStyleSheet("color: #2ecc71; font-size: 10px; padding: 2px 4px;")
-            self.extract_format_combo.setEnabled(True)
-            self.extract_btn.setEnabled(True)
-        else:
-            self.video_extract_status_label.setText("Load a video from the Media Loader page to extract audio")
-            self.video_extract_status_label.setStyleSheet("color: #e67e22; font-size: 10px; font-style: italic; padding: 2px 4px;")
-            self.extract_format_combo.setEnabled(False)
-            self.extract_btn.setEnabled(False)
+        return self.media_controller.update_extraction_ui(self, is_video)
 
     def load_audio_tools_file(self):
-        """Load audio file for Audio Studio processing."""
-        f, _ = QFileDialog.getOpenFileName(
-            self, "Open Audio File for Processing", self.settings["base_directory"],
-            "Audio Files (*.mp3 *.wav *.aac *.m4a *.flac *.ogg *.opus *.wma);;All Files (*.*)"
-        )
-        if f:
-            f = os.path.normpath(f)
-            media_type = self.classify_media_type(f)
-
-            # Audio Studio accepts only audio-only files.
-            if media_type != "audio":
-                QMessageBox.warning(
-                    self,
-                    "Audio Studio Only",
-                    "Audio Studio accepts only audio files. Use Media Loader to open video or mixed media files."
-                )
-                return
-
-            self.audio_tools_file_path = f
-            filename = os.path.basename(f)
-
-            self.audio_file_status.setText(f"✅ {filename} (Audio)")
-            self.load_video(f, is_audio_only=True)
+        return self.media_controller.load_audio_tools_file(self)
     
     def load_history_item(self, file_path):
-        """Load file from history, detecting if it's audio and showing visualization"""
-        if not os.path.exists(file_path):
-            QMessageBox.warning(self, "File Not Found", f"File no longer exists:\n{file_path}")
-            return
-
-        media_type = self.classify_media_type(file_path)
-        is_audio = media_type == "audio"
-        is_video = media_type == "video"
-        
-        # If we're on Audio Studio page, update extraction UI based on file type
-        current_page = self.stack.currentIndex()
-        if current_page == PAGE_AUDIO_STUDIO:  # Audio Studio page
-            if is_video:
-                QMessageBox.information(
-                    self,
-                    "Routed to Video Studio",
-                    "This file contains a video stream. Opening it in Video Studio."
-                )
-                self.load_video(file_path, is_audio_only=False)
-                self.handle_navigation_change(PAGE_VIDEO_STUDIO)
-                return
-
-            self.audio_tools_file_path = file_path
-            filename = os.path.basename(file_path)
-            
-            # Update status label
-            if is_video:
-                self.audio_file_status.setText(f"✅ {filename}")
-            else:
-                self.audio_file_status.setText(f"✅ {filename} (Audio)")
-        
-        # Load with appropriate visualization
-        self.load_video(file_path, is_audio_only=is_audio)
-
-        # Keep conversion target options aligned with detected media.
-        self.refresh_conversion_targets(file_path)
+        return self.media_controller.load_history_item(self, file_path)
 
     def classify_media_type(self, file_path):
         """Classify media file as audio, video, or unknown using ffprobe with extension fallback."""
@@ -2700,33 +2322,10 @@ class KaraokeApp(QWidget):
         return merged
 
     def build_audio_multi_trim_cmd(self, input_file, output_file, target_fmt, ranges_ms):
-        """Build FFmpeg command to keep multiple audio ranges and concatenate them."""
-        ffmpeg_path = self.settings["ffmpeg_path"]
-
-        parts = []
-        for i, (s_ms, e_ms) in enumerate(ranges_ms):
-            s = s_ms / 1000.0
-            e = e_ms / 1000.0
-            parts.append(f"[0:a]atrim=start={s}:end={e},asetpts=PTS-STARTPTS[a{i}]")
-
-        a_inputs = "".join([f"[a{i}]" for i in range(len(ranges_ms))])
-        parts.append(f"{a_inputs}concat=n={len(ranges_ms)}:v=0:a=1[a]")
-        filter_complex = ";".join(parts)
-
-        cmd = [ffmpeg_path, "-y", "-i", input_file, "-filter_complex", filter_complex, "-map", "[a]"]
-
-        if target_fmt == "mp3":
-            cmd += ["-acodec", "libmp3lame", "-b:a", "192k", output_file]
-        elif target_fmt == "wav":
-            cmd += ["-acodec", "pcm_s16le", "-ar", "44100", output_file]
-        elif target_fmt == "aac":
-            cmd += ["-acodec", "aac", "-b:a", "192k", output_file]
-        elif target_fmt == "m4a":
-            cmd += ["-acodec", "aac", "-b:a", "192k", output_file]
-        else:
-            cmd += ["-acodec", "copy", output_file]
-
-        return cmd
+        """Compatibility wrapper for the extracted audio trim builder."""
+        return self.processing_controller.build_audio_multi_trim_cmd(
+            self, input_file, output_file, target_fmt, ranges_ms
+        )
 
     def clear_audio_trim_ranges(self):
         """Reset audio trim rows to one default range (0 to media duration)."""
@@ -2983,78 +2582,16 @@ class KaraokeApp(QWidget):
         self._refresh_realtime_pitch_status()
 
     def build_amplify_export_cmd(self, input_file, output_file, factor, media_kind, src_ext):
-        """Build FFmpeg command to amplify audio or video and preserve the appropriate container."""
-        ffmpeg_path = self.settings["ffmpeg_path"]
-        # Apply a limiter only when boosting above 1.0x to reduce clipping distortion.
-        try:
-            factor_value = float(factor)
-        except Exception:
-            factor_value = 1.0
-
-        if factor_value > 1.0:
-            # Keep boost audible while still catching hard peaks.
-            volume_filter = f"volume={factor_value:.4f},alimiter=limit=0.98:attack=5:release=50"
-        else:
-            volume_filter = f"volume={factor_value:.4f}"
-
-        if media_kind == "video":
-            return [
-                ffmpeg_path, "-y", "-i", input_file,
-                "-af", volume_filter,
-                "-c:v", "copy",
-                "-c:a", "aac", "-b:a", "192k",
-                output_file,
-            ]
-
-        if src_ext == "wav":
-            return [ffmpeg_path, "-y", "-i", input_file, "-af", volume_filter, "-c:a", "pcm_s16le", "-ar", "44100", output_file]
-        if src_ext == "mp3":
-            return [ffmpeg_path, "-y", "-i", input_file, "-af", volume_filter, "-c:a", "libmp3lame", "-b:a", "320k", output_file]
-        if src_ext in {"aac", "m4a"}:
-            return [ffmpeg_path, "-y", "-i", input_file, "-af", volume_filter, "-c:a", "aac", "-b:a", "192k", output_file]
-        if src_ext in {"flac", "ogg", "opus"}:
-            codec = {"flac": "flac", "ogg": "libvorbis", "opus": "libopus"}[src_ext]
-            bitrate = "192k" if src_ext != "flac" else None
-            cmd = [ffmpeg_path, "-y", "-i", input_file, "-af", volume_filter, "-c:a", codec]
-            if bitrate:
-                cmd += ["-b:a", bitrate]
-            cmd += [output_file]
-            return cmd
-
-        return [ffmpeg_path, "-y", "-i", input_file, "-af", volume_filter, "-c:a", "aac", "-b:a", "192k", output_file]
+        """Compatibility wrapper around the extracted processing controller."""
+        return self.processing_controller.build_amplify_export_cmd(
+            self, input_file, output_file, factor, media_kind, src_ext
+        )
 
     def build_format_conversion_cmd(self, input_file, output_file, target_fmt, bitrate):
-        """Build FFmpeg command for format conversion (Feature 7)"""
-        ffmpeg_path = self.settings["ffmpeg_path"]
-
-        # Audio-only formats
-        if target_fmt in ["mp3", "wav", "aac", "m4a"]:
-            # Extract audio only
-            if target_fmt == "mp3":
-                # MP3: use libmp3lame for best quality
-                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "libmp3lame", "-b:a", bitrate, output_file]
-            elif target_fmt == "wav":
-                # WAV: lossless
-                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "pcm_s16le", "-ar", "44100", output_file]
-            elif target_fmt == "aac":
-                # AAC: using aac encoder
-                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "aac", "-b:a", bitrate, output_file]
-            elif target_fmt == "m4a":
-                # M4A: audio only MP4
-                return [ffmpeg_path, "-y", "-i", input_file, "-vn", "-acodec", "aac", "-b:a", bitrate, output_file]
-
-        # Video formats (keep video, optionally re-encode audio)
-        elif target_fmt in ["mp4", "mkv"]:
-            # For video formats, copy video codec (fast), encode audio if needed
-            if target_fmt == "mp4":
-                return [ffmpeg_path, "-y", "-i", input_file, "-c:v", "libx264", "-preset", "fast", 
-                        "-acodec", "aac", "-b:a", bitrate, output_file]
-            elif target_fmt == "mkv":
-                return [ffmpeg_path, "-y", "-i", input_file, "-c:v", "copy", 
-                        "-acodec", "aac", "-b:a", bitrate, output_file]
-
-        # Default: copy streams (fastest)
-        return [ffmpeg_path, "-y", "-i", input_file, "-c", "copy", output_file]
+        """Compatibility wrapper around the extracted processing controller."""
+        return self.processing_controller.build_format_conversion_cmd(
+            self, input_file, output_file, target_fmt, bitrate
+        )
 
     def normalize_audio(self):
         """Normalize audio loudness to consistent LUFS level (Feature 8)"""
@@ -3252,215 +2789,8 @@ class KaraokeApp(QWidget):
         return os.path.join(self.settings["download_directory"], f"{base_a}_{base_b}_{suffix}.{ext}")
 
     def _build_join_merge_cmd(self, input_a, input_b, mode, out_path):
-        """Build ffmpeg command for merge/join operations."""
-        ffmpeg = self.settings["ffmpeg_path"]
-        out_ext = os.path.splitext(out_path)[1].lower()
-
-        if mode == "video_audio_merge":
-            a_type = self._classify_media_type_for_merge(input_a)
-            b_type = self._classify_media_type_for_merge(input_b)
-            if a_type == "video" and b_type == "audio":
-                video_input = input_a
-                audio_input = input_b
-            elif a_type == "audio" and b_type == "video":
-                video_input = input_b
-                audio_input = input_a
-            else:
-                raise RuntimeError(
-                    f"video_audio_merge expected one video + one audio, got a_type={a_type}, b_type={b_type}"
-                )
-
-            if os.path.normcase(os.path.abspath(video_input)) == os.path.normcase(os.path.abspath(audio_input)):
-                raise RuntimeError("Invalid video+audio merge pairing: video and audio inputs resolved to the same file")
-
-            behavior = self._resolve_merge_behavior(mode)
-
-            if behavior == "append":
-                try:
-                    vdur = float(self.get_video_duration_via_ffprobe(video_input))
-                except Exception:
-                    vdur = 0.0
-                if vdur <= 0:
-                    vdur = 1.0
-
-                try:
-                    adur = float(self.get_video_duration_via_ffprobe(audio_input))
-                except Exception:
-                    adur = 0.0
-                if adur <= 0:
-                    adur = 1.0
-
-                return [
-                    ffmpeg,
-                    "-y",
-                    "-i",
-                    video_input,
-                    "-i",
-                    audio_input,
-                    "-filter_complex",
-                    f"[0:v]setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={adur:.3f}[v];"
-                    f"anullsrc=channel_layout=stereo:sample_rate=44100:d={vdur:.3f}[sil];"
-                    "[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];"
-                    "[sil][a1]concat=n=2:v=0:a=1[a]",
-                    "-map",
-                    "[v]",
-                    "-map",
-                    "[a]",
-                    "-c:v",
-                    "libx264",
-                    "-preset",
-                    "fast",
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    "192k",
-                    out_path,
-                ]
-
-            offset_s = 0.0
-            try:
-                offset_s = max(0.0, float(self.merge_audio_offset_spin.value()))
-            except Exception:
-                offset_s = 0.0
-
-            if offset_s > 0.0:
-                delay_ms = int(round(offset_s * 1000.0))
-                cmd = [
-                    ffmpeg,
-                    "-y",
-                    "-i",
-                    video_input,
-                    "-i",
-                    audio_input,
-                    "-filter_complex",
-                    f"[1:a]adelay={delay_ms}:all=1,aresample=44100,asetpts=PTS-STARTPTS[a]",
-                    "-map",
-                    "0:v:0",
-                    "-map",
-                    "[a]",
-                    "-c:v",
-                    "copy",
-                    "-shortest",
-                    "-sn",
-                    "-dn",
-                ]
-            else:
-                cmd = [
-                    ffmpeg,
-                    "-y",
-                    "-i",
-                    video_input,
-                    "-i",
-                    audio_input,
-                    "-map",
-                    "0:v:0",
-                    "-map",
-                    "1:a:0",
-                    "-c:v",
-                    "copy",
-                    "-shortest",
-                    "-sn",
-                    "-dn",
-                ]
-
-            if out_ext == ".mkv":
-                cmd += ["-c:a", "aac", "-b:a", "192k", out_path]
-            else:
-                cmd += ["-c:a", "aac", "-b:a", "192k", out_path]
-            return cmd
-
-        if mode == "audio_audio_join":
-            behavior = self._resolve_merge_behavior(mode)
-            if behavior == "overlay":
-                cmd = [
-                    ffmpeg,
-                    "-y",
-                    "-i",
-                    input_a,
-                    "-i",
-                    input_b,
-                    "-filter_complex",
-                    "[0:a]aresample=44100,asetpts=PTS-STARTPTS[a0];[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];[a0][a1]amix=inputs=2:duration=longest:dropout_transition=2[a]",
-                    "-map",
-                    "[a]",
-                ]
-            else:
-                cmd = [
-                    ffmpeg,
-                    "-y",
-                    "-i",
-                    input_a,
-                    "-i",
-                    input_b,
-                    "-filter_complex",
-                    "[0:a]aresample=44100,asetpts=PTS-STARTPTS[a0];[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];[a0][a1]concat=n=2:v=0:a=1[a]",
-                    "-map",
-                    "[a]",
-                ]
-            if out_ext == ".mp3":
-                cmd += ["-c:a", "libmp3lame", "-b:a", "320k", out_path]
-            else:
-                cmd += ["-c:a", "pcm_s16le", "-ar", "44100", out_path]
-            return cmd
-
-        # video_video_join
-        behavior = self._resolve_merge_behavior(mode)
-        if behavior == "overlay":
-            return [
-                ffmpeg,
-                "-y",
-                "-i",
-                input_a,
-                "-i",
-                input_b,
-                "-filter_complex",
-                "[0:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v0];"
-                "[1:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p[v1];"
-                "[v0][v1]blend=all_mode='screen':all_opacity=0.5[v];"
-                "[0:a]aresample=44100[a0];[1:a]aresample=44100[a1];[a0][a1]amix=inputs=2:duration=shortest:dropout_transition=2[a]",
-                "-map",
-                "[v]",
-                "-map",
-                "[a]",
-                "-shortest",
-                "-c:v",
-                "libx264",
-                "-preset",
-                "fast",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "192k",
-                out_path,
-            ]
-
-        return [
-            ffmpeg,
-            "-y",
-            "-i",
-            input_a,
-            "-i",
-            input_b,
-            "-filter_complex",
-            "[0:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setpts=PTS-STARTPTS[v0];"
-            "[1:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setpts=PTS-STARTPTS[v1];"
-            "[0:a]aresample=44100,asetpts=PTS-STARTPTS[a0];"
-            "[1:a]aresample=44100,asetpts=PTS-STARTPTS[a1];"
-            "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]",
-            "-map",
-            "[v]",
-            "-map",
-            "[a]",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "fast",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            out_path,
-        ]
+        """Compatibility wrapper for the extracted join/merge command builder."""
+        return self.processing_controller._build_join_merge_cmd(self, input_a, input_b, mode, out_path)
 
     def execute_join_merge(self):
         """Execute media join/merge operation from Convert & Export tab."""
@@ -3986,171 +3316,28 @@ class KaraokeApp(QWidget):
                     "-c:a", "aac", "-b:a", "192k", output_file]
 
     def build_video_multi_trim_cmd(self, input_file, output_file, target_fmt, ranges_ms):
-        """Build FFmpeg command to keep multiple ranges and concatenate them."""
-        ffmpeg_path = self.settings["ffmpeg_path"]
-
-        parts = []
-        for i, (s_ms, e_ms) in enumerate(ranges_ms):
-            s = s_ms / 1000.0
-            e = e_ms / 1000.0
-            parts.append(f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS[v{i}]")
-            parts.append(f"[0:a]atrim=start={s}:end={e},asetpts=PTS-STARTPTS[a{i}]")
-
-        va_inputs = "".join([f"[v{i}][a{i}]" for i in range(len(ranges_ms))])
-        parts.append(f"{va_inputs}concat=n={len(ranges_ms)}:v=1:a=1[v][a]")
-        filter_complex = ";".join(parts)
-
-        cmd = [ffmpeg_path, "-y", "-i", input_file, "-filter_complex", filter_complex, "-map", "[v]", "-map", "[a]"]
-
-        if target_fmt == "mp4":
-            cmd += ["-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k", output_file]
-        elif target_fmt == "mkv":
-            cmd += ["-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k", output_file]
-        elif target_fmt == "webm":
-            cmd += ["-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "0", "-c:a", "libopus", "-b:a", "192k", output_file]
-        elif target_fmt == "avi":
-            cmd += ["-c:v", "mpeg4", "-q:v", "5", "-c:a", "libmp3lame", "-b:a", "192k", output_file]
-        else:
-            cmd += ["-c:v", "libx264", "-preset", "fast", "-c:a", "aac", "-b:a", "192k", output_file]
-
-        return cmd
+        """Compatibility wrapper for the extracted video trim builder."""
+        return self.processing_controller.build_video_multi_trim_cmd(
+            self, input_file, output_file, target_fmt, ranges_ms
+        )
 
     def launch_async_task(self, cmd, out_path, task_key, override_duration=0):
-        self.kill_allocated_task(task_key)
-
-        self.log_debug(
-            f"[{task_key}] launch | output={out_path} | duration_hint={override_duration} | cmd={' '.join(map(str, cmd))}"
+        """Compatibility wrapper around the extracted processing lifecycle."""
+        return self.processing_controller.launch_async_task(
+            self, cmd, out_path, task_key, override_duration=override_duration
         )
-
-        thread = ProcessThread(cmd, override_duration)
-        self.active_tasks[task_key] = thread
-
-        thread.status_update.connect(lambda text: self.export_splash.set_progress(self.export_splash.pbar.value(), text))
-        thread.status_update.connect(lambda text: self.log_debug(f"[{task_key}] status | {text}"))
-        thread.progress.connect(lambda v: self.export_splash.set_progress(v, self.export_splash.showMessageLabel.text()))
-        thread.line_output.connect(lambda line: self.log_debug(f"[{task_key}] output | {line}"))
-        thread.finished.connect(lambda success: self.handle_task_completion(task_key, out_path, success))
-        thread.start()
 
     def kill_allocated_task(self, task_key):
-        if task_key in self.active_tasks:
-            thread = self.active_tasks.pop(task_key)
-            was_running = False
-            try:
-                was_running = thread.isRunning()
-            except Exception:
-                pass
-            self.log_debug(f"[{task_key}] cancel requested | running={was_running}")
-            try:
-                thread.stop()
-            except Exception:
-                pass
-            try:
-                waited = thread.wait(2000)
-                self.log_debug(f"[{task_key}] cancel wait complete | stopped={waited}")
-            except Exception:
-                self.log_debug(f"[{task_key}] cancel wait raised exception")
-            if self.export_splash:
-                self.export_splash.close()
-                self.export_splash = None
-            self.status_label.setText("Status: Ready")
+        """Compatibility wrapper around the extracted task cancellation logic."""
+        return self.processing_controller.kill_allocated_task(self, task_key)
 
     def stop_all_tasks(self):
-        """Stop all active tasks during app shutdown"""
-        self.log_debug(f"[tasks] stop_all_tasks | active_count={len(self.active_tasks)}")
-        for task_key in list(self.active_tasks.keys()):
-            try:
-                thread = self.active_tasks[task_key]
-                thread.stop()
-                waited = thread.wait(1000)
-                self.log_debug(f"[{task_key}] shutdown stop | stopped={waited}")
-            except Exception:
-                self.log_debug(f"[{task_key}] shutdown stop | exception while stopping")
-        self.active_tasks.clear()
+        """Compatibility wrapper around the extracted shutdown task cleanup."""
+        return self.processing_controller.stop_all_tasks(self)
 
     def handle_task_completion(self, task_key, out_path, success):
-        self.active_tasks.pop(task_key, None)
-
-        self.log_debug(
-            f"[{task_key}] completion | success={success} | out_path={out_path} | "
-            f"exists={bool(out_path and os.path.exists(out_path))}"
-        )
-
-        if self.export_splash:
-            self.export_splash.close()
-            self.export_splash = None
-
-        self.status_label.setText("Status: Ready")
-
-        if not success:
-            if task_key == "merge_task" and getattr(self, "_last_merge_cmd_text", ""):
-                try:
-                    QApplication.clipboard().setText(self._last_merge_cmd_text)
-                except Exception:
-                    pass
-                QMessageBox.warning(
-                    self,
-                    "Processing Break",
-                    "Execution pipeline stopped or configuration error checked.\n\n"
-                    "Final ffmpeg command has been copied to clipboard for debugging.",
-                )
-                return
-            QMessageBox.warning(self, "Processing Break", "Execution pipeline stopped or configuration error checked.")
-            return
-
-        if out_path and os.path.exists(out_path):
-            # For audio operations, show audio visualization
-            is_audio_task = task_key in ["extract_task", "trim_task", "convert_task"]
-            if task_key == "amplify_task":
-                is_audio_task = getattr(self, '_current_export_media_kind', 'audio') == 'audio'
-            if task_key == "merge_task":
-                is_audio_task = self.classify_media_type(out_path) == "audio"
-            self.load_video(out_path, is_audio_only=is_audio_task)
-            
-            # For extraction task, update audio_tools_file_path and extraction status
-            if task_key == "extract_task":
-                self.audio_tools_file_path = out_path
-                extracted_name = os.path.basename(out_path)
-                self.audio_file_status.setText(f"✅ {extracted_name} (Extracted Audio)")
-                self.update_extraction_ui(False)
-            
-            # For trimming and conversion, also update audio_tools_file_path
-            if task_key in ["trim_task", "convert_task", "amplify_task"]:
-                self.audio_tools_file_path = out_path
-                output_name = os.path.basename(out_path)
-                self.audio_file_status.setText(f"✅ {output_name} (Processed Audio)")
-
-            if task_key == "merge_task":
-                output_name = os.path.basename(out_path)
-                media_kind = self.classify_media_type(out_path)
-                self.merge_status_label.setText(f"✅ Merge completed: {output_name}")
-                if media_kind == "audio":
-                    self.audio_tools_file_path = out_path
-                    self.audio_file_status.setText(f"✅ {output_name} (Merged Output)")
-
-            if task_key == "amplify_task":
-                self.amp_status_label.setText(f"✅ Amplified file loaded: {os.path.basename(out_path)}")
-                self._reset_export_amplify_factor(os.path.basename(out_path))
-            
-            # For widen task, navigate back to widen page
-            if task_key == "widen_task":
-                pass  # output already loaded via load_video in launch_async_task
-
-            QMessageBox.information(self, "Success", f"Output loaded successfully:\n{os.path.basename(out_path)}")
-            
-            # Navigate back to Audio Tools page for audio operations
-            if task_key in ["extract_task", "trim_task"]:
-                QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_AUDIO_STUDIO))
-            if task_key in ["convert_task", "normalize_task"]:
-                QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
-            if task_key == "amplify_task":
-                QTimer.singleShot(100, self._return_to_amplify_export_tab)
-            if task_key == "merge_task":
-                QTimer.singleShot(100, lambda: self.handle_navigation_change(PAGE_CONVERT_EXPORT))
-
-            # Navigate back to Video Tools page after widening
-            if task_key == "widen_task":
-                QTimer.singleShot(100, self._return_to_widen_video_tab)
+        """Compatibility wrapper around the extracted completion orchestration."""
+        return self.processing_controller.handle_task_completion(self, task_key, out_path, success)
 
     def _return_to_widen_video_tab(self):
         """Return to Video Studio's Widen tab after a widen export reloads."""
@@ -4254,192 +3441,22 @@ class KaraokeApp(QWidget):
                     self.time_label.setText(f"{(preview_ms//1000)//60:02d}:{(preview_ms//1000)%60:02d}")
 
     def handle_play(self):
-        """Play button handler — applies Playback Window settings then plays."""
-        if self._is_realtime_pitch_enabled() and self.stack.currentIndex() == PAGE_PLAYBACK:
-            self.play_shifted(start_from_current=True)
-            return
-
-        if not self._ensure_media_loaded_for_playback():
-            QMessageBox.warning(self, "Playback", "No media available to play. Please load a file.")
-            return
-
-        self.apply_playback_window()
-        try:
-            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
-                self._clear_live_amplify_preview_state()
-                self.realtime_pitch.stop()
-        except Exception:
-            pass
-        try:
-            self.player.set_mute(False)
-        except Exception:
-            pass
-        self.player.play()
-        self._apply_pending_seek_after_play()
-        self._refresh_realtime_pitch_status()
+        return self.playback_controller.handle_play(self)
 
     def handle_pause(self):
-        """Pause button handler — pause video and stop real-time shifted stream."""
-        self.player.pause()
-        try:
-            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
-                self._clear_live_amplify_preview_state()
-                self.realtime_pitch.stop()
-        except Exception:
-            pass
-        self._refresh_realtime_pitch_status()
+        return self.playback_controller.handle_pause(self)
 
     def handle_stop(self):
-        """Stop button handler — rewinds to the start and detaches VLC output."""
-        try:
-            if hasattr(self, 'realtime_pitch') and self.realtime_pitch.is_active():
-                self._clear_live_amplify_preview_state()
-                self.realtime_pitch.stop()
-        except Exception:
-            pass
-
-        self.player.stop()
-        self.audio_service.stop_audio_monitoring()
-        self._player_was_active = False
-        self.seek_slider.setValue(0)
-        self.time_label.setText("00:00")
-        if self.video_path:
-            self.status_label.setText(f"Status: Stopped {os.path.basename(self.video_path)}")
-        else:
-            self.status_label.setText("Status: Stopped")
-        self._refresh_realtime_pitch_status()
+        return self.playback_controller.handle_stop(self)
 
     def apply_playback_window(self):
-        """Apply active Playback Window settings: collect ranges, seek to first start, register first end cutoff."""
-        self._pw_end_ms = None
-        self._pw_ranges = []
-        self._pw_range_idx = 0
-
-        # Collect ranges from UI rows
-        try:
-            container = getattr(self, 'pw_ranges_container', None)
-            layout = container.layout()
-            for i in range(layout.count()):
-                row = layout.itemAt(i).widget()
-                if not row:
-                    continue
-                pickers = row.findChildren(TimePickerWidget)
-                if len(pickers) >= 2:
-                    s = int(pickers[0].get_total_seconds() * 1000)
-                    e = int(pickers[1].get_total_seconds() * 1000)
-                    if e > s:
-                        self._pw_ranges.append((s, e))
-        except Exception:
-            self._pw_ranges = []
-
-        # Sort ranges by start time
-        self._pw_ranges.sort(key=lambda x: x[0])
-        # Debug log collected ranges
-        try:
-            print(f"[main.apply_playback_window] collected ranges: {self._pw_ranges}")
-        except Exception:
-            pass
-
-        # Treat a full-track range as no active playback window so Play won't force a rewind.
-        try:
-            dur_ms = int(self.player.get_length()) if self.player else -1
-        except Exception:
-            dur_ms = -1
-        if len(self._pw_ranges) == 1 and dur_ms > 0:
-            only_start, only_end = self._pw_ranges[0]
-            if only_start <= 0 and only_end >= max(0, dur_ms - 500):
-                self._pw_ranges = []
-
-        if not self._pw_ranges:
-            # Nothing to apply
-            self.pw_status_label.setText("No playback window active")
-            self.pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
-            return
-
-        # Start with first range
-        start_ms, end_ms = self._pw_ranges[0]
-        if start_ms > 0:
-            self.player.set_time(int(start_ms))
-        self._pw_range_idx = 0
-        self._pw_end_ms = end_ms
-
-        # Display active ranges in status
-        parts = [f"{(s//1000)//60:02d}:{(s//1000)%60:02d}-{(e//1000)//60:02d}:{(e//1000)%60:02d}" for s, e in self._pw_ranges]
-        self.pw_status_label.setText("Ranges: " + ", ".join(parts))
-        self.pw_status_label.setStyleSheet("color: #2ecc71; font-size: 10px;")
+        return self.playback_controller.apply_playback_window(self)
 
     def clear_playback_window(self):
-        """Reset Playback Window to a single initial range row."""
-        self._pw_end_ms = None
-        self._pw_ranges = []
-        self._pw_range_idx = 0
-
-        try:
-            total_s = self._get_current_video_duration_seconds()
-            self._reset_rows_to_single_range(
-                getattr(self, 'pw_ranges_container', None),
-                getattr(self, 'pw_add_range', None),
-                0,
-                total_s,
-            )
-        except Exception:
-            pass
-
-        self.pw_status_label.setText("No playback window active")
-        self.pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
+        return self.playback_controller.clear_playback_window(self)
 
     def _on_pw_add_range(self):
-        """Handler for Add Range button: compute sensible defaults based on last row and video length."""
-        try:
-            # Get total video length in seconds
-            total_ms = max(0, int(self.player.get_length()))
-            total_s = total_ms // 1000
-
-            # Determine previous end (if any)
-            prev_end_s = 0
-            container = getattr(self, 'pw_ranges_container', None)
-            if container is not None:
-                layout = container.layout()
-                if layout and layout.count() > 0:
-                    last_row = layout.itemAt(layout.count() - 1).widget()
-                    if last_row:
-                        pickers = last_row.findChildren(TimePickerWidget)
-                        if len(pickers) >= 2:
-                            prev_end_s = int(pickers[1].get_total_seconds())
-
-            # New start is previous end + 1 second, but not less than 0
-            # Prevent adding if previous end already reaches or exceeds video end
-            if prev_end_s >= total_s:
-                # Inform user briefly via status label
-                try:
-                    self.pw_status_label.setText("Cannot add range — already covers to video end")
-                    self.pw_status_label.setStyleSheet("color: #e67e22; font-size: 10px;")
-                except Exception:
-                    pass
-                return
-
-            # New start is previous end + 1 second, but not less than 0
-            new_start = max(0, int(prev_end_s) + 1)
-            # New end defaults to video length
-            new_end = max(new_start, int(total_s))
-
-            # Use provided add function from UI if available
-            if hasattr(self, 'pw_add_range') and callable(self.pw_add_range):
-                self.pw_add_range(new_start, new_end)
-            else:
-                # Fallback: directly add a raw row widget to container
-                container = getattr(self, 'pw_ranges_container', None)
-                if container is not None:
-                    layout = container.layout()
-                    if layout is not None:
-                        # Create a new row using the same widget class
-                        from source_code.ui.video_tools_page import make_range_row
-                        try:
-                            layout.addWidget(make_range_row(new_start, new_end))
-                        except Exception:
-                            pass
-        except Exception:
-            pass
+        return self.playback_controller._on_pw_add_range(self)
 
     def toggle_video_fullscreen(self):
         """Toggle true window fullscreen mode while expanding the controls cleanly"""

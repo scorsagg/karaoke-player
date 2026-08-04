@@ -1,5 +1,44 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Controller Extraction Boundary (2026-08-04) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/controllers/playback_controller.py`, `source_code/controllers/media_controller.py`, `source_code/controllers/processing_controller.py`, `source_code/controllers/navigation_controller.py`, `source_code/controllers/__init__.py`, `source_code/models/app_state.py`, `source_code/main.py`, `build_system/KaraokeStudioPro.spec`
+
+### Problem
+The main window class had grown into a high-risk orchestration hub spanning playback, file history/media load, FFmpeg command/task lifecycle, and page-navigation rules.
+
+### Fix
+- Added a focused `PlaybackController` to own play/pause/stop, seek, and playback-window range execution.
+- Added a focused `MediaController` to own media loading, history persistence, and load-finalization UX updates.
+- Added a focused `ProcessingController` to own FFmpeg command builders and process-thread task lifecycle.
+- Added a focused `NavigationController` to own the page-switch, tab-guard, and stack-layout routing decisions that were previously embedded in `main.py`.
+- Added `AppState` as the central runtime-state boundary so window-level fields can be migrated without breaking external behavior.
+- Kept compatibility wrappers in the main window so existing call sites and UI wiring remain stable while the extracted boundaries take over.
+- Added `source_code/controllers/__init__.py` so the controller package is an explicit architectural boundary.
+- Updated the PyInstaller spec to include the new controller/model modules in `hiddenimports` to keep packaged builds aligned with the new runtime structure.
+
+### Result
+The main shell becomes thinner and the extracted controller boundary is now explicit, documented, and build-aware. The refactor is ready for the next verification step, and the navigation branch now has its own tested extraction boundary.
+
+# Change: Build System Interpreter Resolution for Distribution (2026-08-04) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `build_system/build.py`, `build_system/BUILD_GUIDE.md`, `DEVELOPMENT.md`, `documentation/FILE_DEPENDENCIES.md`
+
+### Problem
+The project could build the app only when the shell matched the interpreter that actually had `PyInstaller` installed. In the current environment, the default shell `python` path was using a different runtime, so the build failed before analysis even started.
+
+### Fix
+- Added interpreter resolution in `build_system/build.py` so the packaging path checks for `PyInstaller` availability across the current interpreter, the `KARAOKE_BUILD_PYTHON` override, and the Windows `py -3.13` launcher fallback.
+- Kept the controller refactor visible to the executable build by preserving the explicit hidden-import list in `build_system/KaraokeStudioPro.spec`.
+- Updated the build and development docs to show the verified 3.13 runtime command so distribution packaging remains reproducible.
+
+### Result
+The build entry point is now resilient to shell-level interpreter drift and remains aligned with the controller extraction boundary that was added for the refactor.
+
 # Change: Amplify Initializes on New File Load (2026-07-19) - COMPLETE ✅
 
 **Status:** Implemented

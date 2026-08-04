@@ -32,10 +32,14 @@
 ### 3b. BUNDLED TOOL BINARIES
 **Files to update when adding/removing bundled executables:**
 - `resources/` → must contain required executable
-- `build_system/build.py` → prerequisite validation and summary text
+- `build_system/build.py` → prerequisite validation, interpreter resolution, and summary text
 - `build_system/KaraokeStudioPro.spec` → `binaries=[]` bundle list
 - `source_code/main.py` → default settings and legacy path migration
 - `documentation/INSTALLATION.txt` → bundled component list/settings descriptions
+
+**Build interpreter rule for distribution packaging:**
+- The verified build runtime is the Python 3.13 environment that already has `PyInstaller` and the app's dependencies installed.
+- `build_system/build.py` now supports `KARAOKE_BUILD_PYTHON` override and falls back to the `py -3.13` launcher when the shell is pointing at an unrelated interpreter.
 
 **Required bundled tools:**
 - `ffmpeg.exe` → encoding/transcoding/filter execution
@@ -127,6 +131,25 @@
 - `source_code/[services|workers]/__init__.py` → Export if needed
 - `documentation/ARCHITECTURE.md` → Document new component
 - `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → Add to folder listing
+
+### 7b. CONTROLLER EXTRACTION / APP STATE BOUNDARY (Refactor Step ✅)
+**Current boundary:** `source_code/controllers/`
+**Related files:**
+- `source_code/controllers/playback_controller.py` → playback lifecycle extraction
+- `source_code/controllers/media_controller.py` → media load/history extraction
+- `source_code/controllers/processing_controller.py` → FFmpeg command builders + async task orchestration
+- `source_code/controllers/navigation_controller.py` → page-switching, tab-guard, and navigation-state orchestration
+- `source_code/models/app_state.py` → central runtime state container
+- `source_code/main.py` → main shell compatibility wrappers + controller wiring
+- `build_system/KaraokeStudioPro.spec` → hiddenimports for new controller/model modules
+- `documentation/ARCHITECTURE.md` → architecture diagram + controller package section
+- `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → folder structure summary
+- `documentation/IMPLEMENTATION_LOG.md` → implementation entry for the extraction boundary
+
+**Completion rule:**
+- New controller modules must be added to the build spec hiddenimports list.
+- `main.py` should remain the compatibility façade while controllers own the extracted feature families.
+- Any new state should be stored in `AppState` rather than expanding window instance attributes ad hoc.
 
 ### 8. THREAD-SAFE FILE LOADING (File Loading Operations - FINAL FIX ✅)
 **Current Service:** `source_code/services/file_loading_service.py`

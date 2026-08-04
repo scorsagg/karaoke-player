@@ -16,7 +16,15 @@
 │  │  └─ settings_dialog.py       (Settings UI)
 │  │
 │  ├─ 📁 models/
-│  │  └─ __init__.py
+│  │  ├─ __init__.py
+│  │  └─ app_state.py            (Central runtime state container)
+│  │
+│  ├─ 📁 controllers/
+│  │  ├─ __init__.py
+│  │  ├─ playback_controller.py     (Playback lifecycle extraction)
+│  │  ├─ media_controller.py        (Media load/history extraction)
+│  │  ├─ processing_controller.py   (FFmpeg command builders + task orchestration)
+│  │  └─ navigation_controller.py   (Page-switch + tab-guard navigation orchestration)
 │  │
 │  ├─ 📁 services/
 │  │  ├─ __init__.py

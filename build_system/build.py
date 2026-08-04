@@ -50,10 +50,46 @@ APP_NAME = "KaraokeStudioPro"
 VERSION = "3"  # Update this manually or read from file
 SPEC_FILE = PROJECT_ROOT / "build_system" / "KaraokeStudioPro.spec"
 MAIN_SCRIPT = SOURCE_DIR / "main.py"
+BUILD_PYTHON_ENV_VAR = "KARAOKE_BUILD_PYTHON"
 
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+
+def _python_has_module(interpreter_cmd, module_name):
+    """Return True when the target interpreter can import the requested module."""
+    probe = [*interpreter_cmd, "-c", f"import importlib.util; sys.exit(0 if importlib.util.find_spec('{module_name}') else 1)"]
+    try:
+        result = subprocess.run(probe, capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def resolve_build_python():
+    """Pick the interpreter that has PyInstaller installed for distribution builds."""
+    env_py = os.environ.get(BUILD_PYTHON_ENV_VAR)
+    candidates = []
+
+    if env_py:
+        candidates.append([env_py])
+
+    candidates.append([sys.executable])
+
+    py_launcher = shutil.which("py")
+    if py_launcher:
+        candidates.extend([
+            [py_launcher, "-3.13"],
+            [py_launcher, "-3.12"],
+            [py_launcher, "-3.11"],
+        ])
+
+    for candidate in candidates:
+        if _python_has_module(candidate, "PyInstaller"):
+            return candidate
+
+    return [sys.executable]
 
 def log(message, level="INFO"):
     """Print formatted log message."""
@@ -170,9 +206,13 @@ def clean_old_builds():
 def run_pyinstaller():
     """Execute PyInstaller with spec file."""
     log("Running PyInstaller...", "INFO")
-    
+
+    build_python = resolve_build_python()
+    log(f"Using build interpreter: {' '.join(build_python)}", "INFO")
+
     cmd = [
-        sys.executable, "-m", "PyInstaller",
+        *build_python,
+        "-m", "PyInstaller",
         "--noconfirm",
         "--distpath", str(DIST_DIR),
         "--workpath", str(BUILD_DIR),
