@@ -96,12 +96,6 @@ class DownloadService(QObject):
             self.download_progress.emit(percent, message)
             return
 
-        # Handle post-processing messages (merging, converting)
-        # These are simple string checks, no complex regex escape needed
-        if '[ffmpeg] Merging formats' in line or '[ExtractAudio]' in line:
-            self.download_progress.emit(95, "Post-processing: Merging audio/video...")
-            return
-
         # Final file name when download is finished
         # yt-dlp prints the final file path like: '[download] Destination: /path/to/file.mp4'
         destination_match = re.search(r'\[download\] Destination:\s+(.*)', line)
@@ -121,6 +115,12 @@ class DownloadService(QObject):
         if extracted_audio_match:
             self.current_download_filename = extracted_audio_match.group(1).strip()
             self.download_progress.emit(100, "Download complete.")
+            return
+
+        # Handle post-processing messages (merging, converting)
+        # These are simple string checks, no complex regex escape needed
+        if '[ffmpeg] Merging formats' in line or '[ExtractAudio]' in line:
+            self.download_progress.emit(95, "Post-processing: Merging audio/video...")
             return
 
         # Handle errors reported via stdout
