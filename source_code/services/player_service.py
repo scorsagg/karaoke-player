@@ -112,11 +112,8 @@ class PlayerService(QObject):
         print(f"[PlayerService.set_media] 🎬 ENTRY (media_path={media_path})")
         # Release old media if any
         if self._media is not None:
-            try:
-                self._media = None
-                print(f"[PlayerService.set_media] ✓ Old media released")
-            except:
-                pass
+            self._media = None
+            print(f"[PlayerService.set_media] ✓ Old media released")
         
         # Create and set new media
         print(f"[PlayerService.set_media] Creating new media...")
@@ -133,6 +130,7 @@ class PlayerService(QObject):
         print(f"[PlayerService.set_media] ✓ EXIT")
 
     def play(self):
+        """Start playback. Returns True when the play command was accepted by VLC."""
         print(f"[PlayerService.play] ▶️  ENTRY")
         if self._video_widget_detached and self._video_widget_id:
             self._attach_video_widget()
@@ -140,9 +138,11 @@ class PlayerService(QObject):
         result = self._player.play()
         if result == -1:
             print(f"[PlayerService.play] ❌ Error playing media.")
-        else:
-            print(f"[PlayerService.play] ✓ Play command sent")
+            print(f"[PlayerService.play] ✓ EXIT")
+            return False
+        print(f"[PlayerService.play] ✓ Play command sent")
         print(f"[PlayerService.play] ✓ EXIT")
+        return True
 
     def pause(self):
         """Pause playback"""

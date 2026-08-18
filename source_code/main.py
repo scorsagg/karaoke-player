@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
     QLabel, QMessageBox, QProgressBar, QSplashScreen
 )
-from PySide6.QtCore import Qt, QTimer, QEvent
+from PySide6.QtCore import Qt, QTimer, QEvent, Signal
 from PySide6.QtGui import QPixmap, QColor, QCursor
 
 from source_code.workers.audio_analyzer import AudioAnalyzerThread
@@ -45,6 +45,8 @@ PAGE_VIDEO_STUDIO = 3
 PAGE_CONVERT_EXPORT = 4
 
 class KaraokeApp(QWidget):
+    realtime_pitch_error = Signal(str)
+
     _state_field_names = set(AppState.__dataclass_fields__.keys())
     _page_constant_names = {
         "PAGE_MEDIA_LOADER",
@@ -117,6 +119,7 @@ class KaraokeApp(QWidget):
         self.audio_analyzer = AudioAnalyzerThread()
         self.audio_analyzer.level_updated.connect(self.on_audio_level_updated)
         self.audio_analyzer.pitch_updated.connect(self.on_pitch_detected)
+        self.audio_analyzer.analyzer_error.connect(self.on_audio_analyzer_error)
         self.audio_analyzer.start()
 
         # Initialize audio service for managing audio analyzer and meter
@@ -131,7 +134,11 @@ class KaraokeApp(QWidget):
         self.file_loading_service = FileLoadingService(self.audio_service, self.player)
 
         # Real-time pitch-shift service (ffmpeg decode -> SoundTouch -> sounddevice playback).
-        self.realtime_pitch = RealtimePitchService(ffmpeg_path=self.settings.get("ffmpeg_path", "ffmpeg"))
+        self.realtime_pitch = RealtimePitchService(
+            ffmpeg_path=self.settings.get("ffmpeg_path", "ffmpeg"),
+            error_callback=self.realtime_pitch_error.emit,
+        )
+        self.realtime_pitch_error.connect(self._on_realtime_pitch_error)
 
         # Initialize download service
         self.download_service = DownloadService(self.settings, ProcessThread)
@@ -168,7 +175,8 @@ class KaraokeApp(QWidget):
         if self.settings_file.exists():
             try:
                 with open(self.settings_file, 'r') as f: self.settings.update(json.load(f))
-            except: pass
+            except Exception as e:
+                print(f"[settings] Failed to load {self.settings_file}: {e} (using defaults)")
 
         # Migrate legacy command-only paths to bundled tools when available.
         try:
@@ -185,13 +193,14 @@ class KaraokeApp(QWidget):
                 self.settings["ytdlp_path"] = bundled_ytdlp
 
             self.save_settings()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[settings] Bundled tool path migration failed: {e}")
 
     def save_settings(self):
         try:
             with open(self.settings_file, 'w') as f: json.dump(self.settings, f, indent=2)
-        except: pass
+        except Exception as e:
+            self.log_exception("save_settings", e)
 
     def _setup_debug_logger(self):
         """Initialize persistent debug logging to config/app_debug.log."""
@@ -808,6 +817,16 @@ class KaraokeApp(QWidget):
             self.audio_analyzer.pitch_updated.connect(self.on_pitch_detected)
         except Exception:
             pass
+        try:
+            self.audio_analyzer.analyzer_error.connect(self.on_audio_analyzer_error)
+        except Exception:
+            pass
+
+    def on_audio_analyzer_error(self, message):
+        """Surface audio analyzer capture failures instead of dying silently."""
+        self.log_debug(f"[audio_analyzer] ERROR: {message}")
+        if hasattr(self, "status_label") and self.status_label is not None:
+            self.status_label.setText("Status: Audio meter unavailable (capture stream failed)")
 
     # ── NOTE NAMES for tonic derivation ─────────────────────────────────────
     _NOTE_NAMES_SHARP = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
@@ -1643,7 +1662,8 @@ class KaraokeApp(QWidget):
                 startupinfo.wShowWindow = 0
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, text=True, timeout=3)
             return float(res.stdout.strip())
-        except:
+        except Exception as e:
+            self.log_debug(f"[get_video_duration_via_ffprobe] Failed to probe '{target_path}': {e}")
             return 0
 
     def get_audio_sample_rate_via_ffprobe(self, target_path):
@@ -1852,8 +1872,8 @@ class KaraokeApp(QWidget):
             lines = [ln.strip().lower() for ln in res.stdout.splitlines() if ln.strip()]
             has_video = "video" in lines
             has_audio = "audio" in lines
-        except Exception:
-            pass
+        except Exception as e:
+            self.log_debug(f"[classify_media_type] ffprobe failed for '{file_path}': {e}; falling back to extension")
 
         if has_video:
             return "video"
@@ -1879,6 +1899,13 @@ class KaraokeApp(QWidget):
         self.load_video(path, is_audio_only=(media_type == "audio"))
         self.realtime_pitch.load_file(path)
         self._refresh_realtime_pitch_status()
+
+    def _on_realtime_pitch_error(self, message):
+        """Surface realtime pitch worker failures (runs on the UI thread via signal)."""
+        self.log_debug(f"[realtime_pitch] ERROR: {message}")
+        if self.realtime_pitch_status is not None:
+            self.realtime_pitch_status.setText("Real-time pitch: ERROR (see log)")
+            self.realtime_pitch_status.setStyleSheet("color: #e74c3c; font-size: 10px; font-weight: bold;")
 
     def _is_realtime_pitch_enabled(self):
         return bool(self.realtime_pitch_toggle is not None and self.realtime_pitch_toggle.isChecked())
