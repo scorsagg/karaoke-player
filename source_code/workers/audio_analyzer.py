@@ -101,6 +101,7 @@ class AudioAnalyzerThread(QThread):
     level_updated = Signal(float)  # Emit dB value
     pitch_updated = Signal(float, str, float)  # Emit frequency_hz, note_name, confidence
     clip_warning = Signal()  # Emit when level exceeds 90%
+    analyzer_error = Signal(str)  # Emit when no audio capture stream could be opened
     
     def __init__(self):
         super().__init__()
@@ -418,6 +419,7 @@ class AudioAnalyzerThread(QThread):
 
         if not stream_opened and self.running:
             print(f"[AudioAnalyzerThread] ❌ Could not open any InputStream: {last_error}")
+            self.analyzer_error.emit(f"Could not open any audio capture stream: {last_error}")
     
     def stop(self):
         """Stop the audio analyzer"""

@@ -354,13 +354,21 @@ class ProcessingController:
 
         thread = ProcessThread(cmd, override_duration)
         app.active_tasks[task_key] = thread
+        if not hasattr(self, "_last_task_error"):
+            self._last_task_error = {}
+        self._last_task_error[task_key] = ""
 
         thread.status_update.connect(lambda text: app.export_splash.set_progress(app.export_splash.pbar.value(), text))
         thread.status_update.connect(lambda text: app.log_debug(f"[{task_key}] status | {text}"))
         thread.progress.connect(lambda v: app.export_splash.set_progress(v, app.export_splash.showMessageLabel.text()))
-        thread.line_output.connect(lambda line: app.log_debug(f"[{task_key}] output | {line}"))
+        thread.line_output.connect(lambda line: self._record_task_output(app, task_key, line))
         thread.finished.connect(lambda success: self.handle_task_completion(app, task_key, out_path, success))
         thread.start()
+
+    def _record_task_output(self, app, task_key, line):
+        app.log_debug(f"[{task_key}] output | {line}")
+        if line.startswith("ERROR:"):
+            self._last_task_error[task_key] = line
 
     def kill_allocated_task(self, app, task_key):
         if task_key in app.active_tasks:
@@ -413,19 +421,26 @@ class ProcessingController:
         app.status_label.setText("Status: Ready")
 
         if not success:
+            error_detail = getattr(self, "_last_task_error", {}).get(task_key, "")
+            detail_suffix = f"\n\n{error_detail}" if error_detail else ""
             if task_key == "merge_task" and getattr(app, "_last_merge_cmd_text", ""):
                 try:
                     QApplication.clipboard().setText(app._last_merge_cmd_text)
-                except Exception:
-                    pass
+                except Exception as e:
+                    app.log_debug(f"[{task_key}] clipboard copy failed: {e}")
                 QMessageBox.warning(
                     app,
                     "Processing Break",
                     "Execution pipeline stopped or configuration error checked.\n\n"
-                    "Final ffmpeg command has been copied to clipboard for debugging.",
+                    "Final ffmpeg command has been copied to clipboard for debugging."
+                    + detail_suffix,
                 )
                 return
-            QMessageBox.warning(app, "Processing Break", "Execution pipeline stopped or configuration error checked.")
+            QMessageBox.warning(
+                app,
+                "Processing Break",
+                "Execution pipeline stopped or configuration error checked." + detail_suffix,
+            )
             return
 
         if out_path and os.path.exists(out_path):

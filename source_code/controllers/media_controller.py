@@ -31,8 +31,8 @@ class MediaController:
         try:
             with open(history_file, "w", encoding="utf-8") as f:
                 json.dump(paths, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_exception("save_history_to_disk", e)
 
     def load_history_from_disk(self, app):
         history_file = Path(app.settings_file.parent) / "history.json"
@@ -45,8 +45,8 @@ class MediaController:
                             filename = os.path.basename(path)
                             app.history_list.insertItem(0, filename)
                             app.history_list.item(0).setToolTip(path)
-            except Exception:
-                pass
+            except Exception as e:
+                app.log_exception("load_history_from_disk", e)
 
     def clear_history(self, app):
         app.history_list.clear()
@@ -74,8 +74,8 @@ class MediaController:
             if hasattr(app, '_clear_live_amplify_preview_state'):
                 app._clear_live_amplify_preview_state()
             app.player.set_mute(False)
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_exception("load_video.pre_load_cleanup", e)
 
         if not file_path:
             print(f"[main.load_video] 📂 No file path provided, opening dialog...")

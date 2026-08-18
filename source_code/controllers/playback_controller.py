@@ -73,8 +73,8 @@ class PlaybackController:
                 app.player.set_time(int(target * dur))
             else:
                 app.player.set_position(target)
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_debug(f"[pending_seek] failed to apply seek target {target}: {e}")
 
         app.state._pending_seek_ratio = None
         self._resync_realtime_audio_after_seek(app)
@@ -93,14 +93,14 @@ class PlaybackController:
 
         try:
             app.realtime_pitch.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_debug(f"[realtime_resync] stop failed: {e}")
 
         try:
             app.realtime_pitch.load_file(app.video_path)
             app.play_shifted(start_from_current=True)
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_exception("realtime_resync.restart", e)
 
     def handle_play(self, app):
         """Play button handler — applies Playback Window settings then plays."""
@@ -117,13 +117,15 @@ class PlaybackController:
             if hasattr(app, 'realtime_pitch') and app.realtime_pitch.is_active():
                 app._clear_live_amplify_preview_state()
                 app.realtime_pitch.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_debug(f"[handle_play] realtime stop failed: {e}")
         try:
             app.player.set_mute(False)
-        except Exception:
-            pass
-        app.player.play()
+        except Exception as e:
+            app.log_debug(f"[handle_play] unmute failed: {e}")
+        if not app.player.play():
+            QMessageBox.warning(app, "Playback", "VLC could not start playback for the current media.")
+            return
         self._apply_pending_seek_after_play(app)
         app._refresh_realtime_pitch_status()
 
@@ -134,8 +136,8 @@ class PlaybackController:
             if hasattr(app, 'realtime_pitch') and app.realtime_pitch.is_active():
                 app._clear_live_amplify_preview_state()
                 app.realtime_pitch.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_debug(f"[handle_pause] realtime stop failed: {e}")
         app._refresh_realtime_pitch_status()
 
     def handle_stop(self, app):
@@ -144,8 +146,8 @@ class PlaybackController:
             if hasattr(app, 'realtime_pitch') and app.realtime_pitch.is_active():
                 app._clear_live_amplify_preview_state()
                 app.realtime_pitch.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            app.log_debug(f"[handle_stop] realtime stop failed: {e}")
 
         app.player.stop()
         app.audio_service.stop_audio_monitoring()
@@ -177,7 +179,8 @@ class PlaybackController:
                     e = int(pickers[1].get_total_seconds() * 1000)
                     if e > s:
                         self._pw_ranges.append((s, e))
-        except Exception:
+        except Exception as e:
+            app.log_debug(f"[apply_playback_window] failed to collect ranges: {e}")
             self._pw_ranges = []
 
         self._pw_ranges.sort(key=lambda x: x[0])
