@@ -153,13 +153,11 @@ class TestParseDownloadStatus:
         assert service.current_download_filename == "/media/final.mp4"
         assert recorder["progress"] == [(100, "Download complete.")]
 
-    def test_extract_audio_destination_is_handled_as_post_processing(self, service, recorder):
-        # The generic '[ExtractAudio]' post-processing check runs first, so the
-        # '[ExtractAudio] Destination:' filename branch is never reached.
+    def test_extract_audio_destination_records_final_filename(self, service, recorder):
         service._parse_download_status("[ExtractAudio] Destination: /media/song.m4a")
 
-        assert recorder["progress"] == [(95, "Post-processing: Merging audio/video...")]
-        assert service.current_download_filename is None
+        assert service.current_download_filename == "/media/song.m4a"
+        assert recorder["progress"] == [(100, "Download complete.")]
 
     def test_error_line_emits_error_only_once(self, service, recorder):
         service._parse_download_status("ERROR: unable to download video")
