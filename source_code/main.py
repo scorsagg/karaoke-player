@@ -30,12 +30,20 @@ from source_code.services.audio_service import AudioService
 from source_code.services.file_loading_service import FileLoadingService
 from source_code.services.realtime_pitch_service import RealtimePitchService
 from source_code.ui.main_layout import create_main_layout
-from source_code.ui.extra_page import TimePickerWidget
 from source_code.models.app_state import AppState
 from source_code.controllers.playback_controller import PlaybackController
 from source_code.controllers.media_controller import MediaController
 from source_code.controllers.processing_controller import ProcessingController
 from source_code.controllers.navigation_controller import NavigationController
+from source_code.utils import range_rows
+from source_code.utils.ffprobe_utils import (
+    probe_audio_sample_rate,
+    probe_duration_seconds,
+    probe_stream_codec_types,
+    probe_video_resolution,
+)
+from source_code.utils.media_paths import build_output_path, source_base_name, to_ffmpeg_path
+from source_code.utils.splash_utils import close_splash, show_download_splash, show_task_splash
 
 # Main stack page indices
 PAGE_MEDIA_LOADER = 0
@@ -1154,20 +1162,7 @@ class KaraokeApp(QWidget):
 
     def _reset_rows_to_single_range(self, container, add_row_fn, default_start=0, default_end=0):
         """Reset a range-row container to one row with provided defaults."""
-        if container is None or not callable(add_row_fn):
-            return
-
-        layout = container.layout()
-        if layout is None:
-            return
-
-        while layout.count() > 0:
-            item = layout.takeAt(0)
-            row = item.widget()
-            if row:
-                row.deleteLater()
-
-        add_row_fn(int(default_start), int(default_end))
+        range_rows.reset_rows_to_single_range(container, add_row_fn, default_start, default_end)
 
     def _reset_all_page_timers_on_load(self):
         """Reset all timer/range controls across Audio Studio and Video Studio pages."""
@@ -1193,23 +1188,7 @@ class KaraokeApp(QWidget):
 
     def _set_first_row_end_to_duration(self, container, duration_seconds):
         """Set first row to 00:00 -> media duration for range-row containers."""
-        if container is None:
-            return
-
-        layout = container.layout()
-        if layout is None or layout.count() == 0:
-            return
-
-        row = layout.itemAt(0).widget()
-        if row is None:
-            return
-
-        pickers = row.findChildren(TimePickerWidget)
-        if len(pickers) < 2:
-            return
-
-        pickers[0].set_total_seconds(0)
-        pickers[1].set_total_seconds(max(0, int(duration_seconds)))
+        range_rows.set_first_row_range(container, duration_seconds)
 
     def _reset_join_merge_controls(self):
         """Reset Join & Merge tab inputs, labels, and mode/output controls."""
@@ -1317,21 +1296,6 @@ class KaraokeApp(QWidget):
             self.pw_add_range_btn = self.video_pw_add_range_btn
             self.pw_add_range = self.video_pw_add_range
             self.pw_status_label = self.video_pw_status_label
-
-    def _initialize_playback_window_row(self, container, total_s):
-        """Set first playback row to start=0/end=duration when present."""
-        if container is None:
-            return
-        layout = container.layout()
-        if not layout or layout.count() == 0:
-            return
-        row = layout.itemAt(0).widget()
-        if not row:
-            return
-        pickers = row.findChildren(TimePickerWidget)
-        if len(pickers) >= 2:
-            pickers[0].set_total_seconds(0)
-            pickers[1].set_total_seconds(total_s)
 
     def create_audio_overlay(self):
         """Create an audio visualization overlay for the video frame area"""
@@ -1452,22 +1416,12 @@ class KaraokeApp(QWidget):
             return
 
         self.status_label.setText("Status: Deploying Media Loader Task Pipes...")
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-
-        self.download_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.download_splash.cancel_btn.clicked.connect(self.download_service.stop_download)
-        self.download_splash.show()
-        self.download_splash.set_progress(2, "Initializing download...")
-        QApplication.processEvents()
+        show_download_splash(self)
 
         if self.download_service.download_video(url, self.settings["download_directory"]):
             self._set_download_ui_busy(True)
         else:
-            if self.download_splash:
-                self.download_splash.close()
-                self.download_splash = None
+            close_splash(self, "download_splash")
             self.status_label.setText("Status: Ready")
             self._set_download_ui_busy(False)
 
@@ -1484,15 +1438,7 @@ class KaraokeApp(QWidget):
             return
 
         self.status_label.setText("Status: Downloading audio...")
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-
-        self.download_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.download_splash.cancel_btn.clicked.connect(self.download_service.stop_download)
-        self.download_splash.show()
-        self.download_splash.set_progress(2, "Initializing audio download...")
-        QApplication.processEvents()
+        show_download_splash(self, message="Initializing audio download...")
 
         self._download_from_audio_tools = True
         if self.download_service.download_video(
@@ -1503,9 +1449,7 @@ class KaraokeApp(QWidget):
             self._set_download_ui_busy(True)
         else:
             self._download_from_audio_tools = False
-            if self.download_splash:
-                self.download_splash.close()
-                self.download_splash = None
+            close_splash(self, "download_splash")
             self.status_label.setText("Status: Ready")
             self._set_download_ui_busy(False)
 
@@ -1514,9 +1458,7 @@ class KaraokeApp(QWidget):
             self.download_splash.set_progress(percent, message)
 
     def _on_download_finished(self, filename):
-        if self.download_splash:
-            self.download_splash.close()
-            self.download_splash = None
+        close_splash(self, "download_splash")
         self.status_label.setText("Status: Ready")
         try:
             full_p = ""
@@ -1613,9 +1555,7 @@ class KaraokeApp(QWidget):
         return False
 
     def _on_download_error(self, message):
-        if self.download_splash:
-            self.download_splash.close()
-            self.download_splash = None
+        close_splash(self, "download_splash")
         self.status_label.setText("Status: Ready")
         self._set_download_ui_busy(self.download_service.is_downloading())
         if "cancelled" in message.lower():
@@ -1633,55 +1573,16 @@ class KaraokeApp(QWidget):
         QMessageBox.warning(self, "Download Error", message)
 
     def get_video_duration_via_ffprobe(self, target_path):
-        if not os.path.exists(target_path): return 0
-        try:
-            cmd = [self.settings["ffprobe_path"], "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", target_path]
-            startupinfo = None
-            if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, text=True, timeout=3)
-            return float(res.stdout.strip())
-        except:
-            return 0
+        return probe_duration_seconds(self.settings["ffprobe_path"], target_path, default=0)
 
     def get_audio_sample_rate_via_ffprobe(self, target_path):
         """Return first audio stream sample-rate, falling back to 44100."""
-        if not os.path.exists(target_path):
-            return 44100
-        try:
-            cmd = [
-                self.settings["ffprobe_path"],
-                "-v", "error",
-                "-select_streams", "a:0",
-                "-show_entries", "stream=sample_rate",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                target_path,
-            ]
-            startupinfo = None
-            if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, text=True, timeout=3)
-            sample_rate = int(float((res.stdout or "").strip()))
-            if sample_rate <= 0:
-                return 44100
-            return sample_rate
-        except Exception:
-            return 44100
+        return probe_audio_sample_rate(self.settings["ffprobe_path"], target_path)
 
     def export_video(self):
         if not self.video_path: return
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("exporter"))
-        self.export_splash.show()
+        show_task_splash(self, "exporter")
 
         s, p = self.speed_input.value(), self.pitch_input.value()
         pf = 2**(p/12)
@@ -1718,8 +1619,8 @@ class KaraokeApp(QWidget):
         if s_token: parts.append(s_token)
         out_name = "_".join(parts) + ".mp4"
         out = os.path.join(self.settings["download_directory"], out_name)
-        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
-        abs_out = os.path.abspath(out).replace("\\", "/")
+        abs_in = to_ffmpeg_path(self.video_path)
+        abs_out = to_ffmpeg_path(out)
         input_sr = self.get_audio_sample_rate_via_ffprobe(abs_in)
 
         cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-filter_complex", 
@@ -1734,73 +1635,43 @@ class KaraokeApp(QWidget):
         if not target_input or not os.path.exists(target_input):
             QMessageBox.warning(self, "Missing Asset Input", "Load a file path or complete a download segment beforehand.")
             return
-        # Verify video aspect ratio first: if already ~16:9, warn user and ask confirmation
-        try:
-            # Probe video resolution
-            cmd_probe = [self.settings["ffprobe_path"], "-v", "error", "-select_streams", "v:0",
-                         "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", target_input]
-            startupinfo = None
-            if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-            res = subprocess.run(cmd_probe, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo, text=True, timeout=2)
-            out = res.stdout.strip()
-            if out:
-                parts = out.split('x')
-                if len(parts) == 2:
-                    try:
-                        w = float(parts[0])
-                        h = float(parts[1])
-                        if h > 0:
-                            ratio = w / h
-                            target_ratio = 16.0 / 9.0
-                            # Improved detection logic:
-                            # - If within 4% of 16:9, consider it already 16:9 and warn the user.
-                            # - If clearly narrow/portrait (ratio < 1.5) assume widening is appropriate.
-                            # - If ambiguous (1.5 <= ratio < ~1.7), ask the user with detected resolution and ratio.
-                            lower_wide = target_ratio * 0.96
-                            upper_wide = target_ratio * 1.04
-                            if lower_wide <= ratio <= upper_wide:
-                                # Very close to 16:9 — warn and ask
-                                reply = QMessageBox.question(self, "Already 16:9?",
-                                                             f"Detected resolution: {int(w)}x{int(h)} (ratio {ratio:.3f}).\n"
-                                                             "This appears to already be near 16:9. Running widen may add padding. Continue?",
-                                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                                if reply != QMessageBox.Yes:
-                                    return
-                            elif ratio < 1.5:
-                                # Clearly not wide — proceed without warning
-                                pass
-                            else:
-                                # Ambiguous range — show more informative prompt with detected values
-                                reply = QMessageBox.question(self, "Widen Video - Confirm",
-                                                             f"Detected resolution: {int(w)}x{int(h)} (ratio {ratio:.3f}).\n"
-                                                             "This video is not exactly 16:9 and may be close to portrait/vertical.\n"
-                                                             "Do you want to run the widen operation anyway?",
-                                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                                if reply != QMessageBox.Yes:
-                                    return
-                    except Exception:
-                        # Parsing failed; continue and let widen attempt run
-                        pass
-        except Exception:
-            # If ffprobe is unavailable or fails, continue without verification
-            pass
+        # Verify video aspect ratio first: if already ~16:9, warn user and ask confirmation.
+        # When ffprobe is unavailable the widen attempt simply runs unverified.
+        resolution = probe_video_resolution(self.settings["ffprobe_path"], target_input)
+        if resolution and resolution[1] > 0:
+            w, h = resolution
+            ratio = w / h
+            target_ratio = 16.0 / 9.0
+            # Improved detection logic:
+            # - If within 4% of 16:9, consider it already 16:9 and warn the user.
+            # - If clearly narrow/portrait (ratio < 1.5) assume widening is appropriate.
+            # - If ambiguous (1.5 <= ratio < ~1.7), ask the user with detected resolution and ratio.
+            lower_wide = target_ratio * 0.96
+            upper_wide = target_ratio * 1.04
+            if lower_wide <= ratio <= upper_wide:
+                # Very close to 16:9 — warn and ask
+                reply = QMessageBox.question(self, "Already 16:9?",
+                                             f"Detected resolution: {int(w)}x{int(h)} (ratio {ratio:.3f}).\n"
+                                             "This appears to already be near 16:9. Running widen may add padding. Continue?",
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply != QMessageBox.Yes:
+                    return
+            elif ratio >= 1.5:
+                # Ambiguous range — show more informative prompt with detected values
+                reply = QMessageBox.question(self, "Widen Video - Confirm",
+                                             f"Detected resolution: {int(w)}x{int(h)} (ratio {ratio:.3f}).\n"
+                                             "This video is not exactly 16:9 and may be close to portrait/vertical.\n"
+                                             "Do you want to run the widen operation anyway?",
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply != QMessageBox.Yes:
+                    return
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+        show_task_splash(self, "widen_task")
 
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("widen_task"))
-        self.export_splash.show()
+        out = build_output_path(self.settings["download_directory"], target_input, "-wide", "mp4")
 
-        base_name = os.path.splitext(os.path.basename(target_input))[0]
-        out = os.path.join(self.settings["download_directory"], f"{base_name}-wide.mp4")
-
-        abs_in = os.path.abspath(target_input).replace("\\", "/")
-        abs_out = os.path.abspath(out).replace("\\", "/")
+        abs_in = to_ffmpeg_path(target_input)
+        abs_out = to_ffmpeg_path(out)
 
         crop_y = self.widen_crop_y_spin.value()
         filter_str = f"crop=in_w:in_h*0.3:0:in_h*{crop_y:.2f},scale=1920*1.1:1080*1.1:force_original_aspect_ratio=increase,crop=1920:1080"
@@ -1824,36 +1695,9 @@ class KaraokeApp(QWidget):
         if not file_path or not os.path.exists(file_path):
             return "unknown"
 
-        has_video = False
-        has_audio = False
-
-        try:
-            cmd = [
-                self.settings["ffprobe_path"],
-                "-v", "error",
-                "-show_entries", "stream=codec_type",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                file_path,
-            ]
-            startupinfo = None
-            if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-
-            res = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                startupinfo=startupinfo,
-                text=True,
-                timeout=3,
-            )
-            lines = [ln.strip().lower() for ln in res.stdout.splitlines() if ln.strip()]
-            has_video = "video" in lines
-            has_audio = "audio" in lines
-        except Exception:
-            pass
+        codec_types = probe_stream_codec_types(self.settings["ffprobe_path"], file_path)
+        has_video = "video" in codec_types
+        has_audio = "audio" in codec_types
 
         if has_video:
             return "video"
@@ -1882,6 +1726,22 @@ class KaraokeApp(QWidget):
 
     def _is_realtime_pitch_enabled(self):
         return bool(self.realtime_pitch_toggle is not None and self.realtime_pitch_toggle.isChecked())
+
+    def _sync_realtime_pitch_controls(self):
+        """Push the pitch/speed spinbox values into the player and shifted-audio engine."""
+        try:
+            self.realtime_pitch.set_pitch(float(self.pitch_input.value()))
+        except Exception:
+            self.realtime_pitch.set_pitch(0.0)
+
+        try:
+            self.player.set_rate(float(self.speed_input.value()))
+        except Exception:
+            pass
+        try:
+            self.realtime_pitch.set_speed(float(self.speed_input.value()))
+        except Exception:
+            self.realtime_pitch.set_speed(1.0)
 
     def _is_realtime_neutral(self):
         """True when realtime mode should behave as passthrough (no pitch shift)."""
@@ -1969,19 +1829,7 @@ class KaraokeApp(QWidget):
             self.realtime_pitch.load_file(self.video_path)
 
         # Sync engine state to visible UI values so toggling ON is neutral at defaults.
-        try:
-            self.realtime_pitch.set_pitch(float(self.pitch_input.value()))
-        except Exception:
-            self.realtime_pitch.set_pitch(0.0)
-
-        try:
-            self.player.set_rate(float(self.speed_input.value()))
-        except Exception:
-            pass
-        try:
-            self.realtime_pitch.set_speed(float(self.speed_input.value()))
-        except Exception:
-            self.realtime_pitch.set_speed(1.0)
+        self._sync_realtime_pitch_controls()
 
         # If media is already playing, start shifted stream from current position.
         if self.player.is_active() and self.video_path:
@@ -2080,19 +1928,7 @@ class KaraokeApp(QWidget):
             return
 
         # Always apply currently shown controls before launching shifted stream.
-        try:
-            self.realtime_pitch.set_pitch(float(self.pitch_input.value()))
-        except Exception:
-            self.realtime_pitch.set_pitch(0.0)
-
-        try:
-            self.player.set_rate(float(self.speed_input.value()))
-        except Exception:
-            pass
-        try:
-            self.realtime_pitch.set_speed(float(self.speed_input.value()))
-        except Exception:
-            self.realtime_pitch.set_speed(1.0)
+        self._sync_realtime_pitch_controls()
 
         # At neutral pitch, do not route through shifted engine; preserve original playback.
         if self._is_realtime_neutral():
@@ -2194,7 +2030,6 @@ class KaraokeApp(QWidget):
             QMessageBox.warning(self, "No Video", "Current file is not a video. Load a video from Media Loader to extract audio.")
             return
 
-        base_name = os.path.splitext(os.path.basename(video_path))[0]
         
         # Get selected format from combo
         selected_format = self.extract_format_combo.currentText().lower()
@@ -2210,22 +2045,16 @@ class KaraokeApp(QWidget):
             ext = ".wav"
             codec_args = []
         
-        output_path = os.path.join(self.settings["download_directory"], f"{base_name}-extracted{ext}")
+        output_path = build_output_path(self.settings["download_directory"], video_path, "-extracted", ext)
         
         # Store output path for completion handler
         self._extract_output_path = output_path
         
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
-
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("extract_task"))
-        self.export_splash.show()
+        show_task_splash(self, "extract_task")
 
         # Build FFmpeg command
-        abs_in = os.path.abspath(video_path).replace("\\", "/")
-        abs_out = os.path.abspath(output_path).replace("\\", "/")
+        abs_in = to_ffmpeg_path(video_path)
+        abs_out = to_ffmpeg_path(output_path)
         cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in] + codec_args + ["-map", "a", abs_out]
 
         duration = self.get_video_duration_via_ffprobe(abs_in)
@@ -2239,28 +2068,19 @@ class KaraokeApp(QWidget):
 
         target_format = self.trim_format_combo.currentText().lower()
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+        show_task_splash(self, "trim_task")
 
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("trim_task"))
-        self.export_splash.show()
-
-        duration = self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/"))
+        duration = self.get_video_duration_via_ffprobe(to_ffmpeg_path(self.video_path))
         ranges_ms = self._collect_audio_trim_ranges(duration)
         if not ranges_ms:
             QMessageBox.warning(self, "No Trim Ranges", "Add at least one valid trim range (End must be after Start).")
-            if self.export_splash:
-                self.export_splash.close()
-                self.export_splash = None
+            close_splash(self)
             return
 
-        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
-        out = os.path.join(self.settings["download_directory"], f"{base_name}_trimmed.{target_format}")
+        out = build_output_path(self.settings["download_directory"], self.video_path, "_trimmed", target_format)
 
-        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
-        abs_out = os.path.abspath(out).replace("\\", "/")
+        abs_in = to_ffmpeg_path(self.video_path)
+        abs_out = to_ffmpeg_path(out)
 
         if len(ranges_ms) == 1:
             start_time = ranges_ms[0][0] / 1000.0
@@ -2278,48 +2098,9 @@ class KaraokeApp(QWidget):
 
     def _collect_audio_trim_ranges(self, duration_seconds):
         """Collect and normalize audio trim ranges from row controls (milliseconds)."""
-        ranges_ms = []
-        duration_ms = max(0, int(duration_seconds * 1000))
-
-        container = getattr(self, 'audio_trim_ranges_container', None)
-        if container is None:
-            return []
-
-        layout = container.layout()
-        if layout is None:
-            return []
-
-        for i in range(layout.count()):
-            row = layout.itemAt(i).widget()
-            if not row:
-                continue
-            pickers = row.findChildren(TimePickerWidget)
-            if len(pickers) < 2:
-                continue
-
-            start_ms = int(max(0, pickers[0].get_total_seconds()) * 1000)
-            end_ms = int(max(0, pickers[1].get_total_seconds()) * 1000)
-
-            if duration_ms > 0:
-                start_ms = min(start_ms, duration_ms)
-                end_ms = min(end_ms, duration_ms)
-
-            if end_ms > start_ms:
-                ranges_ms.append((start_ms, end_ms))
-
-        ranges_ms.sort(key=lambda x: x[0])
-        if not ranges_ms:
-            return []
-
-        merged = [ranges_ms[0]]
-        for start_ms, end_ms in ranges_ms[1:]:
-            last_start, last_end = merged[-1]
-            if start_ms <= last_end:
-                merged[-1] = (last_start, max(last_end, end_ms))
-            else:
-                merged.append((start_ms, end_ms))
-
-        return merged
+        return range_rows.collect_ranges_ms(
+            getattr(self, 'audio_trim_ranges_container', None), duration_seconds
+        )
 
     def build_audio_multi_trim_cmd(self, input_file, output_file, target_fmt, ranges_ms):
         """Compatibility wrapper for the extracted audio trim builder."""
@@ -2329,51 +2110,48 @@ class KaraokeApp(QWidget):
 
     def clear_audio_trim_ranges(self):
         """Reset audio trim rows to one default range (0 to media duration)."""
-        container = getattr(self, 'audio_trim_ranges_container', None)
-        if container is None:
-            return
-
-        layout = container.layout()
-        if layout is None:
-            return
-
-        while layout.count() > 0:
-            item = layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-
-        total_s = self._get_current_audio_duration_seconds()
-        if hasattr(self, 'audio_trim_add_range') and callable(self.audio_trim_add_range):
-            self.audio_trim_add_range(0, total_s)
-        self.audio_trim_status_label.setText("Ready to trim audio")
+        self._reset_trim_ranges(
+            getattr(self, 'audio_trim_ranges_container', None),
+            getattr(self, 'audio_trim_add_range', None),
+            self.audio_trim_status_label,
+            "Ready to trim audio",
+        )
 
     def _on_audio_trim_add_range(self):
         """Add a new audio trim range row with sensible defaults based on previous row end."""
-        if not hasattr(self, 'audio_trim_add_range') or not callable(self.audio_trim_add_range):
+        self._append_trim_range(
+            getattr(self, 'audio_trim_ranges_container', None),
+            getattr(self, 'audio_trim_add_range', None),
+            self.audio_trim_status_label,
+            "Cannot add range — already covers to media end",
+        )
+
+    def _reset_trim_ranges(self, container, add_row_fn, status_label, ready_text):
+        """Reset a trim tab to a single 0 -> media duration row and restore its ready status."""
+        if container is None or container.layout() is None:
             return
 
-        total_s = self._get_current_audio_duration_seconds()
-        prev_end_s = 0
-        container = getattr(self, 'audio_trim_ranges_container', None)
-        if container is not None:
-            layout = container.layout()
-            if layout and layout.count() > 0:
-                last_row = layout.itemAt(layout.count() - 1).widget()
-                if last_row:
-                    pickers = last_row.findChildren(TimePickerWidget)
-                    if len(pickers) >= 2:
-                        prev_end_s = int(pickers[1].get_total_seconds())
+        range_rows.reset_rows_to_single_range(
+            container, add_row_fn, 0, self._get_current_media_duration_seconds()
+        )
+        status_label.setText(ready_text)
+
+    def _append_trim_range(self, container, add_row_fn, status_label, exhausted_text):
+        """Append a trim range row starting just after the last row's end."""
+        if not callable(add_row_fn):
+            return
+
+        total_s = self._get_current_media_duration_seconds()
+        prev_end_s = range_rows.last_row_end_seconds(container)
 
         if prev_end_s >= total_s and total_s > 0:
-            self.audio_trim_status_label.setText("Cannot add range — already covers to media end")
+            status_label.setText(exhausted_text)
             return
 
         new_start = max(0, prev_end_s + 1)
-        new_end = max(new_start, total_s)
-        self.audio_trim_add_range(new_start, new_end)
+        add_row_fn(new_start, max(new_start, total_s))
 
-    def _get_current_audio_duration_seconds(self):
+    def _get_current_media_duration_seconds(self):
         """Return current media duration in seconds from player or ffprobe fallback."""
         total_ms = max(0, int(self.player.get_length())) if self.player else 0
         if total_ms > 0:
@@ -2381,7 +2159,7 @@ class KaraokeApp(QWidget):
 
         if self.video_path:
             try:
-                return int(self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/")))
+                return int(self.get_video_duration_via_ffprobe(to_ffmpeg_path(self.video_path)))
             except Exception:
                 return 0
         return 0
@@ -2404,19 +2182,12 @@ class KaraokeApp(QWidget):
         }
         bitrate = bitrate_map.get(quality_text, "192k")
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+        show_task_splash(self, "convert_task")
 
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("convert_task"))
-        self.export_splash.show()
+        out = build_output_path(self.settings["download_directory"], self.video_path, "_converted", target_fmt)
 
-        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
-        out = os.path.join(self.settings["download_directory"], f"{base_name}_converted.{target_fmt}")
-
-        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
-        abs_out = os.path.abspath(out).replace("\\", "/")
+        abs_in = to_ffmpeg_path(self.video_path)
+        abs_out = to_ffmpeg_path(out)
 
         # Build intelligent FFmpeg command based on target format
         cmd = self.build_format_conversion_cmd(abs_in, abs_out, target_fmt, bitrate)
@@ -2457,15 +2228,8 @@ class KaraokeApp(QWidget):
         media_kind = self.classify_media_type(self.video_path)
         self._current_export_media_kind = media_kind
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+        show_task_splash(self, "amplify_task")
 
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("amplify_task"))
-        self.export_splash.show()
-
-        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
         suffix = self._format_amp_suffix(factor)
 
         src_ext = os.path.splitext(self.video_path)[1].lower().lstrip(".")
@@ -2473,10 +2237,10 @@ class KaraokeApp(QWidget):
         video_out_ext = "mp4"
 
         out_ext = audio_out_ext if media_kind == "audio" else video_out_ext
-        out = os.path.join(self.settings["download_directory"], f"{base_name}_{suffix}.{out_ext}")
+        out = build_output_path(self.settings["download_directory"], self.video_path, f"_{suffix}", out_ext)
 
-        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
-        abs_out = os.path.abspath(out).replace("\\", "/")
+        abs_in = to_ffmpeg_path(self.video_path)
+        abs_out = to_ffmpeg_path(out)
 
         cmd = self.build_amplify_export_cmd(abs_in, abs_out, factor, media_kind, src_ext)
         duration = self.get_video_duration_via_ffprobe(abs_in)
@@ -2608,19 +2372,12 @@ class KaraokeApp(QWidget):
         # Extract LUFS value: "-14 LUFS (Streaming)" → -14
         lufs_value = lufs_text.split()[0]  # Get "-14"
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+        show_task_splash(self, "normalize_task")
 
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("normalize_task"))
-        self.export_splash.show()
+        out = build_output_path(self.settings["download_directory"], self.video_path, "_normalized", "wav")
 
-        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
-        out = os.path.join(self.settings["download_directory"], f"{base_name}_normalized.wav")
-
-        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
-        abs_out = os.path.abspath(out).replace("\\", "/")
+        abs_in = to_ffmpeg_path(self.video_path)
+        abs_out = to_ffmpeg_path(out)
 
         # Two-pass loudness normalization using FFmpeg
         # Pass 1: Analyze with loudnorm filter and capture JSON output
@@ -2763,8 +2520,8 @@ class KaraokeApp(QWidget):
 
     def _resolve_join_merge_output(self, mode, input_a, input_b):
         """Resolve output path/extension based on selected mode and optional format override."""
-        base_a = os.path.splitext(os.path.basename(input_a))[0]
-        base_b = os.path.splitext(os.path.basename(input_b))[0]
+        base_a = source_base_name(input_a)
+        base_b = source_base_name(input_b)
         fmt_choice = self.merge_output_format_combo.currentText().strip().upper()
         behavior = self._resolve_merge_behavior(mode)
 
@@ -2821,9 +2578,9 @@ class KaraokeApp(QWidget):
             return
 
         out_path = self._resolve_join_merge_output(mode, input_a, input_b)
-        abs_a = os.path.abspath(input_a).replace("\\", "/")
-        abs_b = os.path.abspath(input_b).replace("\\", "/")
-        abs_out = os.path.abspath(out_path).replace("\\", "/")
+        abs_a = to_ffmpeg_path(input_a)
+        abs_b = to_ffmpeg_path(input_b)
+        abs_out = to_ffmpeg_path(out_path)
 
         cmd = self._build_join_merge_cmd(abs_a, abs_b, mode, abs_out)
         cmd_text = subprocess.list2cmdline([str(part) for part in cmd])
@@ -2871,14 +2628,7 @@ class KaraokeApp(QWidget):
         except Exception:
             duration_hint = 0
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path):
-            pix.fill(QColor("#1e1e1e"))
-
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("merge_task"))
-        self.export_splash.show()
+        show_task_splash(self, "merge_task")
 
         behavior = self._resolve_merge_behavior(mode)
         self.merge_status_label.setText(f"Running {mode.replace('_', ' ')} with {behavior} behavior...")
@@ -2963,21 +2713,18 @@ class KaraokeApp(QWidget):
             f"target={target_mode} | format={output_format} | fast_mode={fast_mode} | demucs_music_recovery={demucs_music_recovery}% | demucs_recovery_mode={demucs_recovery_mode}"
         )
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path):
-            pix.fill(QColor("#1e1e1e"))
-
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("audio_separator_task"))
-        self.export_splash.set_progress(5, f"Starting Vocal Separator ({model_filename})...")
-        self.export_splash.show()
+        show_task_splash(
+            self,
+            "audio_separator_task",
+            progress=5,
+            message=f"Starting Vocal Separator ({model_filename})...",
+        )
 
         os.makedirs(model_dir, exist_ok=True)
 
         self.kill_allocated_task("audio_separator_task")
         thread = AudioSeparatorThread(
-            input_path=os.path.abspath(self.video_path).replace("\\", "/"),
+            input_path=to_ffmpeg_path(self.video_path),
             ffmpeg_path=self.settings["ffmpeg_path"],
             output_dir=self.settings["download_directory"],
             backend_name=backend_name,
@@ -3094,9 +2841,7 @@ class KaraokeApp(QWidget):
             f"vocals={vocals_path} | error={error_text}"
         )
 
-        if self.export_splash:
-            self.export_splash.close()
-            self.export_splash = None
+        close_splash(self)
 
         self.status_label.setText("Status: Ready")
 
@@ -3149,25 +2894,18 @@ class KaraokeApp(QWidget):
         else:
             target_fmt = "mp4"
 
-        duration = self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/"))
+        duration = self.get_video_duration_via_ffprobe(to_ffmpeg_path(self.video_path))
         ranges_ms = self._collect_video_trim_ranges(duration)
         if not ranges_ms:
             QMessageBox.warning(self, "No Trim Ranges", "Add at least one valid trim range (End must be after Start).")
             return
 
-        loading_path = get_resource_path("Loading.png")
-        pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-        if not os.path.exists(loading_path): pix.fill(QColor("#1e1e1e"))
+        show_task_splash(self, "video_trim_task")
 
-        self.export_splash = ModernSplashScreen(pix, show_cancel_button=True)
-        self.export_splash.cancel_btn.clicked.connect(lambda: self.kill_allocated_task("video_trim_task"))
-        self.export_splash.show()
+        out = build_output_path(self.settings["download_directory"], self.video_path, "_trimmed", target_fmt)
 
-        base_name = os.path.splitext(os.path.basename(self.video_path))[0]
-        out = os.path.join(self.settings["download_directory"], f"{base_name}_trimmed.{target_fmt}")
-
-        abs_in = os.path.abspath(self.video_path).replace("\\", "/")
-        abs_out = os.path.abspath(out).replace("\\", "/")
+        abs_in = to_ffmpeg_path(self.video_path)
+        abs_out = to_ffmpeg_path(out)
 
         if len(ranges_ms) == 1:
             start_time = ranges_ms[0][0] / 1000.0
@@ -3182,108 +2920,31 @@ class KaraokeApp(QWidget):
 
     def _collect_video_trim_ranges(self, duration_seconds):
         """Collect and normalize trim ranges from trim range rows (milliseconds)."""
-        ranges_ms = []
-        duration_ms = max(0, int(duration_seconds * 1000))
-
-        container = getattr(self, 'video_trim_ranges_container', None)
-        if container is None:
-            return []
-
-        layout = container.layout()
-        if layout is None:
-            return []
-
-        for i in range(layout.count()):
-            row = layout.itemAt(i).widget()
-            if not row:
-                continue
-            pickers = row.findChildren(TimePickerWidget)
-            if len(pickers) < 2:
-                continue
-
-            start_ms = int(max(0, pickers[0].get_total_seconds()) * 1000)
-            end_ms = int(max(0, pickers[1].get_total_seconds()) * 1000)
-
-            if duration_ms > 0:
-                start_ms = min(start_ms, duration_ms)
-                end_ms = min(end_ms, duration_ms)
-
-            if end_ms > start_ms:
-                ranges_ms.append((start_ms, end_ms))
-
-        ranges_ms.sort(key=lambda x: x[0])
-        if not ranges_ms:
-            return []
-
-        # Merge overlapping/touching ranges so output doesn't duplicate repeated segments.
-        merged = [ranges_ms[0]]
-        for start_ms, end_ms in ranges_ms[1:]:
-            last_start, last_end = merged[-1]
-            if start_ms <= last_end:
-                merged[-1] = (last_start, max(last_end, end_ms))
-            else:
-                merged.append((start_ms, end_ms))
-
-        return merged
+        return range_rows.collect_ranges_ms(
+            getattr(self, 'video_trim_ranges_container', None), duration_seconds
+        )
 
     def clear_video_trim_ranges(self):
         """Reset video trim rows to a single default range (0 to full video length)."""
-        container = getattr(self, 'video_trim_ranges_container', None)
-        if container is None:
-            return
-
-        layout = container.layout()
-        if layout is None:
-            return
-
-        while layout.count() > 0:
-            item = layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-
-        total_s = self._get_current_video_duration_seconds()
-        if hasattr(self, 'video_trim_add_range') and callable(self.video_trim_add_range):
-            self.video_trim_add_range(0, total_s)
-        self.video_trim_status_label.setText("Ready to trim video")
+        self._reset_trim_ranges(
+            getattr(self, 'video_trim_ranges_container', None),
+            getattr(self, 'video_trim_add_range', None),
+            self.video_trim_status_label,
+            "Ready to trim video",
+        )
 
     def _on_video_trim_add_range(self):
         """Add a new trim range row with sensible defaults based on previous row end."""
-        if not hasattr(self, 'video_trim_add_range') or not callable(self.video_trim_add_range):
-            return
-
-        total_s = self._get_current_video_duration_seconds()
-        prev_end_s = 0
-        container = getattr(self, 'video_trim_ranges_container', None)
-        if container is not None:
-            layout = container.layout()
-            if layout and layout.count() > 0:
-                last_row = layout.itemAt(layout.count() - 1).widget()
-                if last_row:
-                    pickers = last_row.findChildren(TimePickerWidget)
-                    if len(pickers) >= 2:
-                        prev_end_s = int(pickers[1].get_total_seconds())
-
-        if prev_end_s >= total_s and total_s > 0:
-            self.video_trim_status_label.setText("Cannot add range — already covers to video end")
-            return
-
-        new_start = max(0, prev_end_s + 1)
-        new_end = max(new_start, total_s)
-        self.video_trim_add_range(new_start, new_end)
+        self._append_trim_range(
+            getattr(self, 'video_trim_ranges_container', None),
+            getattr(self, 'video_trim_add_range', None),
+            self.video_trim_status_label,
+            "Cannot add range — already covers to video end",
+        )
 
     def _get_current_video_duration_seconds(self):
         """Return current video duration in seconds from player or ffprobe fallback."""
-        total_ms = max(0, int(self.player.get_length())) if self.player else 0
-        if total_ms > 0:
-            return total_ms // 1000
-
-        if self.video_path:
-            try:
-                return int(self.get_video_duration_via_ffprobe(os.path.abspath(self.video_path).replace("\\", "/")))
-            except Exception:
-                return 0
-        return 0
+        return self._get_current_media_duration_seconds()
 
     def build_video_trim_cmd(self, input_file, output_file, target_fmt, start_time, end_time):
         """Build FFmpeg command for video trimming with format-specific codec selection"""

@@ -96,6 +96,7 @@ source_code/
 │   ├── audio_studio_page.py       # Audio-only tools (trim ranges + playback window)
 │   ├── video_tools_page.py        # Video tools + extraction + widen + playback window
 │   ├── convert_export_page.py     # Format conversion + normalization + vocal separator + amplify/export
+│   ├── range_row_section.py       # Shared studio tab stylesheet + Start/End range rows + playback-window controls
 │   ├── sidebar.py                 # Navigation list
 │   ├── playback_bar.py            # Playback action bar (play/pause/stop/seek/volume/audio meter)
 │   └── main_layout.py             # Stack construction/wiring
@@ -105,12 +106,43 @@ source_code/
 │   ├── audio_meter.py             # Real-time audio level visualizer
 │   └── video_frame.py             # Video display frame with D&D support
 │
+├── utils/
+│   ├── __init__.py
+│   ├── subprocess_utils.py        # Hidden-console subprocess run/Popen wrappers
+│   ├── ffprobe_utils.py           # FFprobe duration/sample-rate/stream-type/resolution probes
+│   ├── media_paths.py             # FFmpeg path normalization + export output naming
+│   ├── splash_utils.py            # Loading/task/download splash creation & teardown
+│   └── range_rows.py              # Range-row traversal, clamping, merging, reset helpers
+│
 └── workers/
     ├── __init__.py
     ├── audio_analyzer.py          # Audio level capture thread
     ├── process_thread.py          # Generic subprocess executor
     └── audio_separator_thread.py  # External audio-separator CLI worker
 ```
+
+### Shared Utilities Layer (updated 2026-08-18)
+
+`source_code/utils/` holds page-agnostic helpers that previously existed as copy-pasted blocks in
+`main.py`, controllers, services, workers and pages (`range_rows` is the one helper that touches Qt,
+because it reads `TimePickerWidget` rows out of a container). Rules for this layer:
+
+- `subprocess_utils` owns the only Windows `STARTUPINFO`/`CREATE_NO_WINDOW` configuration in the app;
+  every subprocess launch goes through `run_hidden()` or `popen_hidden()`.
+- `ffprobe_utils` owns FFprobe invocation and output parsing (duration, sample rate, stream codec
+  types, resolution) and returns safe defaults when probing fails.
+- `media_paths` owns FFmpeg path normalization (`to_ffmpeg_path`) and export target naming
+  (`source_base_name`, `build_output_path`).
+- `splash_utils` owns `Loading.png` splash creation and teardown for load/export/download flows and
+  imports `ModernSplashScreen`/`get_resource_path` lazily to avoid an import cycle with `main.py`.
+- `range_rows` owns traversal of `TimePickerWidget` range rows: seconds→ms conversion, duration
+  clamping, dropping inverted ranges, sorting and optional overlap merging.
+- `source_code/ui/range_row_section.py` is the UI counterpart: it builds the removable Start/End row
+  container (`create_range_row_section`), the shared Playback Window control block
+  (`add_playback_window_controls`) and exposes `STUDIO_TAB_STYLESHEET` used by both studio pages.
+
+Utilities must stay free of window/app state: they take explicit arguments (tool paths, containers,
+layouts, getters) so Audio Studio and Video Studio can share them without cross-page coupling.
 
 ### Page Layout & Scroll Architecture (updated 2026-06-29)
 

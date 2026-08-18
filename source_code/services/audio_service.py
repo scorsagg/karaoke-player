@@ -2,6 +2,9 @@
 
 import time
 
+from source_code.utils.ffprobe_utils import probe_duration_seconds
+
+
 class AudioService:
     """Service to manage audio analyzer and meter display modes"""
     
@@ -171,27 +174,7 @@ class AudioService:
     
     def get_file_duration(self, ffprobe_path, file_path):
         """Feature 20: Get audio/video file duration in seconds"""
-        import subprocess
-        import os
-        import sys
-        
-        if not os.path.exists(file_path):
-            return 0.0
-        
-        try:
-            cmd = [ffprobe_path, "-v", "error", "-show_entries", "format=duration",
-                   "-of", "default=noprint_wrappers=1:nokey=1", file_path]
-            startupinfo = None
-            if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                    startupinfo=startupinfo, text=True, timeout=3)
-            return float(result.stdout.strip())
-        except Exception as e:
-            print(f"[AudioService.get_file_duration] Error: {e}")
-            return 0.0
+        return probe_duration_seconds(ffprobe_path, file_path)
     
     def get_volume_adjustment_command(self, ffmpeg_path, input_file, output_file, volume_db, apply_limiter=True):
         """Feature 5: Build FFmpeg command for volume adjustment"""

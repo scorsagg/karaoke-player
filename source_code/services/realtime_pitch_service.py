@@ -1,7 +1,8 @@
-import subprocess
 import threading
 
 import numpy as np
+
+from source_code.utils.subprocess_utils import popen_hidden
 
 
 class RealtimePitchService:
@@ -129,18 +130,8 @@ class RealtimePitchService:
             "pipe:1",
         ]
 
-        startupinfo = None
-        if hasattr(subprocess, "STARTUPINFO"):
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
         try:
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                startupinfo=startupinfo,
-            )
+            process = popen_hidden(cmd)
             self._ffmpeg_proc = process
         except Exception as exc:
             self._active = False
