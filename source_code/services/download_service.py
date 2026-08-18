@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from urllib.parse import urlparse
 from PySide6.QtCore import QObject, Signal, QTimer
 
 class DownloadService(QObject):
@@ -60,6 +61,11 @@ class DownloadService(QObject):
             self.download_error.emit("Download already in progress. Please wait for completion before starting another.")
             return False
 
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            self.download_error.emit("Invalid URL. Only http:// and https:// links are supported.")
+            return False
+
         self.download_url = url
         self.last_download_error = None
         self.error_emitted = False
@@ -77,7 +83,8 @@ class DownloadService(QObject):
             "--merge-output-format", "mp4",
             "--force-overwrites",
             "--no-warnings",
-            url
+            "--",
+            url,
         ]
 
         self.download_thread = self.process_thread_factory(cmd=command, duration=0)

@@ -14,6 +14,7 @@ project_files/*
 
 # Local user data and state (not tracked)
 config/history.json
+config/settings.json
 
 # Resources - large binary files
 resources/*.exe
