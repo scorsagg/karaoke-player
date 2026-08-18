@@ -83,11 +83,18 @@ source_code/
 │   ├── pitch_page.py         # Playback page
 │   ├── audio_studio_page.py  # Audio Studio (audio-only tools)
 │   ├── video_tools_page.py   # Video Studio (trim/playback/extract/widen)
+│   ├── range_row_section.py  # Shared studio tab style, Start/End range rows, playback-window controls
 │   └── convert_export_page.py # Convert & Export (conversion/normalization/vocal separation)
 ├── services/
 │   ├── audio_service.py      # Audio analyzer coordination
 │   ├── player_service.py     # VLC player abstraction
 │   └── download_service.py   # YouTube downloads
+├── utils/                     # Shared helpers (no duplicated blocks in callers)
+│   ├── subprocess_utils.py   # Hidden-console subprocess run/Popen wrappers
+│   ├── ffprobe_utils.py      # FFprobe duration/sample-rate/stream-type/resolution probes
+│   ├── media_paths.py        # FFmpeg path normalization + export output naming
+│   ├── splash_utils.py       # Loading/task/download splash creation & teardown
+│   └── range_rows.py         # Range-row traversal, clamping, merging, reset helpers
 ├── widgets/
 │   ├── audio_meter.py        # Real-time audio visualization
 │   └── video_frame.py        # Video display
@@ -128,6 +135,7 @@ config/
 | **UI component** | ui/ files, spec, main.py, docs |
 | **Settings field** | settings.json, settings_dialog.py, main.py |
 | **New service/worker** | spec (hiddenimports), main.py, docs |
+| **Subprocess / FFprobe / paths / splash / range rows** | reuse `source_code/utils/*` and `ui/range_row_section.py` instead of duplicating; new utils modules go in spec hiddenimports |
 | **Fullscreen logic** | main.py `toggle_video_fullscreen()` only — must clear height cap on enter, restore on exit |
 
 **See [`documentation/FILE_DEPENDENCIES.md`](documentation/FILE_DEPENDENCIES.md) for complete details.**

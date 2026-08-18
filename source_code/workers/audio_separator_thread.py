@@ -3,9 +3,10 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
+
+from source_code.utils.subprocess_utils import popen_hidden
 
 
 class AudioSeparatorThread(QThread):
@@ -352,22 +353,7 @@ if __name__ == "__main__":
             separation_total = 1
             last_separation_percent = -1
 
-            startupinfo = None
-            creationflags = 0
-            if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-                creationflags = 0x08000000
-
-            self.process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True,
-                startupinfo=startupinfo,
-                creationflags=creationflags,
-            )
+            self.process = popen_hidden(cmd, merge_stderr=True, universal_newlines=True)
 
             while True:
                 if self.is_killed:
@@ -520,22 +506,7 @@ if __name__ == "__main__":
     def _run_cmd(self, cmd):
         output_lines = []
         try:
-            startupinfo = None
-            creationflags = 0
-            if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-                creationflags = 0x08000000
-
-            self.process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True,
-                startupinfo=startupinfo,
-                creationflags=creationflags,
-            )
+            self.process = popen_hidden(cmd, merge_stderr=True, universal_newlines=True)
 
             while True:
                 if self.is_killed:

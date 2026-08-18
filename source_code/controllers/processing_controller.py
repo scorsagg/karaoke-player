@@ -1,11 +1,10 @@
 import os
-import subprocess
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from source_code.workers.process_thread import ProcessThread
+from source_code.utils.splash_utils import close_splash
 
 
 class ProcessingController:
@@ -380,9 +379,7 @@ class ProcessingController:
                 app.log_debug(f"[{task_key}] cancel wait complete | stopped={waited}")
             except Exception:
                 app.log_debug(f"[{task_key}] cancel wait raised exception")
-            if app.export_splash:
-                app.export_splash.close()
-                app.export_splash = None
+            close_splash(app)
             app.status_label.setText("Status: Ready")
 
     def stop_all_tasks(self, app):
@@ -406,9 +403,7 @@ class ProcessingController:
             f"exists={bool(out_path and os.path.exists(out_path))}"
         )
 
-        if app.export_splash:
-            app.export_splash.close()
-            app.export_splash = None
+        close_splash(app)
 
         app.status_label.setText("Status: Ready")
 

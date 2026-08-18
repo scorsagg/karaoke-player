@@ -151,6 +151,27 @@
 - `main.py` should remain the compatibility façade while controllers own the extracted feature families.
 - Any new state should be stored in `AppState` rather than expanding window instance attributes ad hoc.
 
+### 7c. SHARED UTILITIES (source_code/utils/ + ui/range_row_section.py) ✅ COMPLETE
+**Purpose:** single home for logic that used to be duplicated across pages, controllers, services and workers.
+**Related files:**
+- `source_code/utils/subprocess_utils.py` → hidden-console `run_hidden()` / `popen_hidden()` wrappers
+- `source_code/utils/ffprobe_utils.py` → duration, sample rate, stream codec types, video resolution probes
+- `source_code/utils/media_paths.py` → `to_ffmpeg_path()`, `source_base_name()`, `build_output_path()`
+- `source_code/utils/splash_utils.py` → loading/task/download splash creation + `close_splash()`
+- `source_code/utils/range_rows.py` → range-row collection, clamping, merging, reset helpers
+- `source_code/ui/range_row_section.py` → `STUDIO_TAB_STYLESHEET`, `create_range_row_section()`, `add_playback_window_controls()`
+- `source_code/main.py`, `source_code/controllers/*`, `source_code/services/*`, `source_code/workers/*`,
+  `source_code/ui/audio_studio_page.py`, `source_code/ui/video_tools_page.py` → call sites
+- `build_system/KaraokeStudioPro.spec` → hiddenimports for every utils/ module and `ui.range_row_section`
+
+**Completion rule (apply when touching these areas):**
+- New subprocess launches must use `subprocess_utils`; do not re-add `STARTUPINFO`/`creationflags` blocks.
+- New FFprobe queries must be added to `ffprobe_utils` rather than inlined.
+- New export outputs must be named via `build_output_path()` and paths normalized with `to_ffmpeg_path()`.
+- New splash usage must go through `splash_utils`.
+- New Start/End range UI must reuse `create_range_row_section()` and read ranges via `range_rows`.
+- Any new module added under `source_code/utils/` must be added to the build spec hiddenimports list.
+
 ### 8. THREAD-SAFE FILE LOADING (File Loading Operations - FINAL FIX ✅)
 **Current Service:** `source_code/services/file_loading_service.py`
 **Related files:**
