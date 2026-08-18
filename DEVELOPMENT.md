@@ -629,6 +629,7 @@ To add another processing feature (e.g., normalization, effects):
 
 Before committing or building:
 
+- [ ] `pytest --cov=source_code --cov-report=term-missing` passes (see `documentation/TESTING.md`)
 - [ ] `python source_code/main.py` runs without errors
 - [ ] All UI components load and display correctly
 - [ ] Audio meter shows values (SPL or dBFS)
