@@ -1,0 +1,9 @@
+[run]
+source = source_code
+omit =
+    source_code/v2-VLC_version.py
+    tests/*
+
+[report]
+show_missing = True
+skip_covered = False

@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import tempfile
+import traceback
 
 from source_code.utils.subprocess_utils import popen_hidden
 
@@ -68,6 +69,7 @@ class AudioSeparatorThread(QThread):
             self.status_update.emit("Audio separation complete")
             self.separator_done.emit(True, instrumental_path, vocals_path, "")
         except Exception as exc:
+            traceback.print_exc()
             self.separator_done.emit(False, "", "", str(exc))
         finally:
             try:
@@ -444,6 +446,7 @@ if __name__ == "__main__":
             vocals_out = vocals_path if os.path.exists(vocals_path) else ""
             return True, "", instrumental_out, vocals_out
         except Exception as exc:
+            traceback.print_exc()
             return False, str(exc), "", ""
 
     def _resolve_audio_separator_command(self):

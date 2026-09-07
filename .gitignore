@@ -14,6 +14,7 @@ project_files/*
 
 # Local user data and state (not tracked)
 config/history.json
+config/settings.json
 
 # Resources - large binary files
 resources/*.exe
@@ -33,3 +34,10 @@ build_system/dist/
 .DS_Store
 Thumbs.db
 config/app_debug.log
+
+# Test and coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.venv-test/

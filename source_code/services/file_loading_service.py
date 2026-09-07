@@ -2,6 +2,7 @@
 
 import os
 import time
+import traceback
 from PySide6.QtWidgets import QApplication
 
 
@@ -149,6 +150,7 @@ class FileLoadingService:
         Returns:
             bool: True if load succeeded, False otherwise
         """
+        was_playing = False
         try:
             was_playing = self.prepare_for_loading()
             
@@ -161,5 +163,11 @@ class FileLoadingService:
             return True
         except Exception as e:
             print(f"Error in safe file loading: {e}")
-            self.is_loading = False
+            traceback.print_exc()
+            # Restore analyzer state so audio signals don't stay blocked after a failed load.
+            try:
+                self.finish_loading(resume_audio=was_playing)
+            except Exception as cleanup_error:
+                print(f"Error recovering audio state after failed load: {cleanup_error}")
+                self.is_loading = False
             return False

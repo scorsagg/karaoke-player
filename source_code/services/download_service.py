@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from urllib.parse import urlparse
 from PySide6.QtCore import QObject, Signal, QTimer
 
 class DownloadService(QObject):
@@ -60,6 +61,11 @@ class DownloadService(QObject):
             self.download_error.emit("Download already in progress. Please wait for completion before starting another.")
             return False
 
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            self.download_error.emit("Invalid URL. Only http:// and https:// links are supported.")
+            return False
+
         self.download_url = url
         self.last_download_error = None
         self.error_emitted = False
@@ -77,7 +83,8 @@ class DownloadService(QObject):
             "--merge-output-format", "mp4",
             "--force-overwrites",
             "--no-warnings",
-            url
+            "--",
+            url,
         ]
 
         self.download_thread = self.process_thread_factory(cmd=command, duration=0)
@@ -94,12 +101,6 @@ class DownloadService(QObject):
             percent = int(float(progress_match.group(1)))
             message = f"Downloading: {percent}%"
             self.download_progress.emit(percent, message)
-            return
-
-        # Handle post-processing messages (merging, converting)
-        # These are simple string checks, no complex regex escape needed
-        if '[ffmpeg] Merging formats' in line or '[ExtractAudio]' in line:
-            self.download_progress.emit(95, "Post-processing: Merging audio/video...")
             return
 
         # Final file name when download is finished
@@ -121,6 +122,12 @@ class DownloadService(QObject):
         if extracted_audio_match:
             self.current_download_filename = extracted_audio_match.group(1).strip()
             self.download_progress.emit(100, "Download complete.")
+            return
+
+        # Handle post-processing messages (merging, converting)
+        # These are simple string checks, no complex regex escape needed
+        if '[ffmpeg] Merging formats' in line or '[ExtractAudio]' in line:
+            self.download_progress.emit(95, "Post-processing: Merging audio/video...")
             return
 
         # Handle errors reported via stdout

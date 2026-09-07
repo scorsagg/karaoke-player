@@ -68,6 +68,7 @@ class ProcessThread(QThread):
                     buffer += char
         except Exception as e:
             print(f"Extraction monitoring thread exception: {e}")
+            self.line_output.emit(f"ERROR: Process monitoring failed: {e}")
 
         self.cleanup_process()
         self.finished.emit(not self.is_killed and self.process.returncode == 0)
@@ -78,13 +79,19 @@ class ProcessThread(QThread):
                 try:
                     self.process.terminate()
                     self.process.kill()
-                except: pass
+                except Exception as e:
+                    print(f"[ProcessThread.cleanup_process] terminate/kill failed: {e}")
             try:
                 self.process.wait(timeout=0.5)
-            except: pass
+            except subprocess.TimeoutExpired:
+                pass
+            except Exception as e:
+                print(f"[ProcessThread.cleanup_process] wait failed: {e}")
             if self.process.stdout:
-                try: self.process.stdout.close()
-                except: pass
+                try:
+                    self.process.stdout.close()
+                except Exception as e:
+                    print(f"[ProcessThread.cleanup_process] stdout close failed: {e}")
 
     def stop(self):
         self.is_killed = True
