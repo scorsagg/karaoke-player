@@ -164,6 +164,7 @@ config/
 ### Feature 5: Audio Extraction ✅
 - Extract audio from video files to WAV format
 - Auto-loads extracted audio into player
+- Works correctly with non-ASCII file and folder names on Windows because ffmpeg subprocess output is decoded as UTF-8 with fallback replacement handling
 
 ### Feature 6: Audio Trimming ✅ NEW
 - **Trim First X seconds** - Remove opening
@@ -226,6 +227,11 @@ config/
 - Added low-latency real-time pitch-shift playback pipeline:
    - FFmpeg decode + filter pipeline (`rubberband=pitch=<factor>:tempo=<speed>`)
    - Audio output via `sounddevice`
+
+### Windows Unicode Path Safety ✅ (updated 2026-09-02)
+- Vocal Separator and related ffmpeg subprocesses now force UTF-8 decoding with `errors="replace"` while reading stdout/stderr.
+- This prevents Windows default code-page failures on paths containing Kannada or other non-ASCII characters.
+- The fix is especially important for video files whose names or parent folder names include Unicode text.
 - New app-level methods in `source_code/main.py`:
    - `load_file(path)`
    - `set_pitch(semitones)`
