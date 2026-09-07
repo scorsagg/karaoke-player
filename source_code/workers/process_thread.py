@@ -1,7 +1,7 @@
 from PySide6.QtCore import QThread, Signal
-import subprocess
 import re
-import sys
+
+from source_code.utils.subprocess_utils import popen_hidden
 
 
 class ProcessThread(QThread):
@@ -18,31 +18,12 @@ class ProcessThread(QThread):
         self.is_killed = False
 
     def run(self):
-        startupinfo = None
-        creationflags = 0
-        if sys.platform == "win32":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
-            creationflags = 0x08000000
-            
-        try:
-            self.process = subprocess.Popen(
-                self.cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT,  
-                universal_newlines=True, 
-                startupinfo=startupinfo,
-                creationflags=creationflags,
-                bufsize=1
-            )
-        except Exception as e:
-            error_line = f"ERROR: Failed to start process '{self.cmd[0] if self.cmd else ''}': {e}"
-            print(f"[ProcessThread] {error_line}")
-            self.line_output.emit(error_line)
-            self.status_update.emit("Failed to start process")
-            self.finished.emit(False)
-            return
+        self.process = popen_hidden(
+            self.cmd,
+            merge_stderr=True,
+            universal_newlines=True,
+            bufsize=1,
+        )
         
         buffer = ""
         try:

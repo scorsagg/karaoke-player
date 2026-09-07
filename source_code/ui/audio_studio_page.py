@@ -5,7 +5,8 @@ audio_length_getter = lambda: 0
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton, QTabWidget
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
-from source_code.ui.extra_page import TimePickerWidget
+from source_code.ui.range_row_section import (STUDIO_TAB_STYLESHEET, add_playback_window_controls,
+                                              create_range_row_section)
 
 
 def create_audio_studio_page():
@@ -45,25 +46,7 @@ def create_audio_studio_page():
 
     tabs = QTabWidget()
     tabs.setFocusPolicy(Qt.StrongFocus)
-    tabs.setStyleSheet("""
-        QTabWidget::pane { border: 1px solid #3a3a3a; }
-        QTabBar::tab {
-            background-color: #2a2a2a;
-            color: #fff;
-            padding: 8px 20px;
-            border: 1px solid #3a3a3a;
-            margin-right: 1px;
-        }
-        QTabBar::tab:hover { background-color: #145a86; }
-        QTabBar::tab:selected {
-            background-color: #0e639c;
-            font-weight: bold;
-            border-bottom: 2px solid #2ecc71;
-        }
-        QTabBar::tab:focus {
-            border: 1px solid #2ecc71;
-        }
-    """)
+    tabs.setStyleSheet(STUDIO_TAB_STYLESHEET)
     layout.addWidget(tabs)
 
     # Tab 1: Audio Trimming
@@ -81,56 +64,7 @@ def create_audio_studio_page():
     trim_desc.setWordWrap(True)
     trim_tab_layout.addWidget(trim_desc)
 
-    trim_ranges_container = QWidget()
-    trim_ranges_layout = QVBoxLayout(trim_ranges_container)
-    trim_ranges_layout.setContentsMargins(0, 0, 0, 0)
-    trim_ranges_layout.setSpacing(8)
-
-    def make_trim_range_row(default_start=None, default_end=None):
-        row_w = QWidget()
-        row_l = QHBoxLayout(row_w)
-        start_picker = TimePickerWidget()
-        end_picker = TimePickerWidget()
-
-        try:
-            if default_start is not None:
-                start_picker.set_total_seconds(int(default_start))
-            if default_end is not None:
-                end_picker.set_total_seconds(int(default_end))
-        except Exception:
-            pass
-
-        remove_btn = QPushButton("Remove")
-        remove_btn.setFixedWidth(80)
-        remove_btn.setStyleSheet("background-color: #b00020; color: white;")
-
-        row_l.addWidget(QLabel("Start:"))
-        row_l.addWidget(start_picker)
-        row_l.addSpacing(10)
-        row_l.addWidget(QLabel("End:"))
-        row_l.addWidget(end_picker)
-        row_l.addWidget(remove_btn)
-        row_l.addStretch()
-
-        def _remove():
-            for i in range(trim_ranges_layout.count()):
-                if trim_ranges_layout.itemAt(i).widget() is row_w:
-                    item = trim_ranges_layout.takeAt(i)
-                    w = item.widget()
-                    if w:
-                        w.deleteLater()
-                    break
-            try:
-                if trim_ranges_layout.count() == 0:
-                    add_trim_range_row(0, int(audio_length_getter()))
-            except Exception:
-                pass
-
-        remove_btn.clicked.connect(_remove)
-        return row_w
-
-    def add_trim_range_row(start_seconds=None, end_seconds=None):
-        trim_ranges_layout.addWidget(make_trim_range_row(start_seconds, end_seconds))
+    trim_ranges_container, add_trim_range_row = create_range_row_section(lambda: audio_length_getter())
 
     add_trim_range_row(0, int(audio_length_getter()))
 
@@ -180,56 +114,7 @@ def create_audio_studio_page():
     pw_layout.addWidget(pw_desc)
     pw_layout.addSpacing(6)
 
-    pw_ranges_container = QWidget()
-    pw_ranges_layout = QVBoxLayout(pw_ranges_container)
-    pw_ranges_layout.setContentsMargins(0, 0, 0, 0)
-    pw_ranges_layout.setSpacing(8)
-
-    def make_pw_range_row(default_start=None, default_end=None):
-        row_w = QWidget()
-        row_l = QHBoxLayout(row_w)
-        start_picker = TimePickerWidget()
-        end_picker = TimePickerWidget()
-
-        try:
-            if default_start is not None:
-                start_picker.set_total_seconds(int(default_start))
-            if default_end is not None:
-                end_picker.set_total_seconds(int(default_end))
-        except Exception:
-            pass
-
-        remove_btn = QPushButton("Remove")
-        remove_btn.setFixedWidth(80)
-        remove_btn.setStyleSheet("background-color: #b00020; color: white;")
-
-        row_l.addWidget(QLabel("Start:"))
-        row_l.addWidget(start_picker)
-        row_l.addSpacing(10)
-        row_l.addWidget(QLabel("End:"))
-        row_l.addWidget(end_picker)
-        row_l.addWidget(remove_btn)
-        row_l.addStretch()
-
-        def _remove():
-            for i in range(pw_ranges_layout.count()):
-                if pw_ranges_layout.itemAt(i).widget() is row_w:
-                    item = pw_ranges_layout.takeAt(i)
-                    w = item.widget()
-                    if w:
-                        w.deleteLater()
-                    break
-            try:
-                if pw_ranges_layout.count() == 0:
-                    add_pw_range_row(0, int(audio_length_getter()))
-            except Exception:
-                pass
-
-        remove_btn.clicked.connect(_remove)
-        return row_w
-
-    def add_pw_range_row(start_seconds=None, end_seconds=None):
-        pw_ranges_layout.addWidget(make_pw_range_row(start_seconds, end_seconds))
+    pw_ranges_container, add_pw_range_row = create_range_row_section(lambda: audio_length_getter())
 
     add_pw_range_row(0, int(audio_length_getter()))
 
@@ -237,26 +122,9 @@ def create_audio_studio_page():
     pw_add_range_btn.setFixedWidth(120)
     pw_add_range_btn.setStyleSheet("background-color: #0e639c; color: white;")
 
-    pw_layout.addWidget(QLabel("Playback Ranges (played sequentially):"))
-    pw_layout.addWidget(pw_ranges_container)
-    add_row = QHBoxLayout()
-    add_row.addStretch(); add_row.addWidget(pw_add_range_btn)
-    pw_layout.addLayout(add_row)
-
-    pw_layout.addSpacing(8)
-    btn_row = QHBoxLayout()
-    pw_apply_btn = QPushButton("▶  Apply & Play")
-    pw_apply_btn.setStyleSheet("background-color: #2ecc71; color: black; font-weight: bold; height: 32px;")
-    pw_clear_btn = QPushButton("Clear")
-    pw_clear_btn.setStyleSheet("QPushButton { background-color: #c0392b; color: white; height: 32px; min-width: 80px; font-weight: bold; } QPushButton:disabled { background-color: #555; color: #aaa; }")
-    btn_row.addWidget(pw_apply_btn)
-    btn_row.addWidget(pw_clear_btn)
-    pw_layout.addLayout(btn_row)
-
-    pw_status_label = QLabel("No playback window active")
-    pw_status_label.setStyleSheet("color: #888; font-size: 10px;")
-    pw_layout.addWidget(pw_status_label)
-    pw_layout.addStretch()
+    pw_apply_btn, pw_clear_btn, pw_status_label = add_playback_window_controls(
+        pw_layout, pw_ranges_container, pw_add_range_btn
+    )
 
     tabs.addTab(pw_tab, "⏱ Playback Window")
 

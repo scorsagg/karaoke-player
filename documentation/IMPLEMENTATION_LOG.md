@@ -1,5 +1,23 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Shared Utilities Extraction / Duplicate Code Removal (2026-08-18) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/utils/__init__.py`, `source_code/utils/subprocess_utils.py`, `source_code/utils/ffprobe_utils.py`, `source_code/utils/media_paths.py`, `source_code/utils/splash_utils.py`, `source_code/utils/range_rows.py`, `source_code/ui/range_row_section.py`, `source_code/ui/audio_studio_page.py`, `source_code/ui/video_tools_page.py`, `source_code/main.py`, `source_code/controllers/media_controller.py`, `source_code/controllers/playback_controller.py`, `source_code/controllers/processing_controller.py`, `source_code/services/audio_service.py`, `source_code/services/realtime_pitch_service.py`, `source_code/workers/process_thread.py`, `source_code/workers/audio_separator_thread.py`, `build_system/KaraokeStudioPro.spec`
+
+### Problem
+The same implementation blocks were copy-pasted across the codebase: Windows `STARTUPINFO`/`CREATE_NO_WINDOW` subprocess setup, FFprobe duration/sample-rate/stream-type/resolution queries, FFmpeg path normalization and export output naming, `Loading.png` splash creation/teardown, and the Audio Studio / Video Studio Start-End range row UI plus its range collection logic. A duplicate scan reported 20 clone groups covering 322 duplicated lines (3.27%) in `source_code/`.
+
+### Fix
+- Added `source_code/utils/` with five focused helpers: `subprocess_utils` (hidden-console `run_hidden()` / `popen_hidden()`), `ffprobe_utils` (probe + parse with safe defaults), `media_paths` (`to_ffmpeg_path()`, `source_base_name()`, `build_output_path()`), `splash_utils` (loading/task/download splash + `close_splash()`), and `range_rows` (row traversal, seconds→ms, duration clamping, sorting, optional overlap merge, reset/last-row helpers).
+- Added `source_code/ui/range_row_section.py` holding the shared `STUDIO_TAB_STYLESHEET`, the removable Start/End row factory `create_range_row_section()` and the shared Playback Window control block `add_playback_window_controls()`; both studio pages now build their trim and playback-window sections from it.
+- Refactored the call sites in `main.py`, the playback/media/processing controllers, the audio and realtime-pitch services, and the process/audio-separator workers to use the shared helpers, and folded the duplicated realtime pitch/speed sync block in `main.py` into `_sync_realtime_pitch_controls()`.
+- Removed imports left unused by the extraction (`subprocess`, `QColor`, `QPixmap`, `TimePickerWidget`) and added every new module to the PyInstaller `hiddenimports` list.
+
+### Result
+Behavior is unchanged; the duplicate scan now reports 0 clone groups (322 → 0 duplicated lines) and each duplicated concern has a single owner. Verified with `python -m compileall`, a pyflakes comparison against the pre-change baseline (no new findings, three pre-existing unused imports removed), an offscreen Qt smoke test of both studio pages (row add/remove, last-row re-add, playback-window end sync, range merge/clamp results), and FFprobe helpers exercised against a generated test media file.
+
 # Change: Controller Extraction Boundary (2026-08-04) - COMPLETE ✅
 
 **Status:** Implemented

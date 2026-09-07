@@ -3,9 +3,9 @@ import os
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
+
+from source_code.utils.splash_utils import create_loading_splash
 
 
 class MediaController:
@@ -98,13 +98,7 @@ class MediaController:
             is_audio_only = True
 
         if splash_screen is None:
-            from source_code.main import get_resource_path, ModernSplashScreen
-
-            loading_path = get_resource_path("Loading.png")
-            pix = QPixmap(loading_path).scaled(600, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation) if os.path.exists(loading_path) else QPixmap(600, 300)
-            if not os.path.exists(loading_path):
-                pix.fill(QColor("#1e1e1e"))
-            loader = ModernSplashScreen(pix)
+            loader = create_loading_splash()
             loader.show()
         else:
             loader = splash_screen

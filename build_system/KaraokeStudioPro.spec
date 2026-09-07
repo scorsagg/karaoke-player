@@ -54,6 +54,12 @@ a = Analysis(
         'source_code.services.file_loading_service',
         'source_code.services.realtime_pitch_service',
         'source_code.ui.video_tools_page',
+        'source_code.ui.range_row_section',
+        'source_code.utils.subprocess_utils',
+        'source_code.utils.ffprobe_utils',
+        'source_code.utils.media_paths',
+        'source_code.utils.splash_utils',
+        'source_code.utils.range_rows',
     ],
     
     # Modules to exclude (reduces bundle size)

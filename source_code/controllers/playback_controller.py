@@ -4,7 +4,7 @@ from typing import Optional
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox
 
-from source_code.ui.extra_page import TimePickerWidget
+from source_code.utils import range_rows
 
 
 class PlaybackController:
@@ -183,7 +183,6 @@ class PlaybackController:
             app.log_debug(f"[apply_playback_window] failed to collect ranges: {e}")
             self._pw_ranges = []
 
-        self._pw_ranges.sort(key=lambda x: x[0])
         try:
             print(f"[main.apply_playback_window] collected ranges: {self._pw_ranges}")
         except Exception:
@@ -245,16 +244,9 @@ class PlaybackController:
             total_ms = max(0, int(app.player.get_length()))
             total_s = total_ms // 1000
 
-            prev_end_s = 0
-            container = getattr(app, 'pw_ranges_container', None)
-            if container is not None:
-                layout = container.layout()
-                if layout and layout.count() > 0:
-                    last_row = layout.itemAt(layout.count() - 1).widget()
-                    if last_row:
-                        pickers = last_row.findChildren(TimePickerWidget)
-                        if len(pickers) >= 2:
-                            prev_end_s = int(pickers[1].get_total_seconds())
+            prev_end_s = range_rows.last_row_end_seconds(
+                getattr(app, 'pw_ranges_container', None)
+            )
 
             if prev_end_s >= total_s:
                 try:
@@ -269,15 +261,5 @@ class PlaybackController:
 
             if hasattr(app, 'pw_add_range') and callable(app.pw_add_range):
                 app.pw_add_range(new_start, new_end)
-            else:
-                container = getattr(app, 'pw_ranges_container', None)
-                if container is not None:
-                    layout = container.layout()
-                    if layout is not None:
-                        from source_code.ui.video_tools_page import make_range_row
-                        try:
-                            layout.addWidget(make_range_row(new_start, new_end))
-                        except Exception:
-                            pass
         except Exception:
             pass
