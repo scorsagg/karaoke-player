@@ -33,7 +33,8 @@ build_system/dist/
 *~
 .DS_Store
 Thumbs.db
-config/app_debug.log
+*.log
+runMain.bat
 
 # Test and coverage artifacts
 .coverage
