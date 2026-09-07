@@ -1447,7 +1447,7 @@ class KaraokeApp(QWidget):
 
         input_widget = self.url_input
         url = input_widget.text().strip()
-        if not url.startswith("http"):
+        if not url.lower().startswith(("http://", "https://")):
             QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
             return
 
@@ -1479,7 +1479,7 @@ class KaraokeApp(QWidget):
             return
 
         url = audio_url_input.text().strip()
-        if not url.startswith("http"):
+        if not url.lower().startswith(("http://", "https://")):
             QMessageBox.warning(self, "Validation Alert", "Provide target link URL parameters matching HTTP/HTTPS formats.")
             return
 
