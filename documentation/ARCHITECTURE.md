@@ -181,12 +181,13 @@ Convert & Export owns amplification instead of the studio pages:
 - The audio meter dB Output mode displays true `dBFS` with approximate SPL context for clearer verification of gain changes
 - After load, the control resets to the neutral `1.00x` baseline so the new file becomes the reference point
 
-### Convert & Export: Vocal Separator Tab (updated 2026-07-07)
+### Convert & Export: Vocal Separator Tab (updated 2026-09-02)
 
 Convert & Export includes a dual-backend vocal separation workflow:
 - Default backend/model: `Demucs: htdemucs_ft`
 - Faster alternative backend: `audio-separator` with UVR MDX models
 - Default target: instrumental-only export for karaoke workflows
+- Windows-safe subprocess decoding: ffmpeg and Demucs output are now opened with `encoding="utf-8", errors="replace"` so non-ASCII media paths (including Kannada filenames) do not crash the separator worker with Windows code-page errors
 - Optional `Fast mode` applies backend-specific tuning for speed
 - Optional `Demucs Music Recovery` now includes finer low-end presets (`0, 3, 5, 7, 10, 15, 20, 30%`) for subtler accompaniment recovery
 - Recovery mode now offers `Standard blend`, `Side-heavy recovery`, and `Center-aware recovery` to restore more accompaniment while limiting center-vocal bleed

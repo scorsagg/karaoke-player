@@ -170,6 +170,32 @@ class AudioSeparatorThread(QThread):
         vocals_path = os.path.join(temp_dir, f"{vocals_name}.wav")
         return ok, err, instrumental_path, vocals_path
 
+    def _build_demucs_runner_command(self, demucs_script, prepared_audio, model_name, fast_mode, recovery_percent, recovery_mode, instrumental_path, vocals_path, status_hint_path):
+        runner_args = [
+            prepared_audio,
+            model_name,
+            "1" if fast_mode else "0",
+            str(recovery_percent),
+            recovery_mode,
+            instrumental_path,
+            vocals_path,
+            status_hint_path,
+        ]
+
+        if getattr(sys, "frozen", False) or hasattr(sys, "_MEIPASS"):
+            code = (
+                "import runpy, sys; "
+                f"sys.argv = {runner_args!r}; "
+                f"runpy.run_path({demucs_script!r}, run_name='__main__')"
+            )
+            return [sys.executable, "-c", code]
+
+        return [
+            sys.executable,
+            demucs_script,
+            *runner_args,
+        ]
+
     def _run_demucs(self, prepared_audio, temp_dir):
         try:
             self.progress.emit(40)
@@ -331,18 +357,17 @@ if __name__ == "__main__":
                 script_file.write(script_source)
 
             status_hint_path = os.path.join(temp_dir, "demucs_subprocess_status.txt")
-            cmd = [
-                sys.executable,
+            cmd = self._build_demucs_runner_command(
                 demucs_script,
                 prepared_audio,
                 self.model_filename,
-                "1" if self.fast_mode else "0",
-                str(self.demucs_music_recovery),
+                self.fast_mode,
+                self.demucs_music_recovery,
                 self.demucs_recovery_mode,
                 instrumental_path,
                 vocals_path,
                 status_hint_path,
-            ]
+            )
 
             self.status_update.emit("Running Demucs separation...")
             output_lines = []
@@ -365,6 +390,8 @@ if __name__ == "__main__":
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
+                encoding="utf-8",
+                errors="replace",
                 startupinfo=startupinfo,
                 creationflags=creationflags,
             )
@@ -533,6 +560,8 @@ if __name__ == "__main__":
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
+                encoding="utf-8",
+                errors="replace",
                 startupinfo=startupinfo,
                 creationflags=creationflags,
             )

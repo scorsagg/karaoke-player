@@ -1,5 +1,23 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Windows Unicode Path Fix for Vocal Separator (2026-09-02) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`, `tests/test_audio_separator_thread.py`
+
+### Problem
+Vocal separator extraction could fail for media files stored under folders or names containing non-ASCII characters, especially on Windows. ffmpeg and Demucs subprocess output were being decoded with the local system code page, which caused decode errors such as `charmap codec can't decode byte 0x81`.
+
+### Fix
+- Forced subprocess stdout/stderr to decode as UTF-8 with `errors="replace"` in the shared worker used by ffmpeg and Demucs runs.
+- Added a regression test to ensure the worker keeps UTF-8 decoding enabled for subprocess output.
+- Kept the app behavior stable for normal ASCII paths while removing the Windows Unicode crash path for Kannada and other non-Latin filenames.
+
+### Result
+- Vocal Separator can now process media paths containing Unicode characters without failing during the pre-separation audio extraction step.
+- The app no longer crashes on the local Windows code-page mismatch triggered by non-ASCII filenames.
+
 # Change: Controller Extraction Boundary (2026-08-04) - COMPLETE ✅
 
 **Status:** Implemented

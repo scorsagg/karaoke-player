@@ -1,6 +1,6 @@
 {
   "base_directory": "D:/Entertainment/youtube-downloads/Srikanth",
-  "download_directory": "D:/Entertainment/youtube-downloads/Srikanth/Downloads",
+  "download_directory": "D:\\Entertainment\\PFC Karaoke Songs\\Tracks-of-05-Sep-2026",
   "ffmpeg_path": "D:\\Srikanth\\Academics\\Python\\karaoke-player\\resources\\ffmpeg.exe",
   "ffprobe_path": "D:\\Srikanth\\Academics\\Python\\karaoke-player\\resources\\ffprobe.exe",
   "ytdlp_path": "D:\\Srikanth\\Academics\\Python\\karaoke-player\\resources\\yt-dlp.exe",

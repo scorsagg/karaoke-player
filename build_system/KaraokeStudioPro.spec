@@ -52,6 +52,7 @@ a = Analysis(
         'source_code.controllers.navigation_controller',
         'source_code.workers.audio_separator_thread',
         'source_code.services.file_loading_service',
+        'source_code.services.logging_service',
         'source_code.services.realtime_pitch_service',
         'source_code.ui.video_tools_page',
     ],

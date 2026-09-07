@@ -3,6 +3,7 @@
 import pytest
 from PySide6.QtWidgets import QScrollArea, QStackedWidget
 
+from source_code.main import KaraokeApp
 from source_code.ui.audio_studio_page import create_audio_studio_page
 from source_code.ui.convert_export_page import create_convert_export_page
 from source_code.ui.main_layout import create_main_layout
@@ -151,6 +152,14 @@ class TestConvertExportPage:
     def test_merge_and_amplify_controls_exist(self, page):
         assert {"merge_input_a_btn", "merge_input_b_btn", "merge_execute_btn"} <= set(page)
         assert {"amp_factor_spin", "amp_live_btn", "amp_btn"} <= set(page)
+
+
+def test_demucs_packaged_model_cache_is_recognized_by_hash_names(tmp_path):
+    checkpoint_dir = tmp_path / "hub" / "checkpoints"
+    checkpoint_dir.mkdir(parents=True)
+    checkpoint_dir.joinpath("92cfc3b6-ef3bcb9c.th").write_text("stub")
+
+    assert KaraokeApp._has_local_separator_model(KaraokeApp, "htdemucs_ft", str(tmp_path)) is True
 
 
 class TestMainLayout:

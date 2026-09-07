@@ -24,6 +24,7 @@ from source_code.workers.audio_analyzer import AudioAnalyzerThread
 from source_code.workers.audio_separator_thread import AudioSeparatorThread
 from source_code.workers.process_thread import ProcessThread
 from source_code.dialogs.settings_dialog import SettingsDialog
+from source_code.services.logging_service import LoggingService
 from source_code.services.player_service import PlayerService
 from source_code.services.download_service import DownloadService
 from source_code.services.audio_service import AudioService
@@ -97,6 +98,10 @@ class KaraokeApp(QWidget):
         self.timer.start()
         self.is_user_sliding = False
 
+        # Log app initialization
+        self.log_info("[app] Karaoke Studio Pro v3.0 initialized successfully")
+        self.log_debug(f"[app] Logs directory: {self.logger.get_logs_dir()}")
+
         # Fullscreen Hover Controls Logic Setup
         self.hide_controls_timer = QTimer()
         self.hide_controls_timer.setSingleShot(True)
@@ -149,8 +154,8 @@ class KaraokeApp(QWidget):
         config_dir = app_dir / "config"
         config_dir.mkdir(exist_ok=True)
         self.settings_file = config_dir / "settings.json"
-        self.debug_log_file = config_dir / "app_debug.log"
-        self._setup_debug_logger()
+        # Initialize new centralized logging service with rotation and multi-level logging
+        self.logger = LoggingService(config_dir)
 
         bundled_ffmpeg = get_resource_path("ffmpeg.exe")
         bundled_ffprobe = get_resource_path("ffprobe.exe")
@@ -193,38 +198,30 @@ class KaraokeApp(QWidget):
             with open(self.settings_file, 'w') as f: json.dump(self.settings, f, indent=2)
         except: pass
 
-    def _setup_debug_logger(self):
-        """Initialize persistent debug logging to config/app_debug.log."""
-        self.debug_logger = logging.getLogger("karaoke_app")
-        self.debug_logger.setLevel(logging.INFO)
-        self.debug_logger.propagate = False
-
-        if not self.debug_logger.handlers:
-            file_handler = logging.FileHandler(self.debug_log_file, encoding="utf-8")
-            formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-            file_handler.setFormatter(formatter)
-            self.debug_logger.addHandler(file_handler)
-
-        self.log_debug("[app] debug logger initialized")
-
     def log_debug(self, message):
-        """Log to both console and persistent file for post-crash diagnostics."""
-        try:
-            print(message)
-        except Exception:
-            pass
+        """Log debug message (development/troubleshooting)."""
+        if hasattr(self, "logger"):
+            self.logger.debug(message)
 
-        try:
-            if hasattr(self, "debug_logger") and self.debug_logger:
-                self.debug_logger.info(message)
-        except Exception:
-            pass
+    def log_info(self, message):
+        """Log info message (user-relevant events)."""
+        if hasattr(self, "logger"):
+            self.logger.info(message)
+
+    def log_warning(self, message):
+        """Log warning message (unexpected but non-critical)."""
+        if hasattr(self, "logger"):
+            self.logger.warning(message)
+
+    def log_error(self, message):
+        """Log error message."""
+        if hasattr(self, "logger"):
+            self.logger.error(message)
 
     def log_exception(self, context, exc):
         """Log exception details with traceback."""
-        tb_text = traceback.format_exc()
-        self.log_debug(f"[{context}] ERROR: {exc}")
-        self.log_debug(tb_text)
+        if hasattr(self, "logger"):
+            self.logger.exception(context, exc)
 
     def setup_ui(self):
         """Set up the entire UI using modularized UI components"""
@@ -2886,7 +2883,11 @@ class KaraokeApp(QWidget):
 
     def start_audio_separator(self):
         """Run the selected separator backend, defaulting to Demucs quality mode."""
+        self.log_debug("[audio_separator_task] button clicked")
+        
         if not self.video_path:
+            error_msg = "No file loaded - cannot start vocal separator"
+            self.log_error(f"[audio_separator_task] {error_msg}")
             QMessageBox.warning(self, "No File", "Load an audio or video file first")
             return
 
@@ -2930,6 +2931,8 @@ class KaraokeApp(QWidget):
 
         # Team/offline packaged builds support only the bundled Demucs offline model.
         if enforce_offline_preflight and not self._is_packaged_offline_demucs_allowed(backend_name, model_filename):
+            error_msg = f"Selected model '{model_filename}' requires internet in offline team build - only Demucs: htdemucs_ft is available offline"
+            self.log_warning(f"[audio_separator_task] {error_msg}")
             self.vocal_status_label.setText(
                 "Internet required for this model in team build. Use Demucs: htdemucs_ft (Offline Team Build)."
             )
@@ -2942,6 +2945,10 @@ class KaraokeApp(QWidget):
             enforce_offline_preflight=enforce_offline_preflight,
         )
         if preflight_error:
+            # Log the detailed error for diagnostics
+            self.log_error(f"[audio_separator_task] PREFLIGHT FAILED | backend={backend_name} | model={model_filename}")
+            self.log_error(f"[audio_separator_task] preflight_error: {preflight_error}")
+            
             self.vocal_status_label.setText("Vocal Separator unavailable in this build")
             # For packaged team builds use in-page status only; avoid modal warning spam.
             if enforce_offline_preflight:
@@ -2998,6 +3005,10 @@ class KaraokeApp(QWidget):
         thread.line_output.connect(lambda line: self.log_debug(f"[audio_separator_task] output | {line}"))
         thread.separator_done.connect(self.handle_audio_separator_completion)
         thread.finished.connect(lambda: self._finalize_audio_separator_thread("audio_separator_task"))
+        
+        # Log thread startup
+        self.log_info(f"[audio_separator_task] THREAD STARTED | backend={backend_name} | model={model_filename} | target={target_mode}")
+        
         thread.start()
 
     def _get_vocal_separator_offline_notice(self):
@@ -3041,6 +3052,18 @@ class KaraokeApp(QWidget):
             return False
 
         target = str(model_filename).lower()
+        checkpoint_dir = os.path.join(model_dir, "hub", "checkpoints")
+
+        # Packaged offline Demucs models are stored as hashed checkpoint files
+        # like 92cfc3b6-ef3bcb9c.th rather than literal names such as htdemucs_ft.
+        if os.path.isdir(checkpoint_dir):
+            for root, _dirs, files in os.walk(checkpoint_dir):
+                for file_name in files:
+                    lowered = file_name.lower()
+                    if lowered.endswith(".th"):
+                        if target in lowered or target in ("htdemucs_ft", "htdemucs"):
+                            return True
+
         for root, _dirs, files in os.walk(model_dir):
             for file_name in files:
                 if target in file_name.lower():
