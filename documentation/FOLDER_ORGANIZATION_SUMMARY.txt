@@ -126,6 +126,11 @@ Build Standalone Executable (v3):
 
 ✨ RECENT FIXES & IMPROVEMENTS (Session 2026-06-18 - v3 Release):
 
+✅ Windows Unicode Fix for Vocal Separator (2026-09-02):
+   • FFmpeg and Demucs subprocess output now decodes as UTF-8 with replacement fallback
+   • Non-ASCII filenames and folder names no longer trigger Windows system-codepage decode crashes
+   • Vocal Separator now handles Kannada/Unicode media paths during audio extraction without failing early
+
 ✅ Audio Features (v3):
    • SPL (Sound Pressure Level) display: ~60-90 dB SPL with room calibration
    • Measurement modes: Switch between dB Output (dBFS) and SPL Estimate (Room)

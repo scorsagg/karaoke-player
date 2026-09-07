@@ -25,6 +25,7 @@ def no_sleep(monkeypatch):
 
 
 class TestVlcRuntimeBootstrap:
+    @pytest.mark.skipif(sys.platform.startswith("win"), reason="Windows platform configures VLC runtime")
     def test_non_windows_platforms_are_skipped(self, monkeypatch):
         monkeypatch.setattr(player_service_module.os.environ, "setdefault", lambda *a: pytest.fail("touched env"))
 

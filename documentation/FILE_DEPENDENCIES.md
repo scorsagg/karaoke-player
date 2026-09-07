@@ -46,6 +46,35 @@
 - `ffprobe.exe` → media duration, stream type, and sample-rate probing
 - `yt-dlp.exe` → URL downloads
 
+### 3c. LOGGING SERVICE (Runtime Diagnostics & User Issue Reporting)
+**Files to update:**
+- `source_code/services/logging_service.py` → Main logging service (RotatingFileHandler, multiple log levels)
+- `build_system/KaraokeStudioPro.spec` → Add to hiddenimports: `'source_code.services.logging_service'`
+- `source_code/main.py` → Import LoggingService, initialize in init_settings_manager()
+- `documentation/LOGGING.md` → User guide for finding logs and reporting issues (create if adding logging)
+
+**When to update:** When modifying logging behavior, adding new log levels, or changing log file locations.
+
+**How it works:**
+- Centralized `LoggingService` class handles all logging with automatic rotation
+- Two log files: `app_debug.log` (all events) and `app_errors.log` (errors only)
+- Automatic rotation: 5 MB max per file, keeps 5 backups (~50 MB total)
+- Log levels: DEBUG, INFO, WARNING, ERROR, EXCEPTION
+- Logs stored in `config/` folder where app settings are also stored
+- Easy for users to locate and send logs when reporting issues
+
+**Log methods in app:**
+- `log_debug(msg)` → Debug messages (development/troubleshooting)
+- `log_info(msg)` → Info messages (user-relevant events)
+- `log_warning(msg)` → Warning messages (unexpected but non-critical)
+- `log_error(msg)` → Error messages
+- `log_exception(context, exc)` → Exceptions with full traceback
+
+**References:**
+- User guide: [`documentation/LOGGING.md`](LOGGING.md)
+- Logging service: [`source_code/services/logging_service.py`](../source_code/services/logging_service.py)
+- Initialization: [`source_code/main.py`](../source_code/main.py) → `init_settings_manager()` method
+
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:
 - main_layout.py, sidebar.py, playback_bar.py, media_loader_page.py, pitch_page.py, audio_studio_page.py, video_tools_page.py, convert_export_page.py
@@ -209,7 +238,7 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - `source_code/ui/audio_studio_page.py` → Audio Studio trimming UI with row-based ranges
 - `source_code/ui/convert_export_page.py` → Convert & Export (format conversion, normalization, vocal separator)
 - `source_code/main.py` → trim_audio(), convert_audio_format(), build_format_conversion_cmd(), start_audio_separator(), handle_audio_separator_completion() methods, audio overlay, history loading
-- `source_code/workers/audio_separator_thread.py` → Demucs + audio-separator CLI orchestration and optional video-audio extraction
+- `source_code/workers/audio_separator_thread.py` → Demucs + audio-separator CLI orchestration, optional video-audio extraction, and UTF-8-safe subprocess decoding for non-ASCII Windows paths
 - `build_system/KaraokeStudioPro.spec` → hiddenimports for audio separator worker
 - `documentation/ARCHITECTURE.md` → Audio Processing section
 - `documentation/IMPLEMENTATION_LOG.md` → Features 6 & 7 + UX improvements entry

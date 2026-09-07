@@ -34,7 +34,11 @@ def run_hidden(cmd, timeout=None, text=True):
     )
 
 
+<<<<<<< HEAD
 def popen_hidden(cmd, merge_stderr=False, universal_newlines=False, bufsize=-1):
+=======
+def popen_hidden(cmd, merge_stderr=False, universal_newlines=False, bufsize=-1, encoding=None, errors=None):
+>>>>>>> 0c340836 (Changes)
     """Start a streaming command with stdout piped and no visible console window.
 
     With `merge_stderr`, stderr is folded into the stdout stream so progress output written to
@@ -45,6 +49,11 @@ def popen_hidden(cmd, merge_stderr=False, universal_newlines=False, bufsize=-1):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT if merge_stderr else subprocess.PIPE,
         universal_newlines=universal_newlines,
+<<<<<<< HEAD
+=======
+        encoding=encoding,
+        errors=errors,
+>>>>>>> 0c340836 (Changes)
         startupinfo=hidden_startupinfo(),
         creationflags=hidden_creationflags(),
         bufsize=bufsize,
