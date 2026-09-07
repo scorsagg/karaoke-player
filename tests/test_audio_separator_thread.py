@@ -332,6 +332,12 @@ class TestRunCmd:
         assert lines == ["first", "second"]
         assert popen["process"].stdout.closed is True
 
+    def test_uses_utf8_with_replace_errors_for_subprocess_output(self, thread, popen):
+        thread._run_cmd(["/bin/true"])
+
+        assert popen["kwargs"].get("encoding") == "utf-8"
+        assert popen["kwargs"].get("errors") == "replace"
+
     def test_cancellation_short_circuits(self, thread, popen):
         thread.is_killed = True
 
@@ -371,12 +377,25 @@ class TestDemucsBackend:
         assert os.path.exists(tmp_path / "demucs_subprocess_runner.py")
         cmd = popen["cmd"]
         assert cmd[0] == sys.executable
+        assert cmd[1] != "-c"
         assert cmd[2] == str(tmp_path / "in.wav")
         assert cmd[3] == "htdemucs"
         assert cmd[4] == "0"
         assert cmd[5] == "10"
         assert cmd[6] == "standard"
         assert (instrumental, vocals) == ("", "")
+
+    def test_frozen_build_uses_inline_python_bootstrap(self, tmp_path, qapp, popen, monkeypatch):
+        thread = self._thread(tmp_path)
+        monkeypatch.setattr(separator_module.sys, "frozen", True, raising=False)
+        popen["process"] = FakeProcess(lines=["DEMUCS_SUBPROCESS_DONE\n"])
+
+        thread._run_demucs(str(tmp_path / "in.wav"), str(tmp_path))
+
+        cmd = popen["cmd"]
+        assert cmd[0] == sys.executable
+        assert cmd[1] == "-c"
+        assert "runpy.run_path" in cmd[2]
 
     def test_existing_stems_are_returned(self, tmp_path, qapp, popen):
         thread = self._thread(tmp_path)

@@ -148,6 +148,11 @@ NOTE: Auto-reduce prevents excessive audio spikes and hearing damage!
    ✓ Offline team machines will show a warning and refuse separator launch safely if requirements are missing
    ✓ Playback, export, and other bundled features continue to work offline
 
+❌ Vocal Separator Fails on Files with Non-ASCII Names
+   ✓ This was fixed in v3 by forcing UTF-8 decoding for ffmpeg/Demucs subprocess output
+   ✓ Files and folders with Kannada or other Unicode characters now work correctly in the separator flow
+   ✓ If you still see a failure, move the media to a plain-ASCII folder temporarily and retry
+
 ❌ Video Playback Issues
    ✓ Check file format is supported (MP4, MKV, AVI, WebM)
    ✓ Try a different video file
