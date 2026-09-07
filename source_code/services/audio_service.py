@@ -42,7 +42,11 @@ class AudioService:
         return False
     
     def resume_analyzer(self):
-        """Resume the audio analyzer - recreate and restart the thread"""
+        """Resume the audio analyzer - recreate and restart the thread.
+
+        Returns:
+            bool: True when the analyzer is running and playing, False on failure.
+        """
         print(f"[AudioService.resume_analyzer] ▶️  ENTRY (audio_analyzer={self.audio_analyzer is not None})")
         
         if self.audio_analyzer:
@@ -85,15 +89,19 @@ class AudioService:
                     print(f"[AudioService.resume_analyzer] ❌ Error creating new thread: {e}")
                     import traceback
                     traceback.print_exc()
+                    print(f"[AudioService.resume_analyzer] ✓ EXIT (failed)")
+                    return False
             else:
                 print(f"[AudioService.resume_analyzer] Thread still running, setting is_playing=True")
                 self.audio_analyzer.set_playing(True)
                 print(f"[AudioService.resume_analyzer] ✓ set_playing(True) called")
             
             print(f"[AudioService.resume_analyzer] ✓ EXIT")
+            return True
         else:
             print(f"[AudioService.resume_analyzer] ℹ️  Audio analyzer not available, skipping")
             print(f"[AudioService.resume_analyzer] ✓ EXIT")
+            return False
     
     def get_audio_analyzer(self):
         """Get the current audio analyzer thread instance"""

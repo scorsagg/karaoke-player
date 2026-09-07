@@ -7,8 +7,9 @@ import numpy as np
 class RealtimePitchService:
     """Real-time pitch-shift playback using FFmpeg filter graph + sounddevice output."""
 
-    def __init__(self, ffmpeg_path: str = "ffmpeg"):
+    def __init__(self, ffmpeg_path: str = "ffmpeg", error_callback=None):
         self.ffmpeg_path = ffmpeg_path
+        self.error_callback = error_callback
         self.current_path: str = ""
         self.pitch_semitones: float = 0.0
         self.playback_speed: float = 1.0
@@ -27,6 +28,14 @@ class RealtimePitchService:
 
     def load_file(self, path: str):
         self.current_path = path
+
+    def _report_error(self, message: str):
+        print(f"[RealtimePitchService] {message}")
+        if callable(self.error_callback):
+            try:
+                self.error_callback(message)
+            except Exception as exc:
+                print(f"[RealtimePitchService] error_callback raised: {exc}")
 
     def set_pitch(self, semitones: float):
         self.pitch_semitones = float(semitones)
@@ -95,7 +104,7 @@ class RealtimePitchService:
             import sounddevice as sd
         except Exception as exc:
             self._active = False
-            print(f"[RealtimePitchService] sounddevice import error: {exc}")
+            self._report_error(f"sounddevice import error: {exc}")
             return
 
         pf = float(2 ** (self.pitch_semitones / 12.0))
@@ -144,7 +153,7 @@ class RealtimePitchService:
             self._ffmpeg_proc = process
         except Exception as exc:
             self._active = False
-            print(f"[RealtimePitchService] ffmpeg start error: {exc}")
+            self._report_error(f"ffmpeg start error: {exc}")
             return
 
         bytes_per_frame = self._channels * 4
@@ -161,7 +170,12 @@ class RealtimePitchService:
             stream.start()
         except Exception as exc:
             self._active = False
-            print(f"[RealtimePitchService] output stream error: {exc}")
+            self._report_error(f"output stream error: {exc}")
+            try:
+                process.kill()
+            except Exception:
+                pass
+            self._ffmpeg_proc = None
             return
 
         try:
@@ -180,8 +194,23 @@ class RealtimePitchService:
                 if frames <= 0:
                     continue
                 stream.write(out_arr[:frames * self._channels].reshape(-1, self._channels))
+            if not self._stop_event.is_set():
+                try:
+                    returncode = process.wait(timeout=1.0)
+                except Exception:
+                    returncode = process.poll()
+                if returncode is not None and returncode != 0:
+                    detail = ""
+                    try:
+                        detail = (process.stderr.read() or b"").decode(errors="replace").strip()
+                    except Exception:
+                        pass
+                    message = f"ffmpeg exited with code {returncode}"
+                    if detail:
+                        message += f": {detail}"
+                    self._report_error(message)
         except Exception as exc:
-            print(f"[RealtimePitchService] playback error: {exc}")
+            self._report_error(f"playback error: {exc}")
         finally:
             try:
                 stream.stop()

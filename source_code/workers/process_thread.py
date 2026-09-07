@@ -26,15 +26,23 @@ class ProcessThread(QThread):
             startupinfo.wShowWindow = 0
             creationflags = 0x08000000
             
-        self.process = subprocess.Popen(
-            self.cmd, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.STDOUT,  
-            universal_newlines=True, 
-            startupinfo=startupinfo,
-            creationflags=creationflags,
-            bufsize=1
-        )
+        try:
+            self.process = subprocess.Popen(
+                self.cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT,  
+                universal_newlines=True, 
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+                bufsize=1
+            )
+        except Exception as e:
+            error_line = f"ERROR: Failed to start process '{self.cmd[0] if self.cmd else ''}': {e}"
+            print(f"[ProcessThread] {error_line}")
+            self.line_output.emit(error_line)
+            self.status_update.emit("Failed to start process")
+            self.finished.emit(False)
+            return
         
         buffer = ""
         try:
@@ -79,6 +87,7 @@ class ProcessThread(QThread):
                     buffer += char
         except Exception as e:
             print(f"Extraction monitoring thread exception: {e}")
+            self.line_output.emit(f"ERROR: Process monitoring failed: {e}")
 
         self.cleanup_process()
         self.finished.emit(not self.is_killed and self.process.returncode == 0)
@@ -89,13 +98,19 @@ class ProcessThread(QThread):
                 try:
                     self.process.terminate()
                     self.process.kill()
-                except: pass
+                except Exception as e:
+                    print(f"[ProcessThread.cleanup_process] terminate/kill failed: {e}")
             try:
                 self.process.wait(timeout=0.5)
-            except: pass
+            except subprocess.TimeoutExpired:
+                pass
+            except Exception as e:
+                print(f"[ProcessThread.cleanup_process] wait failed: {e}")
             if self.process.stdout:
-                try: self.process.stdout.close()
-                except: pass
+                try:
+                    self.process.stdout.close()
+                except Exception as e:
+                    print(f"[ProcessThread.cleanup_process] stdout close failed: {e}")
 
     def stop(self):
         self.is_killed = True
