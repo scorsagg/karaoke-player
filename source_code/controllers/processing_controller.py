@@ -23,7 +23,7 @@ class ProcessingController:
             factor_value = 1.0
 
         if factor_value > 1.0:
-            volume_filter = f"volume={factor_value:.4f},alimiter=limit=0.98:attack=5:release=50"
+            volume_filter = f"volume={factor_value:.4f},alimiter=limit=0.98:attack=5:release=50:level=false"
         else:
             volume_filter = f"volume={factor_value:.4f}"
 
@@ -52,6 +52,31 @@ class ProcessingController:
             return cmd
 
         return [ffmpeg_path, "-y", "-i", input_file, "-af", volume_filter, "-c:a", "aac", "-b:a", "192k", output_file]
+
+    def build_audio_speed_export_cmd(
+        self, app, input_file, output_file, speed, pitch_factor,
+        pitch_compensation, input_sample_rate, output_ext,
+    ):
+        """Build an audio-only speed/pitch export command for the selected container."""
+        ffmpeg_path = app.settings["ffmpeg_path"]
+        audio_filter = (
+            f"asetrate={input_sample_rate}*{pitch_factor},"
+            f"aresample={input_sample_rate},"
+            f"atempo={pitch_compensation:.6f},atempo={speed:.6f}"
+        )
+        codec_options = {
+            "mp3": ["-c:a", "libmp3lame", "-b:a", "320k"],
+            "wav": ["-c:a", "pcm_s16le", "-ar", "44100"],
+            "aac": ["-c:a", "aac", "-b:a", "192k"],
+            "m4a": ["-c:a", "aac", "-b:a", "192k"],
+            "flac": ["-c:a", "flac"],
+            "ogg": ["-c:a", "libvorbis", "-b:a", "192k"],
+            "opus": ["-c:a", "libopus", "-b:a", "192k"],
+        }
+        return [
+            ffmpeg_path, "-y", "-i", input_file, "-vn", "-af", audio_filter,
+            *codec_options.get(output_ext, codec_options["mp3"]), output_file,
+        ]
 
     def build_format_conversion_cmd(self, app, input_file, output_file, target_fmt, bitrate):
         """Build FFmpeg command for format conversion (Feature 7)."""

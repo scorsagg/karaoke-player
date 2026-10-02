@@ -1633,15 +1633,25 @@ class KaraokeApp(QWidget):
         parts = [orig_name]
         if p_token: parts.append(p_token)
         if s_token: parts.append(s_token)
-        out_name = "_".join(parts) + ".mp4"
+        media_kind = self.classify_media_type(self.video_path)
+        source_ext = os.path.splitext(self.video_path)[1].lower().lstrip(".")
+        audio_exts = {"mp3", "wav", "aac", "m4a", "flac", "ogg", "opus"}
+        output_ext = source_ext if source_ext in audio_exts else "mp3"
+        out_ext = output_ext if media_kind == "audio" else "mp4"
+        out_name = "_".join(parts) + f".{out_ext}"
         out = os.path.join(self.settings["download_directory"], out_name)
         abs_in = to_ffmpeg_path(self.video_path)
         abs_out = to_ffmpeg_path(out)
         input_sr = self.get_audio_sample_rate_via_ffprobe(abs_in)
 
-        cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-filter_complex", 
-               f"[0:v]setpts=PTS/{s}[v];[0:a]asetrate={input_sr}*{pf},aresample={input_sr},atempo={pitch_comp:.6f},atempo={s:.6f}[a]", 
-               "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-b:v", "2000k", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", abs_out]
+        if media_kind == "audio":
+            cmd = self.processing_controller.build_audio_speed_export_cmd(
+                self, abs_in, abs_out, s, pf, pitch_comp, input_sr, output_ext
+            )
+        else:
+            cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-filter_complex",
+                   f"[0:v]setpts=PTS/{s}[v];[0:a]asetrate={input_sr}*{pf},aresample={input_sr},atempo={pitch_comp:.6f},atempo={s:.6f}[a]",
+                   "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-b:v", "2000k", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", abs_out]
 
         duration = self.get_video_duration_via_ffprobe(abs_in) / s
         self.launch_async_task(cmd, abs_out, "exporter", override_duration=duration)

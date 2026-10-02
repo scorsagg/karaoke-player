@@ -55,7 +55,7 @@ def spawn(monkeypatch):
             captured["kwargs"] = kwargs
             return process
 
-        monkeypatch.setattr(process_thread_module.subprocess, "Popen", fake_popen)
+        monkeypatch.setattr(process_thread_module, "popen_hidden", fake_popen)
 
         thread = ProcessThread(["ffmpeg", "-i", "in.mp4", "out.mp4"], duration=duration)
         events = {"progress": [], "status": [], "lines": [], "finished": []}
@@ -81,6 +81,12 @@ class TestInit:
 
 
 class TestRun:
+    def test_stream_uses_utf8_with_replacement_for_tool_output(self, qapp, spawn):
+        _, _, _, captured = spawn("hello\n")
+
+        assert captured["kwargs"]["encoding"] == "utf-8"
+        assert captured["kwargs"]["errors"] == "replace"
+
     def test_emits_raw_lines_and_success(self, qapp, spawn):
         _, _, events, captured = spawn("hello\nworld\n")
 
@@ -148,7 +154,7 @@ class TestRun:
 
     def test_killed_thread_reports_failure(self, qapp, monkeypatch):
         process = FakeProcess(output="line\n")
-        monkeypatch.setattr(process_thread_module.subprocess, "Popen", lambda cmd, **kwargs: process)
+        monkeypatch.setattr(process_thread_module, "popen_hidden", lambda cmd, **kwargs: process)
 
         thread = ProcessThread(["ffmpeg"])
         thread.is_killed = True
@@ -167,7 +173,7 @@ class TestRun:
 
         process = FakeProcess()
         process.stdout = BrokenStdout("")
-        monkeypatch.setattr(process_thread_module.subprocess, "Popen", lambda cmd, **kwargs: process)
+        monkeypatch.setattr(process_thread_module, "popen_hidden", lambda cmd, **kwargs: process)
 
         thread = ProcessThread(["ffmpeg"])
         results = []

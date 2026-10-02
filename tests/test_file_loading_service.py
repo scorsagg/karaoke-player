@@ -132,7 +132,7 @@ class TestSafeLoadVideo:
 
         assert "resume_analyzer" not in audio_service.calls
 
-    def test_callback_failure_clears_loading_flag(self, audio_service, qapp):
+    def test_callback_failure_restores_audio_state_and_clears_loading_flag(self, audio_service, qapp):
         service = FileLoadingService(audio_service, FakePlayerService())
 
         def _boom(path):
@@ -140,4 +140,4 @@ class TestSafeLoadVideo:
 
         assert service.safe_load_video(_boom, "/media/song.mp4") is False
         assert service.is_currently_loading() is False
-        assert "reconnect" not in audio_service.calls
+        assert audio_service.calls == ["disconnect", "pause_analyzer", "resume_analyzer", "reconnect"]

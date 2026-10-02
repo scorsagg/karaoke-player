@@ -1,334 +1,159 @@
-✅ KARAOKE STUDIO PRO v3 - FOLDER ORGANIZATION (UPcontainerED)
+✅ KARAOKE STUDIO PRO v3 - FOLDER ORGANIZATION
 
 ═══════════════════════════════════════════════════════════════════════════════
 
 📂 karaoke-player/
 │
-├─ 📱 SOURCE_CODE/                 (Refactored Python package)
-│  ├─ __init__.py                 (Package initialization)
-│  ├─ main.py                     (Main application - EXECUTABLE)
-│  ├─ karaoke_app.py              (⚠️ DEPRECATED - Use main.py instead)
-│  ├─ v2-karaoke_app - Copy.py    (Archive - can be deleted)
-│  ├─ v2-VLC_version.py           (Archive - can be deleted)
+├─ source_code/
+│  ├─ __init__.py
+│  ├─ main.py                     (main application entry point)
+│  ├─ v2-VLC_version.py           (legacy archive; not the active app entry)
 │  │
-│  ├─ 📁 dialogs/
+│  ├─ controllers/
 │  │  ├─ __init__.py
-│  │  └─ settings_dialog.py       (Settings UI)
+│  │  ├─ media_controller.py       (file history + load orchestration)
+│  │  ├─ navigation_controller.py  (page switching + guard logic)
+│  │  ├─ playback_controller.py    (playback lifecycle + playback-window execution)
+│  │  └─ processing_controller.py  (FFmpeg task orchestration + audio/video command builders)
 │  │
-│  ├─ 📁 models/
+│  ├─ dialogs/
 │  │  ├─ __init__.py
-│  │  └─ app_state.py            (Central runtime state container)
+│  │  └─ settings_dialog.py        (settings UI and schema)
 │  │
-│  ├─ 📁 controllers/
+│  ├─ models/
 │  │  ├─ __init__.py
-│  │  ├─ playback_controller.py     (Playback lifecycle extraction)
-│  │  ├─ media_controller.py        (Media load/history extraction)
-│  │  ├─ processing_controller.py   (FFmpeg command builders + task orchestration)
-│  │  └─ navigation_controller.py   (Page-switch + tab-guard navigation orchestration)
+│  │  └─ app_state.py             (central runtime state)
 │  │
-│  ├─ 📁 services/
+│  ├─ services/
 │  │  ├─ __init__.py
-│  │  ├─ player_service.py        (VLC player abstraction)
-│  │  ├─ download_service.py      (YouTube/stream downloads)
-│  │  ├─ audio_service.py         (Audio analyzer management & coordination)
-│  │  ├─ file_loading_service.py  (Thread-safe file loading with state coordination)
-│  │  └─ realtime_pitch_service.py (FFmpeg rubberband->sounddevice real-time pitch playback)
+│  │  ├─ audio_service.py         (audio monitoring + analyzer coordination)
+│  │  ├─ download_service.py      (YouTube/download workflows)
+│  │  ├─ file_loading_service.py  (thread-safe load lifecycle)
+│  │  ├─ logging_service.py       (rotating debug/error logger)
+│  │  ├─ player_service.py        (VLC playback abstraction)
+│  │  └─ realtime_pitch_service.py (live pitch + tempo helpers via FFmpeg/sounddevice)
 │  │
-│  ├─ 📁 ui/ (NEW - Modularized UI Components)
-│  │  ├─ __init__.py              (UI package exports)
-│  │  ├─ main_layout.py           (Orchestrator combining all UI)
-│  │  ├─ sidebar.py               (Navigation & settings sidebar)
-│  │  ├─ playback_bar.py          (Play/pause/stop/seek/volume/audio meter)
-│  │  ├─ media_loader_page.py     (Media Loader page: file loading & URL streaming)
-│  │  ├─ pitch_page.py            (Playback controls page)
-│  │  ├─ audio_studio_page.py     (Audio Studio: audio-only trimming + playback window)
-│  │  ├─ video_tools_page.py      (Video Studio: trimming, playback window, extraction, widen)
-│  │  ├─ range_row_section.py     (Shared studio tab stylesheet, Start/End range rows, playback-window controls)
-│  │  └─ convert_export_page.py   (Convert & Export: format conversion + normalization + vocal separator + amplify/export)
-│  │
-│  ├─ 📁 widgets/
+│  ├─ ui/
 │  │  ├─ __init__.py
-│  │  ├─ audio_meter.py           (Audio level visualizer - SPL/dBFS modes)
-│  │  └─ video_frame.py           (Video display frame)
+│  │  ├─ audio_studio_page.py     (audio trim + playback-window controls)
+│  │  ├─ convert_export_page.py   (conversion, normalization, amplify, separator)
+│  │  ├─ main_layout.py           (UI assembly + stack navigation)
+│  │  ├─ media_loader_page.py     (media load / URL download page)
+│  │  ├─ pitch_page.py            (playback controls)
+│  │  ├─ playback_bar.py          (play/pause/stop/seek/volume)
+│  │  ├─ range_row_section.py     (shared time-range row builders)
+│  │  ├─ sidebar.py              (navigation & settings sidebar)
+│  │  ├─ video_tools_page.py     (video trim + extraction + widen)
+│  │  └─ extra_page.py           (legacy/secondary page placeholder)
 │  │
-│  ├─ 📁 utils/ (Shared helpers - single owner per duplicated concern)
+│  ├─ utils/
 │  │  ├─ __init__.py
-│  │  ├─ subprocess_utils.py      (Hidden-console subprocess run/Popen wrappers)
-│  │  ├─ ffprobe_utils.py         (FFprobe duration/sample-rate/stream-type/resolution probes)
-│  │  ├─ media_paths.py           (FFmpeg path normalization + export output naming)
-│  │  ├─ splash_utils.py          (Loading/task/download splash creation & teardown)
-│  │  └─ range_rows.py            (Range-row traversal, clamping, merging, reset helpers)
+│  │  ├─ ffprobe_utils.py        (duration/sample-rate/resolution probes)
+│  │  ├─ media_paths.py          (FFmpeg path handling + output naming)
+│  │  ├─ range_rows.py           (time-range collection + validation)
+│  │  ├─ splash_utils.py         (loading/task/download splash helpers)
+│  │  └─ subprocess_utils.py     (hidden console subprocess wrappers)
 │  │
-│  └─ 📁 workers/
+│  ├─ widgets/
+│  │  ├─ __init__.py
+│  │  ├─ audio_meter.py          (real-time audio metering)
+│  │  └─ video_frame.py          (video display area)
+│  │
+│  └─ workers/
 │     ├─ __init__.py
-│     ├─ audio_analyzer.py        (Real-time audio analysis thread)
-│     ├─ process_thread.py        (Command execution thread)
-│     └─ audio_separator_thread.py (External audio-separator worker)
+│     ├─ audio_analyzer.py       (audio capture thread)
+│     ├─ audio_separator_thread.py (Demucs / separator orchestration)
+│     ├─ process_thread.py       (FFmpeg/yt-dlp subprocess monitoring)
+│     └─ __pycache__/           (generated cache; not source)
 │
-├─ 🛠️ BUILD_SYSTEM/
-│  ├─ build.py                    (Smart build orchestrator v3)
-│  ├─ KaraokeStudioPro.spec       (PyInstaller config - ALL TOOLS BUNDLED)
-│  ├─ BUILD_GUIDE.md              (Build documentation for team)
-│  ├─ requirements-build.txt      (Build dependencies)
-│  ├─ build/                      (PyInstaller temp artifacts - auto-generated)
-│  └─ dist/                       (Output: KaraokeStudioPro.exe + dependencies)
+├─ build_system/
+│  ├─ BUILD_GUIDE.md
+│  ├─ KaraokeStudioPro.spec
+│  ├─ build.py
+│  ├─ requirements-build.txt
+│  ├─ build/
+│  └─ dist/
 │
-├─ 📚 DOCUMENTATION/
-│  ├─ ARCHITECTURE.md             (System design & components)
-│  ├─ INSTALLATION.txt            (User setup guide included in dist/)
-│  ├─ requirements.txt            (Runtime dependencies)
-│  └─ FOLDER_ORGANIZATION_SUMMARY.txt (This file)
+├─ config/
+│  ├─ history.json
+│  ├─ settings.json
+│  ├─ app_debug.log
+│  └─ app_errors.log
 │
-├─ 🔧 RESOURCES/
-│  ├─ ffmpeg.exe                  ✅ Bundled in build
-│  ├─ yt-dlp.exe                  ✅ Bundled in build
-│  ├─ libvlc.dll                  ✅ Bundled in build
-│  ├─ libvlccore.dll              ✅ Bundled in build
-│  ├─ plugins/                    ✅ Bundled in build (VLC plugins)
-│  ├─ splash.png                  ✅ Bundled in build
-│  ├─ Loading.png                 ✅ Bundled in build
-│  └─ PFC_Karaoke_banner.png      (Archive/unused)
+├─ documentation/
+│  ├─ ARCHITECTURE.md
+│  ├─ FEATURE_IMPLEMENTATION_GUIDE.md
+│  ├─ FEATURES.txt
+│  ├─ FILE_DEPENDENCIES.md
+│  ├─ FOLDER_ORGANIZATION_SUMMARY.txt
+│  ├─ IMPLEMENTATION_LOG.md
+│  ├─ INSTALLATION.txt
+│  ├─ LOGGING.md
+│  ├─ TESTING.md
+│  └─ requirements.txt
 │
-├─ 📝 PROJECT_FILES/
-│  ├─ 0-Convert Karaoke Track.txt (Reference notes)
-│  └─ Improvements.txt            (Feature ideas)
+├─ resources/
+│  ├─ ffmpeg.exe
+│  ├─ ffprobe.exe
+│  ├─ yt-dlp.exe
+│  ├─ libvlc.dll
+│  ├─ libvlccore.dll
+│  ├─ plugins/
+│  ├─ Loading.png
+│  ├─ splash.png
+│  └─ offline_models/
 │
-├─ 🎥 SAMPLES/
-│  └─ (Test video files for testing)
-│
-├─ 📋 CONFIG/
-│  └─ settings.json               (App settings - persistent storage)
-│  └─ history.json                (Local only - NOT tracked in git)
-│
-├─ 🏗️ ROOT LEVEL FILES (STREAMLINED)
-│  ├─ README.md                   (Project overview)
-│  ├─ KaraokePlayer.code-workspace (VS Code workspace)
-│  ├─ .gitignore                  (Excludes binaries, history.json, cache)
-│  └─ build_system/requirements-build.txt  (For build)
+├─ README.md
+├─ DEVELOPMENT.md
+├─ pytest.ini
+├─ KaraokePlayer.code-workspace
+├─ .gitignore
+└─ tests/
+   ├─ conftest.py
+   ├─ test_app_state.py
+   ├─ test_audio_analyzer.py
+   ├─ test_audio_meter.py
+   ├─ test_audio_separator_thread.py
+   ├─ test_audio_service.py
+   ├─ test_download_service.py
+   ├─ test_file_loading_service.py
+   ├─ test_media_controller.py
+   ├─ test_navigation_controller.py
+   ├─ test_playback_controller.py
+   ├─ test_player_service.py
+   ├─ test_process_thread.py
+   ├─ test_processing_controller.py
+   ├─ test_realtime_pitch_service.py
+   ├─ test_settings_dialog.py
+   ├─ test_ui_components.py
+   └─ test_video_frame.py
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-🚀 HOW TO RUN THE APP:
-
-Development (Direct):
+🚀 Quick run:
    cd D:\Srikanth\Academics\Python\karaoke-player
    python .\source_code\main.py
 
-Build Standalone Executable (v3):
+🚀 Build:
    cd D:\Srikanth\Academics\Python\karaoke-player
-   pip install -r build_system\requirements-build.txt
-   python build_system\build.py
-
-   Output: build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe
-           INSTALLATION.txt (included in distribution)
+   C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe .\build_system\build.py
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-✨ RECENT FIXES & IMPROVEMENTS (Session 2026-06-18 - v3 Release):
-
-✅ Windows Unicode Fix for Vocal Separator (2026-09-02):
-   • FFmpeg and Demucs subprocess output now decodes as UTF-8 with replacement fallback
-   • Non-ASCII filenames and folder names no longer trigger Windows system-codepage decode crashes
-   • Vocal Separator now handles Kannada/Unicode media paths during audio extraction without failing early
-
-✅ Audio Features (v3):
-   • SPL (Sound Pressure Level) display: ~60-90 dB SPL with room calibration
-   • Measurement modes: Switch between dB Output (dBFS) and SPL Estimate (Room)
-   • Configurable auto-reduce threshold: Adjustable 0-100% for room-specific calibration
-   • Auto-volume reduction: Reduces volume by 5% when sustained above threshold for 2 seconds
-
-✅ Code Architecture:
-   • Extracted all UI building into modular components (ui/ folder)
-   • Created AudioService for audio analyzer management
-   • Refactored main.py from 1100+ lines → cleaner orchestrator
-   • Improved separation of concerns (services, workers, UI, widgets, dialogs)
-
-✅ UI/UX Refactoring:
-   • Moved playback bar creation to ui/playback_bar.py
-   • Moved sidebar creation to ui/sidebar.py
-   • Moved page creation (download, pitch, extra) to individual modules
-   • Created ui/main_layout.py as orchestrator
-   • main.py now only handles event connections and app logic
-
-✅ Playback Controls:
-   • Added a dedicated Stop button next to Play/Pause
-   • Stop freezes the current frame, detaches VLC output, and keeps the image visible on screen
-
-✅ Settings & Configuration:
-   • Added "🔊 Audio Settings" section to settings dialog
-   • Settings now include: measurement_mode, auto_reduce_threshold
-   • Integrated number-type field support in settings dialog
-   • Added QComboBox dropdown selector for measurement modes
-
-✅ File Management:
-   • Added config/history.json to .gitignore (local user data only)
-   • history.json no longer tracked in version control
-   • Ensures clean collaborative development
-
-✅ Stability:
-   • Pauses audio analyzer during settings dialog to prevent conflicts
-   • Properly resumes analyzer after settings close
-   • Improved audio service cleanup on application exit
-   • No more UI hangs when switching audio modes
-   • Recreated audio analyzer threads now reconnect to main dB handler reliably
-   • Audio analyzer InputStream now uses compatibility fallbacks (2ch/1ch, 44.1k/48k)
-    • Windows meter capture now prefers WASAPI loopback of output device for real playback levels
-    • WASAPI output-device discovery is adaptive (host default + output-capable scan), reducing hardware-specific failures
-    • Startup fixed for sounddevice 0.5.x by removing unsupported WasapiSettings(loopback=...) usage
-    • Windows audio meter now uses soundcard loopback backend first (speaker capture), with sounddevice fallback
-    • Sidebar status now refreshes on file load start/success/failure (prevents stale auto-reduce text)
-    • Splash progress bar now updates visibly during file preparation and loading stages
-   • Task cancellation now waits for worker shutdown (`stop()+wait()`) to prevent QThread-destroyed crashes during conversion/separation
-   • Media Loader download actions are now locked during active download/load; repeated clicks no longer spawn overlapping download threads
-   • DownloadService now enforces single active `ProcessThread` and rejects concurrent starts to prevent thread-destroyed crashes
-   • yt-dlp output parser regexes now use escaped bracket patterns, removing Python FutureWarning spam during downloads
-    • Real-time Pitch Mode now has neutral passthrough at 0 semitones, so enabling checkbox no longer alters pitch/tempo unexpectedly
-    • Real-time speed updates now sync VLC + shifted stream together (debounced restart), so speed changes continue working while realtime mode is ON
-   • Realtime FFmpeg path now uses rubberband for independent pitch and tempo control
-    • Hidden live amplification now applies multiplicative gain consistently across repeated adjustments (not just first perceived change)
-   • Persistent debug log added at config/app_debug.log (task lifecycle + worker subprocess output)
-   • PlayerService auto-configures Windows VLC runtime paths for source runs
-     (PATH + VLC_PLUGIN_PATH + add_dll_directory)
-
-✅ Build System (v3):
-   • Version bumped to 3 in build.py and spec file
-   • INSTALLATION.txt copied to dist/ root for user visibility
+✨ Documentation sync note:
+- This project uses the 5-file documentation sync rule (FILE_DEPENDENCIES, ARCHITECTURE, FOLDER_ORGANIZATION_SUMMARY, DEVELOPMENT, IMPLEMENTATION_LOG).
+- Service and feature additions must be documented in those five files together with the actual code changes.
+- Logging support is covered in documentation/LOGGING.md and the runtime logger service in source_code/services/logging_service.py.
+- The current project structure remains modular: controllers, services, UI, utils, widgets, and workers are each owned by dedicated modules.
 
 ═══════════════════════════════════════════════════════════════════════════════
 
-🎯 FEATURE ROADMAP STATUS (2026-06-20):
-
-✅ COMPLETE - 9 Features Fully Implemented:
-   1. Feature 6 - Audio Trimming (with H/M/S controls)
-   2. Feature 7 - Format Conversion (MP3, WAV, M4A, AAC, MP4, MKV, AVI, WebM)
-   3. Feature 8 - Audio Loudness Normalization (LUFS presets)
-   4. Feature 15 - Audio Stream Extraction from videos
-   5. Feature 19 - container/legacy media conversion support in Convert & Export
-   6. Feature 21 - YouTube video downloads
-   7. Feature 32 - Playback with start/end time controls
-   8. Feature 33 - Stop/unload video functionality
-   9. NEW - Video Trimming (trim first/last/range, MP4/MKV/WebM/AVI formats)
-
-⚙️ HELPER FUNCTIONS - 4 Available for Future Use:
-   • Feature 5 - Volume Adjustment (AudioService method)
-   • Feature 9 - Video Speed Adjustment (PlayerService method)
-   • Feature 12 - Speed Synchronization (AudioService methods)
-   • Feature 20 - Duration Analysis (AudioService method)
-
-📋 NOT REQUIRED - 19+ Features Marked as Out of Scope:
-   • All other features from improvements.txt are NOT REQUIRED
-   • See documentation/FILE_DEPENDENCIES.md → "📋 FEATURE IMPLEMENTATION STATUS"
-   • Can be added in future versions if needed
-
-✅ ROADMAP COMPLETE - NO ADDITIONAL FEATURES IN CURRENT SCOPE
-
-✅ Video Trimming UX Alignment (2026-06-29):
-   • Video Tools trimming now mirrors Playback Window interaction style
-   • Dynamic start/end range rows with Add Range, Remove row, and Clear actions
-   • Multi-range trims are concatenated into a single output export
-   • Overlapping/touching ranges are merged automatically before export
-
-✅ Audio/Conversion Processing (2026-06-30):
-    • Audio Trimming (Feature 6): row-based keep-ranges with add/remove/clear
-       - Supports one or multiple ranges; multi-range output is concatenated
-    • Format Conversion (Feature 7): Convert between audio/video formats
-       - Source formats: MP3, WAV, M4A, AAC, container, MP4, MKV, AVI, WebM
-       - Target formats are media-aware based on loaded source
-       - Quality selector: High (320k), Medium (192k), Low (128k)
-    • Loudness Normalization (Feature 8): available for audio and video sources
-    • Vocal Separator (2026-07-07): Demucs default + UVR fast alternative
-       - Default backend/model: Demucs htdemucs_ft
-       - Faster fallback: audio-separator UVR models
-       - Default target: instrumental-only export
-       - Fast mode applies backend-specific speed tuning
-       - Demucs Music Recovery now provides fine low-end presets: 0%, 3%, 5%, 7%, 10%, 15%, 20%, 30%
-       - Recovery Mode adds Standard, Side-heavy, and Center-aware blend styles for better karaoke tradeoffs
-       - Recovery blending is done in numpy export path to avoid extra torch tensor copies and reduce long-track crash risk
-       - Video inputs are pre-extracted to WAV before separation
-       - Demucs path uses Python API + soundfile input loading to avoid torchaudio/torchcodec CLI failures
-      - Demucs inference runs in an isolated subprocess so native crashes do not terminate the main app
-       - Demucs tqdm output is parsed into worker progress signals so the splash bar updates continuously
-      - Team/offline package now supports Demucs `htdemucs_ft` via bundled local model cache (no internet for this path)
-      - UVR/audio-separator model options are marked as internet/manual-setup-required in packaged team build via in-page status messaging (no modal warning)
-      - Offline team builds now show visible in-page guidance and safe preflight refusal when non-offline models/backends are selected
-      - Source/local runs allow first-use backend/model download and do not block separator start only because model cache is initially empty
-      - Demucs status messaging now shows download phase with expected separation passes up-front and adaptive pass counters when extra loops are detected
-
-✅ Playback Timing Reliability (2026-07-09):
-   • On each new file load, timer/range controls reset across Audio Studio and Video Studio pages
-   • Default timer rows are re-synced to loaded media duration (00:00 to media end)
-   • Seekbar progression now uses elapsed playback time ratio for more accurate end-of-song visuals
-   • Direct Media Loader audio file loads now auto-detect as audio-only and show the same audio overlay visuals
-   • Replay reliability improved after natural end: seek-to-middle + Play, Pause->Play, and Stop->Play now recover by rebinding media when needed
-   • End-of-song time label now reaches full duration visually (avoids showing one second short at completion)
-   • Seek while stopped/end-state is deferred and applied on next Play; full-range Playback Window no longer forces rewind on Play
-   • VLC Ended state now auto-rebinds media before controls, so seek/+10/-10/play work immediately after completion (without Stop workaround)
-
-✅ Stop File-Lock Release (2026-07-09):
-   • Stop now detaches output and clears VLC media binding so source files can be deleted/replaced after pressing Stop
-
-✅ Full Page Reset On New Load (2026-07-09):
-   • New file load resets Join & Merge selections and clears selected input styles/status
-   • Audio Studio / Video Studio / Convert & Export tabs reset to default first tab
-   • Convert/Normalize/Vocal/Amplify controls reset to baseline defaults each load
-
-✅ Pitch Tempo Preservation (2026-07-09):
-   • Export pitch shift now applies explicit tempo compensation so lowering pitch does not slow song speed
-   • Speed control remains independent and applies only when intentionally changed
-   • Source audio sample rate is now probed (no hardcoded 44.1 kHz), fixing slowdown on 48 kHz files
-✅ Real-Time Pitch Shift Playback (2026-07-09):
-   • Added live pitch pipeline (FFmpeg decode/filter processing -> sounddevice output)
-   • New app methods available in main window controller: load_file(path), set_pitch(semitones), play_shifted()
-   • Pitch page now includes Real-time Pitch Mode toggle; shifted playback is active only when enabled
-   • While playing with mode ON, pitch changes apply rapidly from current timeline position
-   • Live retune no longer resets seekbar/time display to 00:00 while audio continues from current position
-   • Slider seek and +/-10s skip now resync shifted audio to the new timeline position
-   • Pause then Play now resumes from the paused position in realtime mode
-   • For video inputs, VLC video stays active while shifted audio is played from low-latency external stream
-       - Worker reference is released only after `QThread.finished` to prevent destruction during output auto-load
-      • Join & Merge (2026-07-08): Convert & Export tab for two-input media combination
-         - video+audio: mux karaoke output video
-         - audio+audio: append (concat) or overlay (mix)
-         - video+video: append (A then B) or overlay (A+B from start)
-         - Auto behavior defaults: same-type append, mixed video+audio overlay
-         - Manual video+audio append mode extends video with freeze-frame and appends selected audio at end
-         - video+audio overlay now replaces source audio via explicit stream mapping (prevents original audio retention)
-         - Overlay Audio Start Offset (sec) delays replacement audio cue for lyric lead-in (video+audio Overlay only)
-         - default offset is 0.0s so existing merges behave the same unless user changes it
-         - replacement mapping follows strict karaoke remux pattern: map video from input A and audio from input B only
-         - merge mode media typing uses extension-first classification to avoid artwork-based false video detection
-         - selected Input A/B now show prominent confirmation text on buttons with full-path labels/tooltips
-         - exact final ffmpeg command is shown before processing and written to debug log for verification
-         - final merge command is auto-copied to clipboard so users can paste/run it directly
-         - fixed video+audio input routing so selected audio file is used correctly (no accidental duplicate video inputs)
-         - Uses async `merge_task` pipeline with splash progress and cancel support
-    • Amplify & Export: Convert & Export page owns export-time ffmpeg gain
-       - Signed mode buttons: Amplification + / Reduce amplification -
-       - Positive-only amount spinner with 0.25-step increments
-      - Boost exports above 1.0x now include a tuned peak limiter to reduce clipping while preserving audible gain
-         - Live Preview auditions the same factor through RealtimePitchService without exporting; default realtime gain remains 1.0
-      - Realtime Pitch Mode and Live Preview are page-guarded so users must stop the active realtime mode before switching between Pitch and Amplify
-         - New file loads reset Amplify to neutral state and keep both audio/video inputs supported
-      - Meter dB Output mode now shows true dBFS with approximate SPL context
-       - Auto-loads exported result and resets to 1.00x baseline
-    • UI Location: Audio Studio + Video Studio + Convert & Export
-   • Auto-reload: Both features automatically load results into player
-   • Integrated with ProcessThread for progress updates and cancellation
-   • Validates all prerequisites before building
-   • Optimization level adjusted for NumPy compatibility
-
-✅ Video Studio Fullscreen Access (2026-07-06):
-   • Full video/fullscreen button is now visible across all Video Studio tabs
-   • Improves frame inspection during trimming, playback window setup, extraction, and widen workflows
-
-✅ Widen Video Crop/Zoom Command (2026-07-18):
-   • Widen exports use the user-verified crop/zoom FFmpeg command style
-   • Current crop-height multiplier is 0.3; no plain padding or blurred fill
-   • Widen tab alone uses a larger preview frame; other Video Studio tabs stay compact
-
-✅ UI Visibility Toggles (2026-07-06, updated 2026-07-19):
-   • Pitch page live analyzer panel hidden from UI (widgets kept for compatibility)
-   • Convert & Export Amplify tab visible again for export-time gain workflow review
+Recent updates captured in the project docs:
+- documentation/LOGGING.md is active and describes debug/error log collection and troubleshooting
+- source_code/services/logging_service.py is part of the runtime service boundary and is tracked in the dependency checklist
+- shared helpers under source_code/utils/ are the single owner for repeated subprocess, FFprobe, splash, path, and range-row logic
+- controller extraction remains the design boundary for playback, media, processing, and navigation flows
+- audio separation and processing tasks are tracked via the worker and process-thread modules
 
 ═══════════════════════════════════════════════════════════════════════════════
 

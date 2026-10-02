@@ -75,7 +75,7 @@ def popen(monkeypatch):
         state["kwargs"] = kwargs
         return state["process"]
 
-    monkeypatch.setattr(separator_module.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(separator_module, "popen_hidden", fake_popen)
     return state
 
 
@@ -355,7 +355,7 @@ class TestRunCmd:
         def _boom(cmd, **kwargs):
             raise OSError("ffmpeg missing")
 
-        monkeypatch.setattr(separator_module.subprocess, "Popen", _boom)
+        monkeypatch.setattr(separator_module, "popen_hidden", _boom)
 
         ok, err = thread._run_cmd(["/bin/true"])
 
@@ -415,6 +415,16 @@ class TestDemucsBackend:
         thread._run_demucs(str(tmp_path / "in.wav"), str(tmp_path))
 
         assert popen["cmd"][4:7] == ["1", "25", "side_heavy"]
+
+    def test_fast_mode_does_not_force_incompatible_demucs_segment(self, tmp_path, qapp, popen):
+        thread = make_thread(tmp_path, backend_name="demucs", fast_mode=True)
+        popen["process"] = FakeProcess()
+
+        thread._run_demucs(str(tmp_path / "in.wav"), str(tmp_path))
+
+        runner_source = (tmp_path / "demucs_subprocess_runner.py").read_text(encoding="utf-8")
+        assert "segment = None" in runner_source
+        assert "segment=segment" in runner_source
 
     def test_download_progress_is_mapped_to_setup_band(self, tmp_path, qapp, popen):
         thread = self._thread(tmp_path)

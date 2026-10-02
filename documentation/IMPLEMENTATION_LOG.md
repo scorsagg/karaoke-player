@@ -1,5 +1,113 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Full Test Suite Fixes (2026-10-02) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/controllers/playback_controller.py`, `source_code/workers/process_thread.py`, affected playback/file-loading/worker tests, and the five synchronized project documentation files
+
+### Problem
+The suite contained stale tests that patched `subprocess.Popen` directly instead of the shared launcher, plus playback-window tests exposed a milliseconds-versus-seconds comparison that cleared valid ranges starting at zero.
+
+### Fix
+- Compare playback-window endpoints and media duration in milliseconds.
+- Patch `popen_hidden` directly in tests; import `TimeoutExpired` for ProcessThread cleanup.
+- Align fakes and expectations with the player success return, media duration clamping, and failed-load audio-state recovery.
+
+### Validation
+- Affected test modules: 172 passed.
+- Full suite: 550 passed, 1 skipped.
+
+# Change: Audio Export Gain and Speed Fixes (2026-10-02) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/controllers/processing_controller.py`, `source_code/main.py`, `tests/test_processing_controller.py`, and the five synchronized project documentation files
+
+### Problem
+Boost exports left FFmpeg `alimiter` auto-level enabled, which could level requested gain back down. Playback export always selected an MP4 video graph, so audio-only inputs failed with a missing `[0:v]` stream.
+
+### Fix
+- Disabled limiter auto-level for amplified exports while retaining peak limiting.
+- Added an audio-only speed/pitch export command with a codec matching the supported output extension; video exports retain their existing graph.
+- Added regression coverage for limiter settings and MP3 speed command stream selection.
+
+### Validation
+- Changed Python files passed `py_compile`.
+- Direct command-builder assertions passed.
+- Initial pytest execution was blocked until pytest was installed in `.venv`; final suite results are recorded in the following test-fix entry.
+
+# Change: Documentation Sync Refresh (2026-09-20) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `documentation/IMPLEMENTATION_LOG.md`
+
+### Problem
+The docs were drifting from the current runtime layout. Several sections referenced older naming or omitted the logging service and the actual shared utility tree, making future changes harder to track reliably.
+
+### Fix
+- Refreshed the 5-file documentation sync to match the current app layout and service boundaries.
+- Added the logging service to the architecture and developer guidance sections.
+- Corrected the folder tree to match the real `source_code/` structure and active build/runtime resources.
+- Kept the dependency checklist in sync with the current documentation workflow.
+
+### Validation
+- Architecture and dependency notes were reviewed against the current files in `source_code/`, `build_system/`, and `documentation/`.
+- The doc set now matches the actual logged runtime layout and keeps the 5-file sync rule intact.
+
+# Change: Demucs Fast-Mode Segment Compatibility (2026-09-20) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/audio_separator_thread.py`, `tests/test_audio_separator_thread.py`, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`
+
+### Problem
+Fast mode forced Demucs to use an 8-second segment. With `htdemucs_ft`, that produced an invalid tensor reshape during `apply_model()` (`training_length=343980`).
+
+### Fix
+Fast mode still uses fewer shifts and lower overlap, but leaves `segment=None` so Demucs selects the model-native chunk length. Added a regression test that checks the generated subprocess runner preserves this setting.
+
+### Validation
+The modified Python files compile successfully. The focused pytest could not run because `pytest` is not installed in the available Python interpreters.
+
+# Change: Playback Window Functionality Fixes (2026-09-20) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/controllers/playback_controller.py`, `documentation/IMPLEMENTATION_LOG.md`
+
+### Problem
+The "Add Range" button in the Audio Studio Playback Window was not working correctly, and the "Apply & Play" functionality was failing due to issues in range collection and seeking operations.
+
+### Fix
+- Improved `_on_pw_add_range` method logic to better handle edge cases when adding ranges
+- Enhanced `apply_playback_window` method to use proper range collection utilities
+- Added robust error handling for player operations with fallback seeking methods
+- Fixed duration checking logic for single-range scenarios
+
+### Result
+The Audio Studio Playback Window now works correctly:
+- Add Range button functions properly
+- Apply & Play functionality works as expected
+- Audio files are handled correctly with proper seeking behavior
+- Error handling is more graceful, preventing crashes when player operations fail
+
+# Change: Process Monitor UTF-8 Decoding (2026-09-12) - COMPLETE ✅
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/workers/process_thread.py`, `tests/test_process_thread.py`, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `DEVELOPMENT.md`
+
+### Problem
+The asynchronous FFmpeg monitor inherited Windows' default `charmap` codec. Merge output containing byte `0x8d` could therefore raise a decode exception inside `ProcessThread.run()` and report `Process monitoring failed`.
+
+### Fix
+`ProcessThread` now reads streamed subprocess output with explicit UTF-8 decoding and `errors="replace"`, matching the existing audio-separator worker behavior. A regression test verifies the subprocess decoding options.
+
+### Result
+Non-UTF-8 or otherwise undecodable tool output is replaced rather than terminating extraction, merge, or other asynchronous processing monitors.
+
 # Change: Shared Utilities Extraction / Duplicate Code Removal (2026-08-18) - COMPLETE ✅
 
 **Status:** Implemented
@@ -16,10 +124,9 @@ The same implementation blocks were copy-pasted across the codebase: Windows `ST
 - Removed imports left unused by the extraction (`subprocess`, `QColor`, `QPixmap`, `TimePickerWidget`) and added every new module to the PyInstaller `hiddenimports` list.
 
 ### Result
-<<<<<<< HEAD
-=======
 - Vocal Separator can now process media paths containing Unicode characters without failing during the pre-separation audio extraction step.
 - The app no longer crashes on the local Windows code-page mismatch triggered by non-ASCII filenames.
+
 # Change: Shared Utilities Extraction / Duplicate Code Removal (2026-08-18) - COMPLETE ✅
 
 **Status:** Implemented

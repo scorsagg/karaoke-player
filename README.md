@@ -1,191 +1,136 @@
 # 🎤 Karaoke Studio Pro v3
 
-A feature-rich cross-platform karaoke application built with Python, PySide6, and VLC. Perfect for karaoke enthusiasts and groups!
+A feature-rich karaoke application built with Python, PySide6, VLC, FFmpeg, and Qt-driven media workflows for playback, conversion, trimming, reporting, and audio monitoring.
 
-## ✨ Features
+## ✨ Core capabilities
 
-- **🎬 Multi-Format Playback**: Play MP4, MKV, AVI, WebM and more with VLC backend
-- **📥 YouTube Downloads**: Fetch karaoke tracks directly from YouTube URLs
-- **🔊 Real-Time Audio Levels**: Live audio level meter with SPL and dBFS display options
-- **🎚️ Playback Control**: Play, pause, seek, and speed adjustment (0.5x - 2.0x)
-- **📊 Audio Analysis**: Background audio level monitoring with configurable auto-volume reduction
-- **🎛️ Audio Calibration**: Switchable measurement modes (dB Output vs SPL Estimate) for room calibration
-- **💾 Settings**: Persistent storage of app preferences and recent files
-- **✨ Audio Tools** (NEW v3):
-  - 🎵 **Audio Extraction**: Extract audio from video files (WAV format)
-  - ✂️ **Audio Trimming**: Trim first/last seconds or keep specific range (with H/M/S controls)
-  - 🔄 **Format Conversion**: Convert between MP3, WAV, M4A, AAC, MP4, MKV, and more with quality control
-- **🖥️ Cross-Platform**: Works on Windows, macOS, and Linux
-- **📦 Standalone Distribution**: Build as a single .exe with all dependencies bundled (zero external setup needed)
+- **🎬 Multi-format playback** with VLC and video/audio file support
+- **📥 YouTube downloads** via `yt-dlp`
+- **🔊 Real-time audio levels** with SPL and dBFS monitoring modes
+- **🎚️ Playback controls** including play/pause/seek, speed adjustment, and stop/rebind reliability
+- **🎛️ Audio calibration** with configurable auto-reduction and room-specific thresholds
+- **✨ Audio tools**
+  - audio extraction from video
+  - audio trimming with keep-range controls
+  - format conversion and normalization
+  - vocal separation / karaoke stem generation
+  - amplification preview and export
+- **🖥️ Video tools**
+  - trim, playback-window controls, extraction, widen crop/zoom workflows
+  - join/merge support for media combinations
+- **📦 Standalone packaging** for Windows via PyInstaller
+- **🧭 Documentation sync** across the project’s five-file developer workflow
 
-## 🚀 Quick Start
+## 🚀 Quick start
 
-### Option 1: Run from Source (Development)
+### Run from source
 
-**Prerequisites:**
-- Python 3.8 or higher
-- FFmpeg (optional, for advanced audio/video processing)
-- yt-dlp (optional, for YouTube downloads via CLI)
-
-**Installation:**
-```bash
+```powershell
 cd d:\Srikanth\Academics\Python\karaoke-player
-pip install -r requirements.txt
-```
-
-**Run the Application:**
-```bash
 python .\source_code\main.py
 ```
 
-### Option 2: Run Standalone Executable (Distribution)
+### Build the packaged executable
 
-If you have a built executable, simply double-click:
-```
-KaraokeStudioPro.exe
-```
-
-**No dependencies needed!** Everything is bundled.
-
-## 🔨 Building a Standalone Executable
-
-For team distribution, create a self-contained .exe:
-
-**⚠️ Important:** Before building, ensure you have the required external tools in the `resources/` folder:
-- `ffmpeg.exe`, `yt-dlp.exe`, `libvlc.dll`, `libvlccore.dll`, `plugins/`
-
-See [BUILD_GUIDE.md](build_system/BUILD_GUIDE.md#acquiring-resource-files) for instructions on acquiring these files.
-
-**1. Install build dependencies:**
-```bash
+```powershell
 cd d:\Srikanth\Academics\Python\karaoke-player
-pip install -r build_system\requirements-build.txt
+C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe .\build_system\build.py
 ```
 
-**2. Build the executable:**
-```bash
-python build_system\build.py
-```
+The build output is created under `build_system/dist/KaraokeStudioPro/`.
 
-**3. Output:**
-- Location: `build_system/dist/KaraokeStudioPro/`
-- File: `KaraokeStudioPro.exe`
+## 📁 Project structure
 
-**4. Distribute:**
-Copy the entire `build_system/dist/KaraokeStudioPro/` folder to your team. They can run the .exe directly!
-
-## 📁 Project Structure
-
-```
+```text
 karaoke-player/
-├── source_code/           # Main application package
-│   ├── main.py           # Entry point
-│   ├── dialogs/          # Settings and configuration dialogs
-│   ├── services/         # Player and download services
-│   ├── widgets/          # Custom UI components
-│   ├── workers/          # Background threads (audio analysis)
-│   └── models/           # Data models
-├── build_system/         # Build configuration
-│   ├── build.py          # Build orchestrator
-│   ├── KaraokeStudioPro.spec  # PyInstaller config
-│   └── BUILD_GUIDE.md    # Detailed build instructions
-├── resources/            # External tools and assets (git-ignored binaries)
-│   ├── ffmpeg.exe        # FFmpeg binary (download required)
-│   ├── yt-dlp.exe        # YouTube downloader (download required)
-│   ├── libvlc.dll        # VLC library (download required)
-│   ├── plugins/          # VLC plugins (download required)
-│   ├── splash.png        # Included
-│   └── Loading.png       # Included
-├── config/               # User settings
-│   ├── settings.json     # Application preferences
-│   └── history.json      # Recent files
-└── documentation/        # Project documentation
-    └── ARCHITECTURE.md   # System design
+├── source_code/
+│   ├── main.py
+│   ├── controllers/
+│   ├── dialogs/
+│   ├── models/
+│   ├── services/
+│   ├── ui/
+│   ├── utils/
+│   ├── widgets/
+│   └── workers/
+├── build_system/
+│   ├── build.py
+│   ├── KaraokeStudioPro.spec
+│   ├── BUILD_GUIDE.md
+│   └── requirements-build.txt
+├── config/
+│   ├── settings.json
+│   ├── history.json
+│   ├── app_debug.log
+│   └── app_errors.log
+├── documentation/
+│   ├── ARCHITECTURE.md
+│   ├── FILE_DEPENDENCIES.md
+│   ├── FOLDER_ORGANIZATION_SUMMARY.txt
+│   ├── IMPLEMENTATION_LOG.md
+│   ├── LOGGING.md
+│   └── requirements.txt
+├── resources/
+│   ├── ffmpeg.exe
+│   ├── ffprobe.exe
+│   ├── yt-dlp.exe
+│   ├── libvlc.dll
+│   ├── libvlccore.dll
+│   ├── plugins/
+│   └── offline_models/
+├── tests/
+├── DEVELOPMENT.md
+├── README.md
+├── pytest.ini
+├── KaraokePlayer.code-workspace
+└── .gitignore
 ```
 
-## 🎮 How to Use
+## 🧩 Important developer docs
 
-### Loading Media
-1. Click **Open File** to load a local video file
-2. Or paste a YouTube URL and click **Download & Play**
+- [DEVELOPMENT.md](DEVELOPMENT.md) — setup, developer guide, and usage patterns
+- [documentation/FILE_DEPENDENCIES.md](documentation/FILE_DEPENDENCIES.md) — source-of-truth checklist for coupled file updates
+- [documentation/ARCHITECTURE.md](documentation/ARCHITECTURE.md) — system design and module relationships
+- [documentation/LOGGING.md](documentation/LOGGING.md) — log locations and troubleshooting workflow
+- [documentation/IMPLEMENTATION_LOG.md](documentation/IMPLEMENTATION_LOG.md) — change history and completed fixes
 
-### Playback
-- **Play/Pause**: Click play button or press Space
-- **Seek**: Click on the timeline or use arrow keys
-- **Speed**: Use +/- buttons to adjust playback speed (0.5x to 2.0x)
-- **Volume**: Adjust with the volume slider
-- **Audio Level**: Monitor the real-time audio meter on the right
+## 🧪 Requirements
 
-### Settings
-- Click **Settings** to configure:
-  - FFmpeg location
-  - yt-dlp location
-  - Download directory
-  - Video output settings
+### Development/runtime
 
-## 📋 System Requirements
+- Python 3.10+ recommended
+- PySide6
+- python-vlc
+- numpy
+- sounddevice
+- yt-dlp
+- FFmpeg and FFprobe available for media processing
 
-### For Development
-- Python 3.8+
-- 200 MB free space (for dependencies)
-- Windows, macOS, or Linux
+### Build toolchain
 
-### For Standalone Executable
-- Windows 7 SP1 or later (for .exe)
-- 500 MB free space
-- No external software required!
+- PyInstaller
+- Python 3.13 verified runtime for the current packaging flow
 
 ## 🐛 Troubleshooting
 
-### Application won't start
-- Ensure Python 3.8+ is installed: `python --version`
-- Verify all dependencies: `pip install -r requirements.txt`
-- Check for missing VLC libraries in resources/
+### App does not start
+- verify Python is installed and active
+- install dependencies from the project requirements
+- ensure bundled media tool binaries are present under `resources/`
 
-### No audio output
-- Verify VLC libraries are in `resources/` folder
-- Check system audio settings
-- Ensure sounddevice package is installed
+### Audio / meter issues
+- check the settings and calibration values
+- review the app logs under `config/`
+- see [documentation/LOGGING.md](documentation/LOGGING.md)
 
-### YouTube downloads not working
-- Verify yt-dlp.exe is in `resources/` folder (or installed via pip)
-- Update yt-dlp: `pip install --upgrade yt-dlp`
-- Check internet connection
+### Missing build/runtime tools
+- confirm `ffmpeg.exe`, `ffprobe.exe`, `yt-dlp.exe`, and VLC runtime files exist in `resources/`
+- follow the guidance in [build_system/BUILD_GUIDE.md](build_system/BUILD_GUIDE.md)
 
-### App hangs on close
-- This should not happen with the latest version
-- If it does, force-quit and report the issue
+## 🔄 Current status
 
-## 📦 Dependencies
-
-**Runtime:**
-- `PySide6` - Qt6 GUI framework
-- `python-vlc` - VLC media backend
-- `sounddevice` - Audio level capture
-- `numpy` - Audio processing
-- `yt-dlp` - YouTube downloads
-
-**External Tools (Bundled in Standalone):**
-- FFmpeg - Video encoding/transcoding
-- yt-dlp - YouTube content downloader
-- VLC - Media playback engine
-
-## 🔄 Updates
-
-To update dependencies:
-```bash
-pip install --upgrade -r requirements.txt
-```
-
-To rebuild the standalone executable:
-```bash
-python build_system\build.py
-```
+This project is in an active v3 state with modular UI, controller extraction, shared utility helpers, logging, and the current documentation sync workflow in place.
 
 ## 📝 License
 
-Internal use for Karaoke group.
-
-## 🤝 Support
-
-For issues or feature requests, refer to `build_system/BUILD_GUIDE.md` for advanced configuration.
+Internal use for the karaoke project workflow.
