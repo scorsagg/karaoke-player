@@ -1,5 +1,6 @@
 from PySide6.QtCore import QThread, Signal
 import re
+from subprocess import TimeoutExpired
 
 from source_code.utils.subprocess_utils import popen_hidden
 
@@ -22,6 +23,8 @@ class ProcessThread(QThread):
             self.cmd,
             merge_stderr=True,
             universal_newlines=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
         )
         
@@ -83,7 +86,7 @@ class ProcessThread(QThread):
                     print(f"[ProcessThread.cleanup_process] terminate/kill failed: {e}")
             try:
                 self.process.wait(timeout=0.5)
-            except subprocess.TimeoutExpired:
+            except TimeoutExpired:
                 pass
             except Exception as e:
                 print(f"[ProcessThread.cleanup_process] wait failed: {e}")

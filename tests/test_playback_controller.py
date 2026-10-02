@@ -85,6 +85,7 @@ class FakePlayer:
 
     def play(self):
         self.calls.append(("play",))
+        return True
 
     def pause(self):
         self.calls.append(("pause",))
@@ -467,6 +468,7 @@ class TestPlaybackWindow:
         assert controller._pw_ranges == []
 
     def test_ranges_are_sorted_and_summarized(self, controller, app, qapp):
+        app.player = FakePlayer(length_ms=120000)
         app.pw_ranges_container = _ranges_container(qapp, [(90, 120), (10, 20)])
 
         controller.apply_playback_window(app)

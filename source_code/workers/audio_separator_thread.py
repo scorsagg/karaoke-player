@@ -263,7 +263,7 @@ def main():
         std = torch.tensor(1.0, dtype=wav.dtype)
 
     overlap = 0.1 if fast_mode else 0.25
-    segment = 8 if fast_mode else None
+    segment = None
 
     print(f"Running Demucs apply_model(name={model_name}, shifts={shifts}, overlap={overlap}, segment={segment})", flush=True)
     with torch.no_grad():
@@ -380,9 +380,6 @@ if __name__ == "__main__":
             separation_total = 1
             last_separation_percent = -1
 
-<<<<<<< HEAD
-            self.process = popen_hidden(cmd, merge_stderr=True, universal_newlines=True)
-=======
             self.process = popen_hidden(
                 cmd,
                 merge_stderr=True,
@@ -390,7 +387,6 @@ if __name__ == "__main__":
                 encoding="utf-8",
                 errors="replace",
             )
->>>>>>> 0c340836 (Changes)
 
             while True:
                 if self.is_killed:
@@ -544,9 +540,6 @@ if __name__ == "__main__":
     def _run_cmd(self, cmd):
         output_lines = []
         try:
-<<<<<<< HEAD
-            self.process = popen_hidden(cmd, merge_stderr=True, universal_newlines=True)
-=======
             self.process = popen_hidden(
                 cmd,
                 merge_stderr=True,
@@ -554,7 +547,6 @@ if __name__ == "__main__":
                 encoding="utf-8",
                 errors="replace",
             )
->>>>>>> 0c340836 (Changes)
 
             while True:
                 if self.is_killed:

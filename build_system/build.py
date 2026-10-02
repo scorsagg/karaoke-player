@@ -59,7 +59,11 @@ BUILD_PYTHON_ENV_VAR = "KARAOKE_BUILD_PYTHON"
 
 def _python_has_module(interpreter_cmd, module_name):
     """Return True when the target interpreter can import the requested module."""
-    probe = [*interpreter_cmd, "-c", f"import importlib.util; sys.exit(0 if importlib.util.find_spec('{module_name}') else 1)"]
+    probe = [
+        *interpreter_cmd,
+        "-c",
+        f"import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('{module_name}') else 1)",
+    ]
     try:
         result = subprocess.run(probe, capture_output=True, text=True)
         return result.returncode == 0

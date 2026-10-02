@@ -32,7 +32,7 @@ Complete development and contribution guide for Karaoke Studio Pro.
 
 ### Prerequisites
 ```powershell
-# Python 3.8+ required
+# Python 3.10+ recommended; the project is verified on Python 3.13 for builds
 python --version
 
 # Install development dependencies
@@ -84,11 +84,15 @@ source_code/
 │   ├── audio_studio_page.py  # Audio Studio (audio-only tools)
 │   ├── video_tools_page.py   # Video Studio (trim/playback/extract/widen)
 │   ├── range_row_section.py  # Shared studio tab style, Start/End range rows, playback-window controls
-│   └── convert_export_page.py # Convert & Export (conversion/normalization/vocal separation)
+│   ├── convert_export_page.py # Convert & Export (conversion/normalization/vocal separation)
+│   └── extra_page.py         # Secondary / legacy page placeholder
 ├── services/
 │   ├── audio_service.py      # Audio analyzer coordination
+│   ├── download_service.py   # YouTube downloads
+│   ├── file_loading_service.py # Safe file load lifecycle and cleanup
+│   ├── logging_service.py    # Rotating app/debug/error logger
 │   ├── player_service.py     # VLC player abstraction
-│   └── download_service.py   # YouTube downloads
+│   └── realtime_pitch_service.py # FFmpeg rubberband -> sounddevice realtime pitch playback
 ├── utils/                     # Shared helpers (no duplicated blocks in callers)
 │   ├── subprocess_utils.py   # Hidden-console subprocess run/Popen wrappers
 │   ├── ffprobe_utils.py      # FFprobe duration/sample-rate/stream-type/resolution probes
@@ -100,6 +104,7 @@ source_code/
 │   └── video_frame.py        # Video display
 ├── workers/
 │   ├── audio_analyzer.py     # Real-time audio capture (sounddevice)
+│   ├── audio_separator_thread.py # Demucs / separator orchestration
 │   └── process_thread.py     # Background processing
 └── dialogs/
     └── settings_dialog.py    # Settings UI & configuration
@@ -144,6 +149,12 @@ config/
 
 ## Core Features (v3) - All Complete ✅
 
+### Logging & Diagnostics ✅
+- Centralized runtime logger is managed by `source_code/services/logging_service.py`
+- Logs are stored in `config/app_debug.log` and `config/app_errors.log`
+- The logger uses rotating files with error-only capture and developer-friendly debug output
+- See [`documentation/LOGGING.md`](documentation/LOGGING.md) for user troubleshooting steps
+
 ### Feature 1: Pitch Adjustment ✅
 - Adjust vocal pitch by semitones without changing tempo
 - FFmpeg audio filter: asetrate + atempo
@@ -165,6 +176,7 @@ config/
 - Extract audio from video files to WAV format
 - Auto-loads extracted audio into player
 - Works correctly with non-ASCII file and folder names on Windows because ffmpeg subprocess output is decoded as UTF-8 with fallback replacement handling
+- All asynchronous FFmpeg task monitors use explicit UTF-8 decoding with replacement handling, preventing Windows `charmap` failures when output contains non-ASCII bytes
 
 ### Feature 6: Audio Trimming ✅ NEW
 - **Trim First X seconds** - Remove opening
@@ -196,6 +208,7 @@ config/
 - **"▶ Apply & Play"** button — applies window settings and starts playback
 - **"Clear"** button — resets all controls to zero (signal-blocked to prevent auto-check)
 - Settings are cleared automatically on every new file load (`clear_playback_window()`)
+- Playback-window range ends and media duration are both compared in milliseconds when detecting a full-track range.
 - Timer loop in `update_ui()` enforces the end-cutoff via `_pw_end_ms`
 
 ### Playback Timeline Reliability ✅ (updated 2026-07-09)
@@ -222,6 +235,7 @@ config/
 - Export path now preserves tempo when pitch changes by applying explicit pitch compensation (`atempo=1/pf`) and then user speed (`atempo=s`).
 - This prevents pitch-down operations from unintentionally reducing song speed.
 - Export now reads source audio sample rate via ffprobe and avoids hardcoded 44.1 kHz pitch base, fixing slowdown on 48 kHz sources.
+- Audio-only sources export to a supported audio container with audio-only FFmpeg mapping; video timestamp filters are used only for video media.
 
 ### Real-Time Pitch Shift Playback ✅ (updated 2026-07-09)
 - Added low-latency real-time pitch-shift playback pipeline:
@@ -274,7 +288,7 @@ config/
 - **Convert & Export**: Amplify now uses export-time FFmpeg volume gain instead of live studio playback gain
 - **Mode selection**: `Amplification + ▲` exports with the entered positive amount; `Reduce amplification - ▼` exports with the reciprocal factor
 - **Amount input**: positive-only spinner with 0.25 steps, supporting values from 0.25x to 10.00x
-- **Anti-clipping**: boost exports above `1.0x` apply a peak limiter (`alimiter`) after gain to reduce distortion while keeping the boost audible
+- **Anti-clipping**: boost exports above `1.0x` apply a peak limiter (`alimiter`) after gain with auto-level disabled, so the limiter controls peaks without canceling the requested gain
 - **Meter readout**: dB Output mode shows true `dBFS` plus approximate SPL context for better gain validation
 - **Workflow**: export file is auto-loaded after processing, then the amplify control resets to `1.00x`
 - **Naming**: output files use readable suffixes like `amp_up_5_times` and `amp_down_5_times`
@@ -285,7 +299,7 @@ config/
 - Default backend is `Demucs: htdemucs_ft` for higher quality separation on Python 3.13 and offline team distribution
 - Faster fallback remains available via `audio-separator` UVR models
 - Default export target is instrumental-only for the common karaoke workflow
-- `Fast mode` applies backend-specific speed tuning
+- `Fast mode` applies backend-specific speed tuning. For Demucs, it reduces shifts and overlap but does not force an 8-second segment, because `htdemucs_ft` requires its native training length for tensor shape compatibility
 - Demucs backend now runs through the Python API with `soundfile` input loading, avoiding the failing `torchaudio`/`torchcodec` CLI load path
 - Demucs tqdm console output is parsed in `audio_separator_thread.py` and bridged into Qt progress signals so the splash progress bar moves during separation
 - `Demucs Music Recovery` now offers finer presets (`0, 3, 5, 7, 10, 15, 20, 30%`) so accompaniment can be restored more gradually

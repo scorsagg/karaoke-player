@@ -154,7 +154,7 @@ class TestAmplifyExportCmd:
     def test_boost_adds_limiter(self, controller, app):
         cmd = controller.build_amplify_export_cmd(app, "in.wav", "out.wav", 2.0, "audio", "wav")
 
-        assert cmd[cmd.index("-af") + 1] == "volume=2.0000,alimiter=limit=0.98:attack=5:release=50"
+        assert cmd[cmd.index("-af") + 1] == "volume=2.0000,alimiter=limit=0.98:attack=5:release=50:level=false"
 
     def test_attenuation_has_no_limiter(self, controller, app):
         cmd = controller.build_amplify_export_cmd(app, "in.wav", "out.wav", 0.5, "audio", "wav")
@@ -192,6 +192,23 @@ class TestAmplifyExportCmd:
 
         assert cmd[cmd.index("-c:a") + 1] == "aac"
         assert cmd[0] == FFMPEG
+
+
+class TestAudioSpeedExportCmd:
+    def test_mp3_speed_export_is_audio_only(self, controller, app):
+        cmd = controller.build_audio_speed_export_cmd(
+            app, "in.mp3", "out.mp3", 1.02, 1.0, 1.0, 48000, "mp3"
+        )
+
+        assert "-vn" in cmd
+        assert "-filter_complex" not in cmd
+        assert "[0:v]" not in " ".join(cmd)
+        assert cmd[cmd.index("-af") + 1] == (
+            "asetrate=48000*1.0,aresample=48000,"
+            "atempo=1.000000,atempo=1.020000"
+        )
+        assert cmd[cmd.index("-c:a") + 1] == "libmp3lame"
+        assert cmd[-1] == "out.mp3"
 
 
 class TestFormatConversionCmd:

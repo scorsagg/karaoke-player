@@ -182,7 +182,7 @@ class TestPlayWorker:
         def _boom(*args, **kwargs):
             raise OSError("ffmpeg not found")
 
-        monkeypatch.setattr(module.subprocess, "Popen", _boom)
+        monkeypatch.setattr(module, "popen_hidden", _boom)
         service.load_file("/media/song.mp3")
         service._active = True
 
@@ -200,7 +200,7 @@ class TestPlayWorker:
             captured["cmd"] = cmd
             raise OSError("stop here")
 
-        monkeypatch.setattr(module.subprocess, "Popen", fake_popen)
+        monkeypatch.setattr(module, "popen_hidden", fake_popen)
         service.load_file("/media/song.mp3")
         service.set_pitch(12)
         service.set_speed(1.5)
@@ -228,7 +228,7 @@ class TestPlayWorker:
             captured["cmd"] = cmd
             raise OSError("stop here")
 
-        monkeypatch.setattr(module.subprocess, "Popen", fake_popen)
+        monkeypatch.setattr(module, "popen_hidden", fake_popen)
         service.load_file("/media/song.mp3")
 
         service._play_worker()
@@ -245,7 +245,7 @@ class TestPlayWorker:
             captured["cmd"] = cmd
             raise OSError("stop here")
 
-        monkeypatch.setattr(module.subprocess, "Popen", fake_popen)
+        monkeypatch.setattr(module, "popen_hidden", fake_popen)
         service.load_file("/media/song.mp3")
         service.set_gain(0.5)
 
@@ -267,7 +267,7 @@ class TestPlayWorker:
             def kill(self):
                 pass
 
-        monkeypatch.setattr(module.subprocess, "Popen", lambda cmd, **kwargs: FakeProc())
+        monkeypatch.setattr(module, "popen_hidden", lambda cmd, **kwargs: FakeProc())
 
         def _boom(*args, **kwargs):
             raise RuntimeError("no output device")

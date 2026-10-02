@@ -87,6 +87,7 @@ source_code/
 │   ├── download_service.py        # YouTube/stream download service
 │   ├── file_loading_service.py    # Safe load lifecycle + cleanup coordination
 │   ├── audio_service.py           # Audio analysis integration + helper commands
+│   ├── logging_service.py         # Rotating debug/error logger and troubleshooting capture
 │   └── realtime_pitch_service.py  # FFmpeg rubberband->sounddevice live pitch pipeline
 │
 ├── ui/
@@ -143,6 +144,17 @@ because it reads `TimePickerWidget` rows out of a container). Rules for this lay
 
 Utilities must stay free of window/app state: they take explicit arguments (tool paths, containers,
 layouts, getters) so Audio Studio and Video Studio can share them without cross-page coupling.
+
+### Logging & Diagnostics Layer (updated 2026-09-20)
+
+`source_code/services/logging_service.py` provides the app-wide diagnostic boundary. This service owns:
+
+- rotating `app_debug.log` and `app_errors.log` files under the active `config/` directory
+- event classification by DEBUG, INFO, WARNING, ERROR, and EXCEPTION levels
+- a single access point for app startup, process lifecycle, download, and media-load troubleshooting
+- user-facing guidance via `documentation/LOGGING.md` for collecting the right logs when reporting issues
+
+`main.py` initializes the logger at startup and uses it across playback, processing, and file-load flows so errors are captured consistently without ad hoc print statements.
 
 ### Page Layout & Scroll Architecture (updated 2026-06-29)
 
@@ -205,7 +217,7 @@ Convert & Export owns amplification instead of the studio pages:
     - `Reduce amplification - ▼` applies the reciprocal factor
 - The amount spinner stays positive-only and uses 0.25-step increments
 - `main.py` builds FFmpeg commands with `volume=<factor>` and auto-loads the exported result
-- For boost factors above `1.0x`, the export pipeline appends `alimiter` after gain to reduce peak clipping distortion while preserving louder output
+- For boost factors above `1.0x`, the export pipeline appends `alimiter` after gain to reduce peak clipping distortion; `level=false` prevents automatic leveling from canceling the requested gain
 - Live Preview uses `RealtimePitchService` with an explicit gain factor to audition the same setting without creating a file; default service gain is `1.0`, preserving existing realtime pitch behavior until preview is started
 - Navigation guards keep Real-time Pitch Mode and Live Amplify Preview from crossing pages: pitch mode must be OFF before opening Amplify & Export, and live preview must be stopped before switching to Playback / Real-time Pitch
 - Each new media load resets Amplify & Export to neutral `Amplification + 1.00x`, clears Live Preview state, resets realtime gain, and unmutes VLC playback
@@ -220,7 +232,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Faster alternative backend: `audio-separator` with UVR MDX models
 - Default target: instrumental-only export for karaoke workflows
 - Windows-safe subprocess decoding: ffmpeg and Demucs output are now opened with `encoding="utf-8", errors="replace"` so non-ASCII media paths (including Kannada filenames) do not crash the separator worker with Windows code-page errors
-- Optional `Fast mode` applies backend-specific tuning for speed
+- Optional `Fast mode` applies backend-specific tuning for speed; Demucs reduces shifts and overlap but keeps the model-native chunk length so `htdemucs_ft` tensors remain shape-compatible
 - Optional `Demucs Music Recovery` now includes finer low-end presets (`0, 3, 5, 7, 10, 15, 20, 30%`) for subtler accompaniment recovery
 - Recovery mode now offers `Standard blend`, `Side-heavy recovery`, and `Center-aware recovery` to restore more accompaniment while limiting center-vocal bleed
 - Recovery blend is applied in export-time numpy space (not extra torch graph tensors) to keep memory usage stable on longer inputs
@@ -288,6 +300,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - End-of-track display now clamps the final half-second to full duration label to avoid visible one-second under-reporting.
 - `main.py::on_slider_released()` stores a pending seek target when inactive/end-state and `main.py::handle_play()` applies it after playback starts once timing info is available.
 - `main.py::apply_playback_window()` now treats a single full-track range (`00:00 -> duration`) as no active window, preventing unintended rewind-on-play.
+- `PlaybackController.apply_playback_window()` compares collected millisecond ranges against media duration converted to milliseconds, preserving partial ranges that start at zero.
 - `main.py::_ensure_media_loaded_for_playback()` now forces a media rebind when VLC reports `Ended` state, because this state can appear loaded but may ignore seek/play until rebound.
 
 ### Stop/Detach File Handle Release (updated 2026-07-09)
@@ -307,6 +320,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Export pitch shifting in `main.py::export_video()` now uses explicit two-stage tempo handling (`atempo=1/pitch_factor` then `atempo=speed`) so pitch and speed remain independent.
 - Lowering pitch no longer implies slower tempo unless speed control is intentionally changed.
 - The export path now probes source audio sample rate and uses it for `asetrate/aresample` to avoid duration drift on 48 kHz or other non-44.1 kHz inputs.
+- Audio-only sources use an audio filter/output codec and retain a supported audio extension; they do not receive the video timestamp filter or video stream mapping.
 
 ### Real-Time Pitch Shift Playback (updated 2026-07-17)
 
@@ -713,6 +727,7 @@ level_updated = pyqtSignal(float)  # Emits dB values (-80 to 0)
 **Responsibilities:**
 - Execute external commands (FFmpeg, FFprobe, yt-dlp)
 - Capture and parse process output
+- Decode streamed tool output as UTF-8 with replacement handling across Windows code pages
 - Stream progress updates
 - Handle process errors
 - Prevent UI blocking during long operations

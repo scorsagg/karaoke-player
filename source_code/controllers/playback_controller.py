@@ -167,18 +167,22 @@ class PlaybackController:
         self._pw_range_idx = 0
 
         try:
-            container = getattr(app, 'pw_ranges_container', None)
-            layout = container.layout()
-            for i in range(layout.count()):
-                row = layout.itemAt(i).widget()
-                if not row:
-                    continue
-                pickers = row.findChildren(TimePickerWidget)
-                if len(pickers) >= 2:
-                    s = int(pickers[0].get_total_seconds() * 1000)
-                    e = int(pickers[1].get_total_seconds() * 1000)
-                    if e > s:
-                        self._pw_ranges.append((s, e))
+            # Use the proper range collection utility instead of direct layout traversal
+            duration_seconds = 0
+            
+            # Try to get duration from player if available
+            try:
+                dur_ms = int(app.player.get_length()) if app.player else -1
+                if dur_ms > 0:
+                    duration_seconds = dur_ms / 1000.0
+            except Exception:
+                pass
+            
+            # Collect ranges using the utility function that handles edge cases better
+            self._pw_ranges = range_rows.collect_ranges_ms(
+                getattr(app, 'pw_ranges_container', None),
+                duration_seconds=duration_seconds
+            )
         except Exception as e:
             app.log_debug(f"[apply_playback_window] failed to collect ranges: {e}")
             self._pw_ranges = []
@@ -188,13 +192,12 @@ class PlaybackController:
         except Exception:
             pass
 
-        try:
-            dur_ms = int(app.player.get_length()) if app.player else -1
-        except Exception:
-            dur_ms = -1
-        if len(self._pw_ranges) == 1 and dur_ms > 0:
+        # Special case: if we have a single range that covers the entire file, clear it
+        if len(self._pw_ranges) == 1 and duration_seconds > 0:
             only_start, only_end = self._pw_ranges[0]
-            if only_start <= 0 and only_end >= max(0, dur_ms - 500):
+            # Check if this range covers nearly the entire duration (within 500ms)
+            duration_ms = int(duration_seconds * 1000)
+            if only_start <= 0 and only_end >= max(0, duration_ms - 500):
                 self._pw_ranges = []
 
         if not self._pw_ranges:
@@ -204,7 +207,16 @@ class PlaybackController:
 
         start_ms, end_ms = self._pw_ranges[0]
         if start_ms > 0:
-            app.player.set_time(int(start_ms))
+            try:
+                app.player.set_time(int(start_ms))
+            except Exception as e:
+                app.log_debug(f"[apply_playback_window] failed to seek: {e}")
+                # Try alternative seeking method
+                try:
+                    app.player.set_position(start_ms / (app.player.get_length() or 1))
+                except Exception:
+                    pass
+        
         self._pw_range_idx = 0
         self._pw_end_ms = end_ms
         app._pw_end_ms = self._pw_end_ms
@@ -241,14 +253,21 @@ class PlaybackController:
     def _on_pw_add_range(self, app):
         """Handler for Add Range button: compute sensible defaults based on last row and video length."""
         try:
+            # Get total duration
             total_ms = max(0, int(app.player.get_length()))
             total_s = total_ms // 1000
 
+            # Get the end time of the last range
             prev_end_s = range_rows.last_row_end_seconds(
                 getattr(app, 'pw_ranges_container', None)
             )
 
-            if prev_end_s >= total_s:
+            # Check if we're at the end - but allow adding ranges even when at end
+            # to enable users to create multiple ranges that can be played sequentially
+            new_start = max(0, int(prev_end_s) + 1)
+            
+            # If start exceeds video duration, don't add range
+            if new_start >= total_s:
                 try:
                     app.pw_status_label.setText("Cannot add range — already covers to video end")
                     app.pw_status_label.setStyleSheet("color: #e67e22; font-size: 10px;")
@@ -256,10 +275,11 @@ class PlaybackController:
                     pass
                 return
 
-            new_start = max(0, int(prev_end_s) + 1)
             new_end = max(new_start, int(total_s))
 
             if hasattr(app, 'pw_add_range') and callable(app.pw_add_range):
                 app.pw_add_range(new_start, new_end)
-        except Exception:
+        except Exception as e:
+            # Log the error for debugging
+            print(f"Error in _on_pw_add_range: {e}")
             pass

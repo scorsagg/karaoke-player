@@ -4,7 +4,7 @@
 
 ## When Making Changes to These Areas, Update These Files:
 
-### 1. VERSION UPcontainerES (Currently: v3)
+### 1. VERSION UPDATES (Currently: v3)
 **Files to update:**
 - `build_system/build.py` → `VERSION = "3"`
 - `build_system/KaraokeStudioPro.spec` → Comment at top mentions v3
@@ -51,7 +51,8 @@
 - `source_code/services/logging_service.py` → Main logging service (RotatingFileHandler, multiple log levels)
 - `build_system/KaraokeStudioPro.spec` → Add to hiddenimports: `'source_code.services.logging_service'`
 - `source_code/main.py` → Import LoggingService, initialize in init_settings_manager()
-- `documentation/LOGGING.md` → User guide for finding logs and reporting issues (create if adding logging)
+- `documentation/LOGGING.md` → User guide for finding logs and reporting issues
+- `documentation/IMPLEMENTATION_LOG.md` → Record the change and validation notes
 
 **When to update:** When modifying logging behavior, adding new log levels, or changing log file locations.
 
@@ -75,9 +76,26 @@
 - Logging service: [`source_code/services/logging_service.py`](../source_code/services/logging_service.py)
 - Initialization: [`source_code/main.py`](../source_code/main.py) → `init_settings_manager()` method
 
+### 3d. DOCUMENTATION SYNC AUDIT (5-File Rule)
+**Files to update when touching architecture/project structure:**
+- `documentation/FILE_DEPENDENCIES.md` → dependency checklist and coupling notes
+- `documentation/ARCHITECTURE.md` → module responsibilities and cross-cutting design changes
+- `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → actual file tree and package layout
+- `DEVELOPMENT.md` → contributor workflow, setup, and runtime expectations
+- `documentation/IMPLEMENTATION_LOG.md` → changelog and validation record
+
+**Why they are coupled:**
+- The app architecture, file layout, and developer guidance must remain aligned so future changes do not drift away from the verified runtime structure.
+- This is especially important after refactors such as controller extraction, shared utils, and logging additions.
+
+**Validation:**
+- [ ] Project tree matches the real folders under `source_code/`, `services/`, `ui/`, `utils/`, and `workers/`
+- [ ] All new modules are listed in `build_system/KaraokeStudioPro.spec` hidden imports when required
+- [ ] 5-file sync has been refreshed after feature or structure changes
+
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:
-- main_layout.py, sidebar.py, playback_bar.py, media_loader_page.py, pitch_page.py, audio_studio_page.py, video_tools_page.py, convert_export_page.py
+- main_layout.py, sidebar.py, playback_bar.py, media_loader_page.py, pitch_page.py, audio_studio_page.py, video_tools_page.py, convert_export_page.py, extra_page.py, range_row_section.py
 
 **Files to update when modifying UI:**
 - `build_system/KaraokeStudioPro.spec` → hiddenimports for new UI modules
@@ -168,6 +186,9 @@
 - `source_code/controllers/media_controller.py` → media load/history extraction
 - `source_code/controllers/processing_controller.py` → FFmpeg command builders + async task orchestration
 - `source_code/controllers/navigation_controller.py` → page-switching, tab-guard, and navigation-state orchestration
+- `tests/test_playback_controller.py` → playback-window range and playback behavior regression coverage
+- `tests/test_file_loading_service.py`, `tests/test_process_thread.py`, `tests/test_audio_separator_thread.py`, `tests/test_realtime_pitch_service.py` → lifecycle and shared subprocess-launcher tests
+- `tests/test_processing_controller.py` → regression coverage for FFmpeg command construction, including audio-only speed export
 - `source_code/models/app_state.py` → central runtime state container
 - `source_code/main.py` → main shell compatibility wrappers + controller wiring
 - `build_system/KaraokeStudioPro.spec` → hiddenimports for new controller/model modules
@@ -179,6 +200,8 @@
 - New controller modules must be added to the build spec hiddenimports list.
 - `main.py` should remain the compatibility façade while controllers own the extracted feature families.
 - Any new state should be stored in `AppState` rather than expanding window instance attributes ad hoc.
+- Audio amplification must disable `alimiter` auto-level (`level=false`) so the requested volume gain is not normalized away; Playback export must avoid video stream maps for audio-only inputs.
+- Playback-window ranges and media durations are compared in milliseconds; tests that fake a media duration must match the range values under test.
 
 ### 7c. SHARED UTILITIES (source_code/utils/ + ui/range_row_section.py) ✅ COMPLETE
 **Purpose:** single home for logic that used to be duplicated across pages, controllers, services and workers.
@@ -200,6 +223,14 @@
 - New splash usage must go through `splash_utils`.
 - New Start/End range UI must reuse `create_range_row_section()` and read ranges via `range_rows`.
 - Any new module added under `source_code/utils/` must be added to the build spec hiddenimports list.
+
+### 7d. PROCESS OUTPUT ENCODING
+**Related files:**
+- `source_code/workers/process_thread.py` → FFmpeg/FFprobe/yt-dlp streaming output monitor
+- `source_code/workers/audio_separator_thread.py` → Existing UTF-8 replacement decoding pattern
+- `tests/test_process_thread.py` → Regression coverage for the decoding contract
+
+**Rule:** Streaming subprocess output must use explicit `encoding="utf-8"` and `errors="replace"` so non-ASCII tool output cannot fall back to the Windows `charmap` codec.
 
 ### 8. THREAD-SAFE FILE LOADING (File Loading Operations - FINAL FIX ✅)
 **Current Service:** `source_code/services/file_loading_service.py`
@@ -298,7 +329,7 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Dedicated `Vocal Separator` tab is present in Convert & Export
 - Default backend/model is `Demucs: htdemucs_ft`
 - Faster alternative remains available via `audio-separator` UVR models
-- Fast mode applies backend-specific tuning: lower overlap and lighter Demucs chunk settings for quicker CPU inference
+- Fast mode applies backend-specific tuning: lower overlap and fewer Demucs shifts for quicker CPU inference; the model-native chunk length is preserved for compatibility with `htdemucs_ft`
 - Demucs Music Recovery now offers finer low-end presets (`0, 3, 5, 7, 10, 15, 20, 30%`) so users can recover accompaniment without jumping straight to 10%
 - Recovery mode selector offers `Standard blend`, `Side-heavy recovery`, and `Center-aware recovery`; the latter two reduce center-heavy vocal bleed while restoring accompaniment
 - Recovery blend is performed during numpy export to avoid extra large torch tensor copies that can destabilize long-track processing
