@@ -1,121 +1,62 @@
-# 🎤 Karaoke Studio Pro v3 - Development Context for AI Agents
+# Copilot instructions
 
-## Project Overview
+Karaoke Studio Pro v3 is a Python/PySide6 desktop app. Playback is provided by VLC; FFmpeg/FFprobe handle media processing and probing; yt-dlp handles downloads; `sounddevice` and NumPy support audio monitoring. Windows is the primary packaging target.
 
-**Karaoke Studio Pro v3** is a Python/PySide6 karaoke application with:
-- Real-time audio monitoring, YouTube downloads, video/audio playback
-- Audio tools: trimming, format conversion, extraction, loudness normalization
-- Modular architecture: controllers, services, UI pages
-- Standalone executable (PyInstaller bundle)
+## Before changing code
 
-**Key Files:**
-- Main app: [`source_code/main.py`](source_code/main.py)
-- Build: [`build_system/build.py`](build_system/build.py) & [`build_system/KaraokeStudioPro.spec`](build_system/KaraokeStudioPro.spec)
-- Setup: [`DEVELOPMENT.md`](DEVELOPMENT.md) (setup, architecture, testing)
-- Architecture: [`documentation/ARCHITECTURE.md`](documentation/ARCHITECTURE.md)
+- Read [`documentation/FILE_DEPENDENCIES.md`](../documentation/FILE_DEPENDENCIES.md) and [`DEVELOPMENT.md`](../DEVELOPMENT.md) first. The dependency checklist identifies coupled files and packaging requirements.
+- Keep the five project docs in sync for code or structural changes: `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, and `documentation/IMPLEMENTATION_LOG.md`.
+- Follow the more specific guidance when changing an applicable file:
+  - [`main-py-editing.instructions.md`](instructions/main-py-editing.instructions.md) for `source_code/main.py`
+  - [`build-spec-editing.instructions.md`](instructions/build-spec-editing.instructions.md) for `build_system/KaraokeStudioPro.spec`
+  - [`file-dependencies-editing.instructions.md`](instructions/file-dependencies-editing.instructions.md) for the dependency checklist
+  - [`docs-sync-editing.instructions.md`](instructions/docs-sync-editing.instructions.md) for the five-doc workflow
 
----
+## Build, test, and run
 
-## ⚠️ BEFORE MAKING ANY CHANGES
+Run commands from the repository root in PowerShell:
 
-**ALWAYS read first:**
-1. [`documentation/FILE_DEPENDENCIES.md`](documentation/FILE_DEPENDENCIES.md) ⭐ — Identifies ALL files to update together
-2. [`DEVELOPMENT.md`](DEVELOPMENT.md) — Full development guide
+```powershell
+# Run the app from source
+python source_code\main.py
 
-This prevents missed updates and broken builds.
+# Run all unit tests
+python -m pytest
 
----
+# Run one test module
+python -m pytest tests\test_playback_controller.py
 
-## Change Workflow
+# Run one test
+python -m pytest tests\test_app_state.py::TestDefaults::test_paths_default_to_empty_strings
 
-### 1. Plan (Read Dependencies)
-Consult [`documentation/FILE_DEPENDENCIES.md`](documentation/FILE_DEPENDENCIES.md):
-- New module → Add to build spec + main.py imports
-- UI change → Update main_layout.py + build spec + docs
-- New service → Create in `source_code/services/` + build spec + main.py
-- Version bump → Multiple files need updating
+# Run tests with coverage
+python -m pytest --cov=source_code --cov-report=term-missing
 
-### 2. Implement
-Make primary code changes. **Do NOT skip the build spec** for new modules—it breaks the executable.
-
-### 3. Update Documentation
-Always update these 5 files together (use multi-edit in one call):
-1. [`documentation/FILE_DEPENDENCIES.md`](documentation/FILE_DEPENDENCIES.md) — Add/update entry
-2. [`documentation/ARCHITECTURE.md`](documentation/ARCHITECTURE.md) — Document new components
-3. [`documentation/FOLDER_ORGANIZATION_SUMMARY.txt`](documentation/FOLDER_ORGANIZATION_SUMMARY.txt) — Reflect structure
-4. [`DEVELOPMENT.md`](DEVELOPMENT.md) — Add developer guidance
-5. [`documentation/IMPLEMENTATION_LOG.md`](documentation/IMPLEMENTATION_LOG.md) — Track changes
-
-### 4. Verify
-- Syntax check all modified files
-- Confirm all dependencies in FILE_DEPENDENCIES.md were updated
-- If adding modules, verify build spec entry exists
-
----
-
-## Project Structure (Key Directories)
-
-```
-source_code/
-├── main.py                      # Entry point & event handler
-├── controllers/                 # Orchestration (playback, media, processing, navigation)
-├── services/                    # Core features (player, download, audio, file loading)
-├── ui/                          # Pages (media_loader, pitch, audio_studio, video_tools, convert_export)
-├── dialogs/                     # Settings dialog
-└── models/                      # app_state.py (runtime state)
-
-build_system/                    # PyInstaller build configuration
-documentation/                   # Architecture, dependencies, implementation log
-resources/                       # Bundled FFmpeg, yt-dlp, libvlc (for .exe)
+# Build the Windows distribution (verified with Python 3.13)
+python build_system\build.py
 ```
 
-See [`documentation/ARCHITECTURE.md`](documentation/ARCHITECTURE.md) for full module details.
+Pytest discovers `tests/test_*.py` and uses quiet output from `pytest.ini`. `tests/conftest.py` configures Qt for offscreen use and stubs VLC/audio-device dependencies, so the unit suite does not require media hardware or a GUI display. Widget tests use the shared `qapp` fixture. A repository-wide lint command is not defined; use `python -m py_compile source_code\path\to\changed_file.py` for a focused syntax check.
 
----
+The build script resolves an interpreter with PyInstaller; set `KARAOKE_BUILD_PYTHON` if needed to select one explicitly. A distribution build requires the bundled media resources and offline Demucs model cache described in `build_system/build.py` and `build_system/BUILD_GUIDE.md`. The script clears generated build, distribution, and temporary build output directories before packaging.
 
-## Common Patterns
+## Architecture and data flow
 
-**Feature-specific files to check:**
-- Audio features → `source_code/services/audio_service.py`, `ui/audio_studio_page.py`
-- Playback → `source_code/services/player_service.py`, `controllers/playback_controller.py`
-- Video processing → `source_code/ui/video_tools_page.py`, `controllers/processing_controller.py`
-- Settings → `dialogs/settings_dialog.py`, `config/settings.json`
+- [`source_code/main.py`](../source_code/main.py) is the application shell: it creates `AppState`, services, and controllers, builds the UI, and wires Qt signals and callbacks. Its compatibility mapping exposes `AppState` fields through the window while state is being migrated.
+- [`source_code/models/app_state.py`](../source_code/models/app_state.py) holds window-level runtime state. Controllers take the app as context and coordinate focused workflows: playback, media loading/history, processing, and navigation.
+- Services own integrations and lifecycles such as VLC playback, downloads, audio monitoring, file loading, logging, and real-time pitch. UI modules under `source_code/ui/` build individual pages; [`main_layout.py`](../source_code/ui/main_layout.py) assembles them into a `QStackedWidget`.
+- Long-running work runs in Qt workers (`QThread`) and reports completion/progress through signals rather than blocking the UI. Keep worker references alive until their `finished` signal and follow existing stop/wait cleanup patterns.
+- Shared helpers under `source_code/utils/` centralize subprocess launch behavior, FFprobe probing, media paths, splash lifecycle, and range-row handling. Reuse them instead of duplicating these operations.
+- The PyInstaller spec explicitly lists hidden imports and bundled binaries; source imports working is not sufficient to guarantee the packaged app works.
 
-**Bundled tools** (resources/):
-- `ffmpeg.exe` — Encoding/transcoding
-- `yt-dlp.exe` — YouTube downloads
-- `ffprobe.exe` — Media probing
-Update `build_system/build.py` validation if changing these.
+For detailed component responsibilities and pipelines, see [`documentation/ARCHITECTURE.md`](../documentation/ARCHITECTURE.md).
 
----
+## Repository-specific conventions
 
-## Documentation Sync Rule
-
-**These 5 files MUST stay in sync:**
-- FILE_DEPENDENCIES.md (source of truth for dependencies)
-- ARCHITECTURE.md (technical design)
-- FOLDER_ORGANIZATION_SUMMARY.txt (project structure)
-- DEVELOPMENT.md (developer guide)
-- IMPLEMENTATION_LOG.md (change history)
-
-Update all 5 after code changes. Use multi-edit for efficiency.
-
----
-
-## Token Efficiency
-
-- **Before editing**: Read all needed context in parallel, plan all changes at once
-- **When editing**: Batch related changes in one multi_replace_string_in_file call
-- **When reading**: Use large ranges, not sequential small reads
-- **When documenting**: Update all 5 sync files together in one call
-
----
-
-## Quick Checklist: Making Any Change
-
-- [ ] Read FILE_DEPENDENCIES.md
-- [ ] List all affected files
-- [ ] Make code changes + update build spec if needed
-- [ ] Update all 5 docs together
-- [ ] Verify syntax
-- [ ] Confirm FILE_DEPENDENCIES.md entries were updated
+- Use absolute package imports such as `from source_code.services.player_service import PlayerService`.
+- Keep responsibilities in their existing layer: UI builders construct widgets, controllers orchestrate app workflows, services encapsulate integrations, and workers handle long-running operations.
+- If adding a Python module, update `build_system/KaraokeStudioPro.spec` hidden imports as needed. If adding or changing bundled tools, also update the spec binaries and prerequisite validation in `build_system/build.py`.
+- The page order is a contract: Media Loader `0`, Playback `1`, Audio Studio `2`, Video Studio `3`, Convert & Export `4`. Keep it aligned across `main.py`, the stacked layout, and the dependency checklist. Pages 2–4 are wrapped in `QScrollArea`; retrieve the page widget through the scroll area when a caller needs it.
+- Route subprocesses through `source_code.utils.subprocess_utils`; use the shared FFprobe helpers and media-path helpers for their respective jobs. Subprocess output that may contain user paths should follow the existing UTF-8 decoding with replacement behavior.
+- Settings span the JSON configuration, settings dialog, and app initialization. When opening settings, pause audio analysis as the existing workflow does; clean up the analyzer during shutdown.
+- Tests favor hand-written fakes around services, workers, and Qt signals, asserting behavior such as command arguments and state changes. `main.py` is primarily exercised through the controllers, services, and UI builders it wires together.
