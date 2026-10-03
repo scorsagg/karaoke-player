@@ -50,9 +50,10 @@
 **Files to update:**
 - `source_code/services/logging_service.py` → Main logging service (RotatingFileHandler, multiple log levels)
 - `build_system/KaraokeStudioPro.spec` → Add to hiddenimports: `'source_code.services.logging_service'`
-- `source_code/main.py` → Import LoggingService, initialize in init_settings_manager()
+- `source_code/main.py` → Initialize LoggingService and route uncaught exceptions to the logs directory
 - `documentation/LOGGING.md` → User guide for finding logs and reporting issues
 - `documentation/IMPLEMENTATION_LOG.md` → Record the change and validation notes
+- `.gitignore` → Exclude the root `logs/` directory
 
 **When to update:** When modifying logging behavior, adding new log levels, or changing log file locations.
 
@@ -61,7 +62,7 @@
 - Two log files: `app_debug.log` (all events) and `app_errors.log` (errors only)
 - Automatic rotation: 5 MB max per file, keeps 5 backups (~50 MB total)
 - Log levels: DEBUG, INFO, WARNING, ERROR, EXCEPTION
-- Logs stored in `config/` folder where app settings are also stored
+- Logs stored in the root `logs/` folder, parallel to `config/`
 - Easy for users to locate and send logs when reporting issues
 
 **Log methods in app:**

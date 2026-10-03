@@ -124,6 +124,10 @@ documentation/
 config/
 ├── settings.json             # User preferences
 └── history.json              # Local data (NOT tracked in git)
+
+logs/
+├── app_debug.log              # Rotating application diagnostics (NOT tracked in git)
+└── app_errors.log             # Error-only log (NOT tracked in git)
 ```
 
 ---
@@ -151,7 +155,7 @@ config/
 
 ### Logging & Diagnostics ✅
 - Centralized runtime logger is managed by `source_code/services/logging_service.py`
-- Logs are stored in `config/app_debug.log` and `config/app_errors.log`
+- Logs are stored in `logs/app_debug.log` and `logs/app_errors.log`, in a root-level `logs/` folder parallel to `config/`
 - The logger uses rotating files with error-only capture and developer-friendly debug output
 - See [`documentation/LOGGING.md`](documentation/LOGGING.md) for user troubleshooting steps
 

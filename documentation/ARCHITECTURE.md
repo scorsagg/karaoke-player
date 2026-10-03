@@ -149,7 +149,7 @@ layouts, getters) so Audio Studio and Video Studio can share them without cross-
 
 `source_code/services/logging_service.py` provides the app-wide diagnostic boundary. This service owns:
 
-- rotating `app_debug.log` and `app_errors.log` files under the active `config/` directory
+- rotating `app_debug.log` and `app_errors.log` files under the root `logs/` directory, parallel to `config/`
 - event classification by DEBUG, INFO, WARNING, ERROR, and EXCEPTION levels
 - a single access point for app startup, process lifecycle, download, and media-load troubleshooting
 - user-facing guidance via `documentation/LOGGING.md` for collecting the right logs when reporting issues
@@ -362,7 +362,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Manage audio analyzer thread
 - Refresh sidebar status text on load start/success/failure events
 - Drive splash progress updates through full load lifecycle, including preparation phase
-- Persist task lifecycle logs and uncaught exceptions to `config/app_debug.log`
+- Persist task lifecycle logs and uncaught exceptions to `logs/app_debug.log`
 - Clean shutdown and resource cleanup
 
 **Key Methods:**
