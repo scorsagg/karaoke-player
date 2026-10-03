@@ -30,7 +30,7 @@ class LoggingService:
         Initialize logging service.
         
         Args:
-            log_dir: Path to directory where logs will be stored (e.g., config/)
+            log_dir: Path to directory where logs will be stored (e.g., logs/)
         """
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(exist_ok=True)

@@ -12,6 +12,9 @@ samples/*
 #local project files
 project_files/*
 
+# Runtime logs
+/logs/
+
 # Local user data and state (not tracked)
 config/history.json
 config/settings.json

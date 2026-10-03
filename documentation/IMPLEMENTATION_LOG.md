@@ -1,5 +1,21 @@
 # Implementation Log - Karaoke Studio Pro v3
 
+# Change: Store Runtime Logs in a Dedicated Folder (2026-10-03) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/services/logging_service.py`, `.gitignore`, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `documentation/LOGGING.md`, `documentation/IMPLEMENTATION_LOG.md`
+
+### Change
+- Moved centralized application logs and uncaught-exception logs to the root `logs/` directory, parallel to `config/`.
+- Moved the existing `app_debug.log` and `app_errors.log` from `config/` into `logs/`.
+- Added the root `logs/` directory to `.gitignore` and updated the logging documentation.
+
+### Validation
+- Pylance syntax checks passed for `source_code/main.py` and `source_code/services/logging_service.py`.
+- Runtime check confirmed both log file paths resolve under a sibling `logs/` directory.
+- Confirmed the existing logs are now in `logs/`, no `.log` files remain in `config/`, and Git ignores `logs/app_debug.log`.
+
 # Change: Full Test Suite Fixes (2026-10-02) - COMPLETE
 
 **Status:** Implemented

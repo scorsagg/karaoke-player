@@ -170,7 +170,7 @@ class KaraokeApp(QWidget):
         config_dir.mkdir(exist_ok=True)
         self.settings_file = config_dir / "settings.json"
         # Initialize new centralized logging service with rotation and multi-level logging
-        self.logger = LoggingService(config_dir)
+        self.logger = LoggingService(app_dir / "logs")
 
         bundled_ffmpeg = get_resource_path("ffmpeg.exe")
         bundled_ffprobe = get_resource_path("ffprobe.exe")
@@ -3491,9 +3491,9 @@ def log_uncaught_exception(exc_type, exc_value, exc_traceback):
     """Global uncaught exception handler for startup/runtime fatal errors."""
     try:
         app_dir = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(__file__).parent.parent
-        config_dir = app_dir / "config"
-        config_dir.mkdir(exist_ok=True)
-        log_file = config_dir / "app_debug.log"
+        logs_dir = app_dir / "logs"
+        logs_dir.mkdir(exist_ok=True)
+        log_file = logs_dir / "app_debug.log"
 
         logger = logging.getLogger("karaoke_app_boot")
         logger.setLevel(logging.ERROR)

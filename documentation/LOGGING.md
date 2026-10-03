@@ -4,7 +4,7 @@
 
 The application includes a comprehensive logging system that tracks runtime events, errors, and diagnostics. This is essential for troubleshooting issues when users report problems.
 
-**Log Location:** `config/` folder in the application directory
+**Log Location:** `logs/` folder in the application directory, parallel to `config/`
 
 ---
 
@@ -65,25 +65,25 @@ All log entries follow this format:
 ### For Source Runs
 ```powershell
 # Log location:
-# - Windows: D:\Your\Project\Path\config\
-# - macOS/Linux: /Your/Project/Path/config/
+# - Windows: D:\Your\Project\Path\logs\
+# - macOS/Linux: /Your/Project/Path/logs/
 
 # Open directly:
-# Windows: explorer config\
-# macOS: open config/
-# Linux: xdg-open config/
+# Windows: explorer logs\
+# macOS: open logs/
+# Linux: xdg-open logs/
 ```
 
 ### For Standalone Executable (.exe)
 ```powershell
 # Log location:
-# Windows: C:\Users\[YourUsername]\AppData\Local\KaraokeStudioPro\config\
+# Windows: C:\Users\[YourUsername]\AppData\Local\KaraokeStudioPro\logs\
 # (Exact path depends on installation location)
 
 # To find it:
 # 1. Open File Explorer
 # 2. Paste this in address bar:
-#    %APPDATA%\..\..\AppData\Local\KaraokeStudioPro\config\
+#    %APPDATA%\..\..\AppData\Local\KaraokeStudioPro\logs\
 # 3. Look for app_debug.log and app_errors.log
 ```
 
@@ -94,8 +94,8 @@ All log entries follow this format:
 When a user reports an issue, ask them to:
 
 1. **Locate logs folder:**
-   - For .exe: Check `AppData/Local/KaraokeStudioPro/config/` (or installation directory)
-   - For source: Check `config/` in project root
+   - For .exe: Check `AppData/Local/KaraokeStudioPro/logs/` (or installation directory)
+   - For source: Check `logs/` in project root
 
 2. **Collect both files:**
    - `app_debug.log` (full debug log)
@@ -109,14 +109,14 @@ When a user reports an issue, ask them to:
 **Example request to user:**
 ```
 Please send me the following files from your Karaoke Studio Pro installation:
-- config/app_debug.log (the main log file)
-- config/app_errors.log (if it exists)
+- logs/app_debug.log (the main log file)
+- logs/app_errors.log (if it exists)
 
 These logs contain diagnostic information that will help me diagnose your issue.
 
-Location: Look for a "config" folder where you installed or ran the app.
+Location: Look for a "logs" folder where you installed or ran the app.
 If using the executable (.exe), check:
-  C:\Users\[YourName]\AppData\Local\KaraokeStudioPro\config\
+  C:\Users\[YourName]\AppData\Local\KaraokeStudioPro\logs\
 ```
 
 ---
@@ -181,7 +181,7 @@ This makes it easy to find logs for a specific session.
 ### Finding errors
 ```powershell
 # Windows PowerShell: Search for ERROR in debug log
-Select-String "ERROR|EXCEPTION" config\app_debug.log | Select-Object -First 20
+Select-String "ERROR|EXCEPTION" logs\app_debug.log | Select-Object -First 20
 
 # Then check app_errors.log for critical issues
 ```
@@ -189,16 +189,16 @@ Select-String "ERROR|EXCEPTION" config\app_debug.log | Select-Object -First 20
 ### Finding recent issues
 ```powershell
 # Find logs from last session (look for APPLICATION STARTED marker)
-Select-String "APPLICATION STARTED" config\app_debug.log | Select-Object -Last 5
+Select-String "APPLICATION STARTED" logs\app_debug.log | Select-Object -Last 5
 ```
 
 ### Checking specific features
 ```powershell
 # Search for video loading
-Select-String "load_video" config\app_debug.log | Select-Object -Last 10
+Select-String "load_video" logs\app_debug.log | Select-Object -Last 10
 
 # Search for audio processing
-Select-String "audio_studio|pitch_service|audio_separator" config\app_debug.log
+Select-String "audio_studio|pitch_service|audio_separator" logs\app_debug.log
 ```
 
 ---
@@ -221,10 +221,10 @@ The logging service is automatically initialized when the app starts. Key compon
 
 If users report no logs appear:
 
-1. **Check permissions:** User must have write access to config/ folder
+1. **Check permissions:** User must have write access to logs/ folder
 2. **Check disk space:** Ensure 50+ MB free space for log rotation
 3. **Check log level:** Logger initializes to DEBUG level by default
-4. **Verify config folder exists:** `config/` folder should be created automatically
+4. **Verify logs folder exists:** `logs/` folder should be created automatically
 
 If logs still don't appear, this indicates an issue with file permissions or disk access.
 
@@ -252,7 +252,7 @@ except Exception as e:
 
 ```powershell
 # Watch logs in real-time (Windows PowerShell)
-Get-Content config\app_debug.log -Tail 20 -Wait
+Get-Content logs\app_debug.log -Tail 20 -Wait
 
 # Or open in editor and refresh to see updates
 ```
@@ -263,10 +263,10 @@ Get-Content config\app_debug.log -Tail 20 -Wait
 
 | Environment | Location | Notes |
 |---|---|---|
-| **Source Run (Windows)** | `project_root\config\` | Relative to main.py location |
-| **Source Run (macOS/Linux)** | `project_root/config/` | Relative to main.py location |
-| **Standalone .exe** | `InstallDir\config\` or `%APPDATA%\KaraokeStudioPro\config\` | Depends on installation |
-| **Portable .exe** | `exe_directory\config\` | Same folder as .exe |
+| **Source Run (Windows)** | `project_root\logs\` | Relative to main.py location |
+| **Source Run (macOS/Linux)** | `project_root/logs/` | Relative to main.py location |
+| **Standalone .exe** | `InstallDir\logs\` or `%APPDATA%\KaraokeStudioPro\logs\` | Depends on installation |
+| **Portable .exe** | `exe_directory\logs\` | Same folder as .exe |
 
 ---
 
