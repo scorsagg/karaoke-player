@@ -14,7 +14,7 @@
 │  │  ├─ media_controller.py       (file history + load orchestration)
 │  │  ├─ navigation_controller.py  (page switching + guard logic)
 │  │  ├─ playback_controller.py    (playback lifecycle + playback-window execution)
-│  │  └─ processing_controller.py  (FFmpeg task orchestration + audio/video command builders)
+│  │  └─ processing_controller.py  (FFmpeg task orchestration + audio/video export command builders)
 │  │
 │  ├─ dialogs/
 │  │  ├─ __init__.py
@@ -84,6 +84,7 @@
 │
 ├─ documentation/
 │  ├─ ARCHITECTURE.md
+│  ├─ FEATURE_SERVICE_MIGRATION_PLAN.md
 │  ├─ FEATURE_IMPLEMENTATION_GUIDE.md
 │  ├─ FEATURES.txt
 │  ├─ FILE_DEPENDENCIES.md
@@ -92,6 +93,7 @@
 │  ├─ INSTALLATION.txt
 │  ├─ LOGGING.md
 │  ├─ TESTING.md
+│  ├─ requirements-dev.txt
 │  └─ requirements.txt
 │
 ├─ resources/
@@ -128,6 +130,7 @@
    ├─ test_realtime_pitch_service.py
    ├─ test_settings_dialog.py
    ├─ test_ui_components.py
+   ├─ test_ui_regression.py          (offscreen shell interaction + generated media)
    └─ test_video_frame.py
 
 ═══════════════════════════════════════════════════════════════════════════════

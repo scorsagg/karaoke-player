@@ -122,6 +122,14 @@ source_code/
     └── audio_separator_thread.py  # External audio-separator CLI worker
 ```
 
+### Planned feature ownership migration
+
+The current structure is being documented for a planned, incremental separation of feature workflows into UI, feature controller, and feature service boundaries. This is a target plan only; it does not mean those boundaries have already been implemented. Shared capabilities such as playback, media loading, background job execution, FFprobe, and logging remain shared services.
+
+See [`FEATURE_SERVICE_MIGRATION_PLAN.md`](FEATURE_SERVICE_MIGRATION_PLAN.md) for the workflow ownership map, migration sequence, constraints, and validation gates. Update this architecture description as each phase is actually implemented.
+
+The regression baseline uses `PySide6.QtTest.QTest` to drive native PySide6 widgets and fake shared dependencies; media-processing integration tests use generated temporary fixtures. Playwright is not used because the application does not render its UI in a browser. See [`TESTING.md`](TESTING.md) and the Phase 0 coverage matrix in [`FEATURE_SERVICE_MIGRATION_PLAN.md`](FEATURE_SERVICE_MIGRATION_PLAN.md) for current coverage boundaries and conventions.
+
 ### Shared Utilities Layer (updated 2026-08-18)
 
 `source_code/utils/` holds page-agnostic helpers that previously existed as copy-pasted blocks in
@@ -315,12 +323,13 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - Studio tab selections (Audio Studio / Video Studio / Convert & Export) return to default tab 0.
 - Convert/Normalize/Vocal/Amplify controls are reset to baseline defaults before new operations.
 
-### Pitch Export Tempo Preservation (updated 2026-07-09)
+### Pitch Export Tempo Preservation (updated 2026-10-14)
 
 - Export pitch shifting in `main.py::export_video()` now uses explicit two-stage tempo handling (`atempo=1/pitch_factor` then `atempo=speed`) so pitch and speed remain independent.
 - Lowering pitch no longer implies slower tempo unless speed control is intentionally changed.
 - The export path now probes source audio sample rate and uses it for `asetrate/aresample` to avoid duration drift on 48 kHz or other non-44.1 kHz inputs.
 - Audio-only sources use an audio filter/output codec and retain a supported audio extension; they do not receive the video timestamp filter or video stream mapping.
+- MP4 video exports copy the video stream for pitch-only, speed-only, and combined changes. Speed changes scale video packet timestamps with `-itsscale:v:0`; non-MP4 sources retain the video re-encode fallback.
 
 ### Real-Time Pitch Shift Playback (updated 2026-07-17)
 
