@@ -10,6 +10,8 @@ Complete development and contribution guide for Karaoke Studio Pro.
 
 **ALWAYS read before modifying code or documentation:**
 - [`documentation/FILE_DEPENDENCIES.md`](documentation/FILE_DEPENDENCIES.md) - Complete dependency checklist
+- [`documentation/FEATURE_SERVICE_MIGRATION_PLAN.md`](documentation/FEATURE_SERVICE_MIGRATION_PLAN.md) - Required when changing feature ownership or performing the UI/controller/service migration
+- [`documentation/TESTING.md`](documentation/TESTING.md) - Test setup, Qt UI automation, and media integration guidance
 - [`.copilot-instructions.md`](.copilot-instructions.md) - Copilot context
 
 ---
@@ -149,6 +151,12 @@ logs/
 
 **See [`documentation/FILE_DEPENDENCIES.md`](documentation/FILE_DEPENDENCIES.md) for complete details.**
 
+### Feature ownership and migration
+
+Feature workflows should follow **UI → feature controller → feature service → shared services**. Keep shared capabilities such as playback, media loading, subprocess execution, FFprobe, paths, and logging behind reusable services; do not pass the whole app object into feature logic. Migrate one behavior slice at a time, preserve existing UX, add regression tests, and run the full suite after each slice.
+
+The staged ownership map, migration phases, all-feature Qt UI regression gates, and instructions for future implementation agents are in [`documentation/FEATURE_SERVICE_MIGRATION_PLAN.md`](documentation/FEATURE_SERVICE_MIGRATION_PLAN.md). Native PySide6 widget automation uses QtTest rather than Playwright; run the shell-level UI baseline with `python -m pytest tests\test_ui_regression.py`. The suite uses fake operation boundaries; existing controller/service tests cover operation logic. See [`documentation/TESTING.md`](documentation/TESTING.md) for generated media and integration-test guidance. Treat proposed module names as guidance, not as proof that a phase has been implemented.
+
 ---
 
 ## Core Features (v3) - All Complete ✅
@@ -235,11 +243,12 @@ logs/
 - Join & Merge input picks and visual selected states are cleared on each new file.
 - Studio tabs return to default first tab and conversion/separator/amplify controls reset to baseline values.
 
-### Pitch/Speed Decoupled Export ✅ (updated 2026-07-09)
+### Pitch/Speed Decoupled Export ✅ (updated 2026-10-14)
 - Export path now preserves tempo when pitch changes by applying explicit pitch compensation (`atempo=1/pf`) and then user speed (`atempo=s`).
 - This prevents pitch-down operations from unintentionally reducing song speed.
 - Export now reads source audio sample rate via ffprobe and avoids hardcoded 44.1 kHz pitch base, fixing slowdown on 48 kHz sources.
 - Audio-only sources export to a supported audio container with audio-only FFmpeg mapping; video timestamp filters are used only for video media.
+- MP4 video is stream-copied for pitch-only, speed-only, and combined exports; speed changes use inverse timestamp scaling to preserve synchronization without re-encoding. Non-MP4 sources retain the video re-encode fallback.
 
 ### Real-Time Pitch Shift Playback ✅ (updated 2026-07-09)
 - Added low-latency real-time pitch-shift playback pipeline:

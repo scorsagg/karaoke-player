@@ -211,6 +211,61 @@ class TestAudioSpeedExportCmd:
         assert cmd[-1] == "out.mp3"
 
 
+class TestVideoSpeedExportCmd:
+    def test_pitch_only_copies_video_stream(self, controller, app):
+        cmd = controller.build_video_speed_export_cmd(
+            app, "in.mp4", "out.mp4", 1.0, 0.890899, 1.122462, 48000,
+            copy_video_stream=True,
+        )
+
+        assert cmd[cmd.index("-c:v") + 1] == "copy"
+        assert "-filter:a" in cmd
+        assert "-filter_complex" not in cmd
+        assert "-itsscale:v:0" not in cmd
+        assert cmd[cmd.index("-filter:a") + 1] == (
+            "asetrate=48000*0.890899,aresample=48000,"
+            "atempo=1.122462,atempo=1.000000"
+        )
+        assert cmd[-1] == "out.mp4"
+
+    @pytest.mark.parametrize("speed, timestamp_scale", [(1.25, "0.8"), (0.8, "1.25")])
+    def test_speed_only_scales_timestamps_and_copies_video(
+        self, controller, app, speed, timestamp_scale
+    ):
+        cmd = controller.build_video_speed_export_cmd(
+            app, "in.mp4", "out.mp4", speed, 1.0, 1.0, 48000,
+            copy_video_stream=True,
+        )
+
+        assert cmd[cmd.index("-c:v") + 1] == "copy"
+        assert cmd.index("-itsscale:v:0") < cmd.index("-i")
+        assert cmd[cmd.index("-itsscale:v:0") + 1] == timestamp_scale
+        assert "-filter_complex" not in cmd
+        assert cmd[-1] == "out.mp4"
+
+    def test_pitch_and_speed_scale_timestamps_and_copy_video(self, controller, app):
+        cmd = controller.build_video_speed_export_cmd(
+            app, "in.mp4", "out.mp4", 1.25, 0.890899, 1.122462, 48000,
+            copy_video_stream=True,
+        )
+
+        audio_filter = cmd[cmd.index("-filter:a") + 1]
+        assert cmd[cmd.index("-c:v") + 1] == "copy"
+        assert cmd[cmd.index("-itsscale:v:0") + 1] == "0.8"
+        assert "asetrate=48000*0.890899" in audio_filter
+        assert "atempo=1.122462,atempo=1.250000" in audio_filter
+        assert cmd[-1] == "out.mp4"
+
+    def test_non_mp4_video_keeps_reencode_fallback(self, controller, app):
+        cmd = controller.build_video_speed_export_cmd(
+            app, "in.webm", "out.mp4", 1.0, 0.890899, 1.122462, 48000
+        )
+
+        assert cmd[cmd.index("-c:v") + 1] == "libx264"
+        assert "-filter_complex" in cmd
+        assert "-itsscale:v:0" not in cmd
+
+
 class TestFormatConversionCmd:
     @pytest.mark.parametrize(
         "target_fmt, expected_codec",

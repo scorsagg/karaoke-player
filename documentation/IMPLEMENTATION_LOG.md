@@ -1,4 +1,55 @@
 # Implementation Log - Karaoke Studio Pro v3
+# Change: Preserve Video Streams During MP4 Pitch/Speed Exports (2026-10-14) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/main.py`, `source_code/controllers/processing_controller.py`, `tests/test_processing_controller.py`, and the five synchronized project documentation files
+
+### Problem
+Playback-page video exports re-encoded the video stream at a fixed 2000k bitrate even though MP4 output can preserve its video packets when timestamps are adjusted separately.
+
+### Fix
+- Added a dedicated video export command builder that copies MP4 video packets for pitch-only, speed-only, and combined adjustments.
+- Speed changes now scale video timestamps with `-itsscale:v:0`; non-MP4 sources retain the existing video re-encode fallback.
+- Added command-builder regression tests for all three adjustment combinations, faster and slower playback, and non-MP4 fallback.
+
+### Validation
+- Focused `tests/test_processing_controller.py`: 63 passed; full suite: 560 passed, 1 skipped.
+- Changed Python files passed `py_compile`; `git diff --check` passed.
+- A synthetic 2-second MP4 retimed to 1.25x retained H.264 video and produced 1.608-second video and 1.605-second audio streams.
+
+# Change: Feature UI-Service Migration Phase 0 Baseline (2026-10-03) - COMPLETE
+
+**Status:** Phase 0 complete; migration implementation has not started
+
+**Files Changed:** `tests/test_ui_regression.py`, `tests/conftest.py`, `documentation/FEATURE_SERVICE_MIGRATION_PLAN.md`, `documentation/TESTING.md`, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `documentation/IMPLEMENTATION_LOG.md`
+
+### Change
+- Inventoried current feature test ownership and recorded a feature-to-test baseline matrix with remaining integration gaps in the migration plan.
+- Added offscreen QtTest coverage that constructs the real `KaraokeApp` shell with fake external services, navigates pages/tabs, exercises feature control wiring, and closes the shell cleanly.
+- Added `generated_media_files`, which creates a short synthetic WAV and MP4 in a temporary directory using FFmpeg and verifies audio/video streams using FFprobe.
+- No application runtime behavior was changed. Real VLC playback and device-dependent audio remain outside this offscreen fake-service baseline and are explicitly recorded as unverified.
+
+### Validation
+- Focused Qt UI regression suite: 5 passed.
+- Full suite: 555 passed, 1 skipped (expected Windows-specific VLC runtime test skip), 3.17 seconds.
+- The test suite includes offscreen shell startup/navigation/shutdown and generated audio/video fixture generation/probing.
+- `git diff --check` passed.
+
+# Change: Feature Service Migration Plan (2026-10-03) - PLANNING
+
+**Status:** Plan documented; implementation not started
+
+**Files Changed:** `documentation/FEATURE_SERVICE_MIGRATION_PLAN.md`, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `documentation/IMPLEMENTATION_LOG.md`
+
+### Change
+- Documented the decision to migrate incrementally in the existing repository using a dedicated branch or isolated worktree, rather than creating a parallel project.
+- Added feature ownership boundaries, a workflow map, staged migration phases, regression safeguards, testing gates, and execution guidance for future agents.
+- Linked the plan from the five synchronized project documents; the architecture entry explicitly distinguishes the proposed target from the currently implemented structure.
+- Specified automated native Qt UI testing with QtTest instead of Playwright, all-feature UI coverage gates, generated-media integration fixtures, and optional user-provided samples for local issue reproduction. Kept pytest-qt optional because it is not currently in the development requirements.
+
+### Validation
+- Documentation-only change; reviewed plan links and checked that the plan is clearly marked as not yet implemented.
 
 # Change: Store Runtime Logs in a Dedicated Folder (2026-10-03) - COMPLETE
 

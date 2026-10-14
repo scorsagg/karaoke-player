@@ -84,6 +84,7 @@
 - `documentation/FOLDER_ORGANIZATION_SUMMARY.txt` → actual file tree and package layout
 - `DEVELOPMENT.md` → contributor workflow, setup, and runtime expectations
 - `documentation/IMPLEMENTATION_LOG.md` → changelog and validation record
+- `documentation/FEATURE_SERVICE_MIGRATION_PLAN.md` → staged UI/controller/service extraction plan and migration status
 
 **Why they are coupled:**
 - The app architecture, file layout, and developer guidance must remain aligned so future changes do not drift away from the verified runtime structure.
@@ -93,6 +94,28 @@
 - [ ] Project tree matches the real folders under `source_code/`, `services/`, `ui/`, `utils/`, and `workers/`
 - [ ] All new modules are listed in `build_system/KaraokeStudioPro.spec` hidden imports when required
 - [ ] 5-file sync has been refreshed after feature or structure changes
+
+### 3e. FEATURE UI-CONTROLLER-SERVICE MIGRATION
+**Plan:** [`documentation/FEATURE_SERVICE_MIGRATION_PLAN.md`](FEATURE_SERVICE_MIGRATION_PLAN.md)
+
+**When extracting or changing a feature workflow, update together as applicable:**
+- Feature UI in `source_code/ui/` → Keep widget construction and presentation separate from workflow rules
+- Feature controller in `source_code/controllers/` → Own that feature's UI wiring, state transitions, and service calls
+- Feature service in `source_code/services/` → Own cohesive workflow behavior and feature-specific command construction
+- Shared services/workers/utilities → Reuse player, media lifecycle, processing runner, FFprobe, paths, subprocess, and logging capabilities
+- Feature tests → Cover service behavior, controller integration, UI wiring, failure paths, cancellation, and cleanup
+- `tests/test_ui_regression.py` and `tests/conftest.py` → Preserve shell-level Qt interaction coverage and generated media fixtures; extend the feature-to-test matrix in the migration plan as ownership migrates
+- `source_code/main.py` → Composition-root wiring only; do not reintroduce feature logic
+- `build_system/KaraokeStudioPro.spec` → Add hidden imports for new modules when required
+- Five synchronized docs → Update architecture/structure only after the code slice is implemented
+
+**Rules:**
+- Migrate one workflow at a time, preserving observable behavior.
+- Pass explicit inputs and inject narrow dependencies; do not pass the whole application object to feature services.
+- Keep shared infrastructure single-instance where appropriate; do not duplicate the player or generic processing runner.
+- Finish focused tests and the full test suite before marking a migration phase complete.
+
+**Validation:** Follow the phase gates, baseline feature-to-test matrix, and per-feature procedure in `FEATURE_SERVICE_MIGRATION_PLAN.md`. Each phase requires all-feature service/controller tests, automated Qt UI navigation/workflow tests, applicable generated-media integration tests, and app-availability verification. Playwright is for browser UI; this PySide6 desktop app uses `PySide6.QtTest.QTest` (pytest-qt is not currently a dependency).
 
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:
@@ -232,6 +255,19 @@
 - `tests/test_process_thread.py` → Regression coverage for the decoding contract
 
 **Rule:** Streaming subprocess output must use explicit `encoding="utf-8"` and `errors="replace"` so non-ASCII tool output cannot fall back to the Windows `charmap` codec.
+
+### 7e. PLAYBACK PITCH/SPEED VIDEO EXPORT
+**Related files:**
+- `source_code/main.py` → routes Playback-page exports to the command builder
+- `source_code/controllers/processing_controller.py` → builds audio-only and video export commands
+- `tests/test_processing_controller.py` → verifies pitch-only, speed-only, combined, and non-MP4 fallback behavior
+
+**Video stream behavior:**
+- MP4 exports copy the video stream for pitch-only, speed-only, and combined changes.
+- Speed changes use `-itsscale:v:0` to scale video packet timestamps while the audio filter applies speed and pitch independently.
+- Non-MP4 sources retain the existing video re-encode path for output-container compatibility.
+
+**Validation:** Run `python -m pytest tests\test_processing_controller.py` and verify the command cases above.
 
 ### 8. THREAD-SAFE FILE LOADING (File Loading Operations - FINAL FIX ✅)
 **Current Service:** `source_code/services/file_loading_service.py`

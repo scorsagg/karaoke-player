@@ -7,6 +7,9 @@ application module is imported so the pure-Python logic can be unit tested.
 """
 
 import os
+import json
+import shutil
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -89,3 +92,63 @@ def sd_stub():
     sounddevice.query_devices = lambda *args, **kwargs: {}
     sounddevice.query_hostapis = lambda *args, **kwargs: []
     return sounddevice
+
+
+@pytest.fixture
+def generated_media_files(tmp_path):
+    """Generate short local audio/video inputs and verify their streams with FFprobe."""
+    resource_dir = REPO_ROOT / "resources"
+    ffmpeg = resource_dir / "ffmpeg.exe"
+    ffprobe = resource_dir / "ffprobe.exe"
+    if not ffmpeg.is_file():
+        ffmpeg = Path(shutil.which("ffmpeg") or "")
+    if not ffprobe.is_file():
+        ffprobe = Path(shutil.which("ffprobe") or "")
+    if not ffmpeg.is_file() or not ffprobe.is_file():
+        pytest.skip("FFmpeg and FFprobe are required for generated-media integration tests")
+
+    audio_path = tmp_path / "synthetic-audio.wav"
+    video_path = tmp_path / "synthetic-video.mp4"
+    subprocess.run(
+        [
+            str(ffmpeg), "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+            "-c:a", "pcm_s16le", str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    subprocess.run(
+        [
+            str(ffmpeg), "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "color=c=black:s=160x120:r=10",
+            "-f", "lavfi", "-i", "sine=frequency=660:duration=1",
+            "-shortest", "-c:v", "mpeg4", "-c:a", "aac", str(video_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    def probe(path):
+        result = subprocess.run(
+            [
+                str(ffprobe), "-v", "error", "-show_entries",
+                "stream=codec_type", "-of", "json", str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        return {stream["codec_type"] for stream in json.loads(result.stdout)["streams"]}
+
+    assert probe(audio_path) == {"audio"}
+    assert probe(video_path) == {"audio", "video"}
+    return {"audio": audio_path, "video": video_path}

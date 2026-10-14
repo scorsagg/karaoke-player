@@ -78,6 +78,35 @@ class ProcessingController:
             *codec_options.get(output_ext, codec_options["mp3"]), output_file,
         ]
 
+    def build_video_speed_export_cmd(
+        self, app, input_file, output_file, speed, pitch_factor,
+        pitch_compensation, input_sample_rate, copy_video_stream=False,
+    ):
+        """Build a video export command, preserving compatible video streams when possible."""
+        ffmpeg_path = app.settings["ffmpeg_path"]
+        audio_filter = (
+            f"asetrate={input_sample_rate}*{pitch_factor},"
+            f"aresample={input_sample_rate},"
+            f"atempo={pitch_compensation:.6f},atempo={speed:.6f}"
+        )
+        if copy_video_stream:
+            cmd = [ffmpeg_path, "-y"]
+            if speed != 1.0:
+                cmd += ["-itsscale:v:0", f"{1.0 / speed:.9g}"]
+            return [
+                *cmd, "-i", input_file,
+                "-map", "0:v:0", "-map", "0:a:0", "-filter:a", audio_filter,
+                "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", output_file,
+            ]
+
+        return [
+            ffmpeg_path, "-y", "-i", input_file, "-filter_complex",
+            f"[0:v]setpts=PTS/{speed}[v];[0:a]{audio_filter}[a]",
+            "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-b:v", "2000k", "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", output_file,
+        ]
+
     def build_format_conversion_cmd(self, app, input_file, output_file, target_fmt, bitrate):
         """Build FFmpeg command for format conversion (Feature 7)."""
         ffmpeg_path = app.settings["ffmpeg_path"]

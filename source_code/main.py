@@ -1649,9 +1649,10 @@ class KaraokeApp(QWidget):
                 self, abs_in, abs_out, s, pf, pitch_comp, input_sr, output_ext
             )
         else:
-            cmd = [self.settings["ffmpeg_path"], "-y", "-i", abs_in, "-filter_complex",
-                   f"[0:v]setpts=PTS/{s}[v];[0:a]asetrate={input_sr}*{pf},aresample={input_sr},atempo={pitch_comp:.6f},atempo={s:.6f}[a]",
-                   "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-b:v", "2000k", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", abs_out]
+            cmd = self.processing_controller.build_video_speed_export_cmd(
+                self, abs_in, abs_out, s, pf, pitch_comp, input_sr,
+                copy_video_stream=source_ext == "mp4",
+            )
 
         duration = self.get_video_duration_via_ffprobe(abs_in) / s
         self.launch_async_task(cmd, abs_out, "exporter", override_duration=duration)
