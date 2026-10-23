@@ -385,7 +385,7 @@ class TestDemucsBackend:
         assert cmd[6] == "standard"
         assert (instrumental, vocals) == ("", "")
 
-    def test_frozen_build_uses_inline_python_bootstrap(self, tmp_path, qapp, popen, monkeypatch):
+    def test_frozen_build_uses_private_runner_mode(self, tmp_path, qapp, popen, monkeypatch):
         thread = self._thread(tmp_path)
         monkeypatch.setattr(separator_module.sys, "frozen", True, raising=False)
         popen["process"] = FakeProcess(lines=["DEMUCS_SUBPROCESS_DONE\n"])
@@ -394,8 +394,8 @@ class TestDemucsBackend:
 
         cmd = popen["cmd"]
         assert cmd[0] == sys.executable
-        assert cmd[1] == "-c"
-        assert "runpy.run_path" in cmd[2]
+        assert cmd[1] == "--demucs-subprocess-runner"
+        assert cmd[2].endswith("demucs_subprocess_runner.py")
 
     def test_existing_stems_are_returned(self, tmp_path, qapp, popen):
         thread = self._thread(tmp_path)

@@ -68,7 +68,7 @@
 │
 ├─ build_system/
 │  ├─ BUILD_GUIDE.md
-│  ├─ KaraokeStudioPro.spec
+│  ├─ KaraokeStudioPro.spec (bundles Demucs model data and NumPy pickle shims)
 │  ├─ build.py
 │  ├─ requirements-build.txt
 │  ├─ build/

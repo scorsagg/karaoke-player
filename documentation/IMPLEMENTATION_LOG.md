@@ -1,4 +1,24 @@
 # Implementation Log - Karaoke Studio Pro v3
+# Change: Fix Packaged Vocal Separator Startup and Model Lookup (2026-10-21) - COMPLETE
+
+**Status:** Packaging fixes in progress; final packaged model-load smoke test pending.
+
+**Files Changed:** `source_code/main.py`, `source_code/workers/audio_separator_thread.py`, `tests/test_audio_separator_thread.py`, `build_system/KaraokeStudioPro.spec`, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `build_system/BUILD_GUIDE.md`, `documentation/IMPLEMENTATION_LOG.md`
+
+### Problem
+The packaged Vocal Separator could relaunch the GUI when starting its isolated Demucs worker. Subsequent packaged runs exposed missing Demucs model metadata and a NumPy legacy module path referenced dynamically by checkpoint pickle files.
+
+### Fix
+- Dispatch the packaged Demucs helper before importing the UI, preventing worker startup from opening a second app window.
+- Collect Demucs `remote/files.txt` and `remote/htdemucs_ft.yaml` as package data in the PyInstaller spec, preserving their `demucs/remote/` destination alongside the offline checkpoint cache.
+- Explicitly include `numpy.core.multiarray` and `numpy._core.multiarray` so packaged checkpoint unpickling can resolve NumPy compatibility shims.
+- Document the package-data requirement and a post-build verification path.
+
+### Validation
+- Focused `tests/test_audio_separator_thread.py` passed; changed Python files passed `py_compile`.
+- Pending spec/build validation and an actual frozen model-load smoke test.
+
+# Change: Preserve Video Streams During MP4 Pitch/Speed Exports (2026-10-14) - COMPLETE
 # Change: Preserve Video Streams During MP4 Pitch/Speed Exports (2026-10-14) - COMPLETE
 
 **Status:** Implemented

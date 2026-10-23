@@ -46,6 +46,11 @@
 - `ffprobe.exe` → media duration, stream type, and sample-rate probing
 - `yt-dlp.exe` → URL downloads
 
+**Demucs runtime package data:**
+- `build_system/KaraokeStudioPro.spec` → collect `demucs/remote/files.txt` and `demucs/remote/htdemucs_ft.yaml`; Demucs needs both the model index and the `htdemucs_ft` bag definition to resolve cached checkpoints.
+- `build_system/KaraokeStudioPro.spec` → explicitly include `numpy.core.multiarray` and `numpy._core.multiarray`; Demucs checkpoint pickles reference the NumPy legacy module path dynamically, so PyInstaller cannot reliably discover it.
+- After building, verify both files exist under `dist/KaraokeStudioPro/_internal/demucs/remote/` alongside the bundled offline model cache.
+
 ### 3c. LOGGING SERVICE (Runtime Diagnostics & User Issue Reporting)
 **Files to update:**
 - `source_code/services/logging_service.py` → Main logging service (RotatingFileHandler, multiple log levels)
@@ -378,6 +383,8 @@ The key fix: **Never call player.stop() when decoder is active** instead:
 - Demucs progress status text now distinguishes download phase vs separation pass (n/m), announces expected total passes up-front, and grows the denominator if additional pass loops are detected
 - Worker cleanup is deferred until `QThread.finished` so completion handling can load the output safely
 - Offline packaged/team builds now run Demucs `htdemucs_ft` from bundled local cache (no internet required for that path)
+- The PyInstaller spec must bundle Demucs `remote/files.txt` and `remote/htdemucs_ft.yaml`; the model resolver requires both files even when the checkpoints are cached offline
+- The PyInstaller spec must include both NumPy multiarray shim modules because checkpoint unpickling imports `numpy.core.multiarray` dynamically
 - UVR/audio-separator selections in packaged/team builds are treated as internet/manual-setup-required and show in-page status guidance (no modal popup)
 - Build prerequisites now require offline Demucs cache assets in `resources/offline_models/demucs` (must include `htdemucs_ft` files)
 
