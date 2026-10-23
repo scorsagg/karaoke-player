@@ -321,6 +321,8 @@ The staged ownership map, migration phases, all-feature Qt UI regression gates, 
 - Demucs now executes inside an isolated subprocess worker script; if torch/demucs crashes natively, the main app process remains alive and shows a controlled task error
 - Splash status text is phase-aware for Demucs (`Downloading model files`, `Running separation pass n/m`, `Applying music recovery`) and now announces expected passes up-front while allowing the denominator to expand if additional pass loops are detected
 - Packaged/team runtime is now Demucs-offline-first: `htdemucs_ft` runs from bundled local model cache with no internet requirement
+- The PyInstaller spec must bundle `demucs/remote/files.txt` and `demucs/remote/htdemucs_ft.yaml`; without the index and bag definition, the packaged Demucs resolver cannot select the cached checkpoints
+- The spec must explicitly include `numpy.core.multiarray` and `numpy._core.multiarray`; Demucs checkpoint pickles dynamically import the legacy NumPy path during model loading
 - In packaged/team runtime, non-offline models (UVR/audio-separator and non-bundled variants) are marked as internet/manual-setup-required via in-page status text (no modal popup)
 - Build pipeline now validates bundled Demucs offline model cache (`resources/offline_models/demucs`) before packaging
 - Thread lifetime is finalized on `QThread.finished` so output auto-load does not destroy the worker before it fully exits

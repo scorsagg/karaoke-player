@@ -12,6 +12,8 @@ All required tools are bundled:
 Team members need ZERO external dependencies!
 """
 
+from PyInstaller.utils.hooks import collect_data_files
+
 block_cipher = None
 
 a = Analysis(
@@ -27,6 +29,7 @@ a = Analysis(
     
     # Data files and directories (from resources folder)
     datas=[
+        *collect_data_files('demucs', includes=['remote/files.txt', 'remote/htdemucs_ft.yaml']),
         ('../resources/libvlc.dll', '.'),
         ('../resources/libvlccore.dll', '.'),
         ('../resources/plugins', 'plugins'),
@@ -40,6 +43,8 @@ a = Analysis(
         'vlc',
         'PySide6',
         'numpy',
+        'numpy.core.multiarray',
+        'numpy._core.multiarray',
         'torch',
         'demucs',
         'demucs.apply',

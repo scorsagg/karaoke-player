@@ -186,12 +186,7 @@ class AudioSeparatorThread(QThread):
         ]
 
         if getattr(sys, "frozen", False) or hasattr(sys, "_MEIPASS"):
-            code = (
-                "import runpy, sys; "
-                f"sys.argv = {runner_args!r}; "
-                f"runpy.run_path({demucs_script!r}, run_name='__main__')"
-            )
-            return [sys.executable, "-c", code]
+            return [sys.executable, "--demucs-subprocess-runner", demucs_script, *runner_args]
 
         return [
             sys.executable,

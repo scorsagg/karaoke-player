@@ -134,6 +134,7 @@ build_system/
 - ✅ python-vlc - VLC bindings
 - ✅ sounddevice - Audio capture
 - ✅ numpy - Numerical processing
+- ✅ Demucs model index and `htdemucs_ft` definition, NumPy pickle-compatibility modules, and offline checkpoint cache
 - ✅ All other dependencies
 
 ### Application Files (Bundled)
@@ -164,6 +165,9 @@ Required files:
 1. Run from `build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe`
 2. Try running with administrator privileges
 3. Check Windows Defender/Antivirus - may be blocking (add exception)
+
+### Vocal Separator Fails in the Packaged Build
+Verify the distribution contains both Demucs metadata files under `_internal/demucs/remote/` and includes `numpy.core.multiarray`. Checkpoint loading dynamically imports this NumPy compatibility module.
 
 ### File Size Too Large
 The standalone executable is typically **400-800 MB** due to bundled tools. This is normal.

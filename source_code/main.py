@@ -13,6 +13,14 @@ from pathlib import Path
 # Add parent directory to path so we can import source_code as a module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+if __name__ == "__main__" and len(sys.argv) >= 3 and sys.argv[1] == "--demucs-subprocess-runner":
+    import runpy
+
+    runner_script = sys.argv[2]
+    sys.argv = [runner_script, *sys.argv[3:]]
+    runpy.run_path(runner_script, run_name="__main__")
+    sys.exit(0)
+
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QFileDialog,
     QLabel, QMessageBox, QProgressBar, QSplashScreen

@@ -252,7 +252,7 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - The worker stays referenced until `QThread.finished` fires, preventing thread-destroyed crashes during auto-load of the output stem
 - Packaged/team runtime enforces Demucs offline mode (`htdemucs_ft`) using bundled local model cache under `config/audio_separator_models`
 - Packaged/team runtime marks UVR/audio-separator paths as internet/manual-setup required using in-page status messaging (no modal warning for this case)
-- Build-time validation ensures offline Demucs cache assets are present before team distribution packaging
+- Build-time validation ensures offline Demucs cache assets are present before team distribution packaging; the PyInstaller spec bundles the Demucs model metadata and explicitly includes NumPy's legacy multiarray shims required to resolve and unpickle the cached model bag
 
 ### Convert & Export: Join & Merge Tab (updated 2026-07-08)
 
@@ -851,6 +851,7 @@ Audio pitch remains constant (VLC handles this)
   - yt-dlp (yt-dlp.exe)
   - VLC libraries (libvlc.dll, libvlccore.dll)
   - VLC plugins directory
+- Demucs model metadata, NumPy pickle-compatibility shims, and the offline checkpoint cache are bundled for offline vocal separation
 - Standalone executable requires zero external dependencies
 - Output: `build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe`
 
