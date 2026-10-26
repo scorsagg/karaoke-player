@@ -1,44 +1,60 @@
 ╔════════════════════════════════════════════════════════════════════════════╗
-║          KARAOKE STUDIO PRO v3 - INSTALLATION GUIDE                        ║
-║                                                                            ║
-║  Quick Setup: No installation required!                                   ║
-║  Just extract and run KaraokeStudioPro.exe                                 ║
+║          KARAOKE STUDIO PRO v3 - INSTALLATION & SETUP GUIDE              ║
 ╚════════════════════════════════════════════════════════════════════════════╝
+
+Karaoke Studio Pro v3 supports two supported launch paths:
+
+1. Run directly from source during development
+2. Launch a packaged build for end-user distribution
+
+The current packaged Windows output is:
+  build_system\dist\KaraokeStudioPro\KaraokeStudioProV3.exe
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  SYSTEM REQUIREMENTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ Windows 7 SP1 or later (or Windows 10/11 recommended)
-✓ 500 MB free disk space
-✓ No external software dependencies required!
-  (All required tools are bundled in this package)
+✓ Windows 10/11 recommended (Windows 7 SP1+ may still work, but 10/11 is the verified target)
+✓ Python 3.10+ for source runs; Python 3.13 is the verified packaging runtime
+✓ 500 MB free disk space for the build and bundled media tools
+✓ For packaged builds: FFmpeg, FFprobe, yt-dlp, and VLC runtime files are bundled in the distribution
+✓ For source runs: install the project requirements before launching the app
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- INSTALLATION STEPS
+ SOURCE SETUP
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. EXTRACT THE ZIP FILE
-   ├─ Locate the downloaded ZIP file: KaraokeStudioPro_v3_*.zip
-   ├─ Right-click and select "Extract All..."
-   └─ Choose extraction folder (e.g., C:\KaraokeStudioPro\)
-      (You can place it anywhere on your system)
+1. Open PowerShell in the project root
+   cd D:\Srikanth\Academics\Python\karaoke-player
 
-2. LOCATE THE EXECUTABLE
-   ├─ After extraction, navigate to the folder
-   ├─ Look for: KaraokeStudioProV3.exe (Windows application)
-   └─ This is the main application file
+2. Install runtime dependencies
+   python -m pip install -r documentation\requirements.txt
 
-3. RUN THE APPLICATION
-   ├─ Double-click KaraokeStudioProV3.exe
-   ├─ Application will launch (may take 5-10 seconds on first run)
-   └─ Karaoke Studio Pro is ready to use!
+3. Launch the app from source
+   python .\source_code\main.py
 
-4. CREATE A SHORTCUT (Optional)
-   ├─ Right-click KaraokeStudioProV3.exe
-   ├─ Select "Create shortcut"
-   ├─ Move shortcut to Desktop or Start Menu
-   └─ For quick access in future
+Note:
+- The app automatically resolves VLC runtime files from `resources\libvlc.dll` and `resources\plugins\` when present.
+- No manual VLC PATH export is required for a normal source run.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ PACKAGED BUILD SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Install the build toolchain
+   python -m pip install -r build_system\requirements-build.txt
+
+2. Build the standalone package
+   python build_system\build.py
+
+3. Locate the packaged executable
+   build_system\dist\KaraokeStudioPro\KaraokeStudioProV3.exe
+
+4. Distribute the whole folder or ZIP archive to end users
+   - Folder: `build_system\dist\KaraokeStudioPro\`
+   - ZIP: `build_system\dist\KaraokeStudioPro_v3_*.zip`
+
+The packaged build includes the required FFmpeg, FFprobe, yt-dlp, VLC runtime DLLs, the VLC plugins directory, splash assets, and the offline Demucs model cache.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GETTING STARTED
@@ -46,152 +62,91 @@
 
 LOADING MEDIA
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ Option 1: Load Local Video File                                            │
-│   ✓ Click "Open File" button                                               │
-│   ✓ Select a video file (MP4, MKV, AVI, WebM, etc.)                       │
+│ Option 1: Load Local Media File                                            │
+│   ✓ Click "Open File" or "Media Loader"                                   │
+│   ✓ Select a video or audio file                                            │
 │   ✓ Click "Open"                                                           │
-│   ✓ Video displays and ready to play                                       │
+│   ✓ Media loads and playback is ready                                       │
 │                                                                            │
 │ Option 2: Download from YouTube                                            │
-│   ✓ Paste YouTube URL in input field                                       │
-│   ✓ Click "Download & Play"                                                │
-│   ✓ App downloads video to configured directory                            │
-│   ✓ Video plays automatically after download                               │
+│   ✓ Paste YouTube URL in the media loader                                  │
+│   ✓ Click "Download & Load"                                                │
+│   ✓ App downloads the media to the configured directory                    │
+│   ✓ The result is loaded into the app automatically                        │
 └────────────────────────────────────────────────────────────────────────────┘
 
 PLAYBACK CONTROLS
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ Play / Pause          - Click play button or press SPACEBAR                │
-│ Seek / Skip            - Click on timeline or use arrow keys               │
-│ Speed Control         - Use +/- buttons to adjust (0.5x to 2.0x)          │
-│ Volume Control        - Move volume slider left/right                      │
-│ Audio Level Monitor   - Real-time SPL/dBFS visualization (right side)      │
-│ Full Screen           - Double-click video to toggle                       │
+│ Play / Pause          - Click the play button or press SPACEBAR            │
+│ Seek / Skip            - Click the timeline or use the skip controls        │
+│ Speed Control         - Use the playback speed controls                    │
+│ Volume Control        - Adjust the volume slider                            │
+│ Audio Level Monitor   - Real-time SPL/dBFS visualization                   │
+│ Full Screen           - Toggle the video display in fullscreen            │
 └────────────────────────────────────────────────────────────────────────────┘
 
 FEATURES
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ 🎬  Multi-Format Playback  - MP4, MKV, AVI, WebM and more                 │
-│ 📥  YouTube Downloads       - Fetch karaoke tracks directly               │
-│ 🔊  Smart Audio Analysis    - SPL room calibration + dBFS modes            │
-│ 📊  Audio Level Monitoring  - Real-time visualization (~60-90 dB SPL)     │
-│ ⚙️  Configurable Threshold   - Auto-reduce at custom level for rooms       │
-│ 🎚️  Playback Control        - Play, pause, seek, speed adjustment         │
-│ 🎤  Vocal Separator         - Visible in app, but not bundled for offline  │
-│ 💾  Settings                - Save preferences and history                │
+│ 🎬  Multi-format playback     - Local files and URL downloads               │
+│ 📥  YouTube downloads         - Fetch karaoke tracks directly              │
+│ 🔊  Real-time audio analysis  - SPL + dBFS calibration modes               │
+│ 📊  Audio level monitoring    - Live bar/graph meters                       │
+│ ⚙️  Configurable calibration  - Auto-reduction and room thresholds          │
+│ 🎚️  Playback control          - Play, pause, seek, and speed changes        │
+│ 🎤  Vocal separation          - Demucs-based karaoke stem export             │
+│ 💾  Settings                  - Save preferences and recent history          │
 └────────────────────────────────────────────────────────────────────────────┘
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  CONFIGURATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Click "Settings" button to configure:
-├─ FFmpeg Path          - Location of FFmpeg executable (usually auto-detected)
-├─ FFprobe Path         - Location of FFprobe executable (usually auto-detected)
-├─ yt-dlp Path          - Location of yt-dlp (usually auto-detected)
-├─ Download Directory   - Where to save downloaded videos
-├─ Measurement Mode    - Switch between dB Output (dBFS) or SPL Estimate
-└─ Auto-Reduce Threshold - Sound level trigger in dB SPL (default 90 dB SPL, adjustable)
+Use the Settings dialog to configure:
+├─ FFmpeg Path          - FFmpeg binary location (usually auto-detected)
+├─ FFprobe Path         - FFprobe binary location (usually auto-detected)
+├─ yt-dlp Path          - yt-dlp executable location (usually auto-detected)
+├─ Download Directory   - Where downloads are saved
+├─ Measurement Mode     - dBFS or SPL estimate
+├─ Auto-reduce threshold - Room-level gain reduction trigger
+├─ Audio/video export defaults
+└─ Output naming conventions
 
-Most settings are auto-configured. Customize audio settings for your room!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- AUDIO CALIBRATION (v3 NEW FEATURE)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Karaoke Studio Pro v3 includes room-specific audio calibration:
-
-MEASUREMENT MODES:
-├─ dB Output (dBFS)      - Raw digital signal level (-80 to 0 dB)
-│                          [Technical mode for debugging]
-│
-└─ SPL Estimate (Room)   - Room sound pressure (~60-90 dB SPL)
-                          [Calibrated for typical karaoke rooms]
-
-HOW TO CALIBRATE:
-1. Open "Settings" → "🔊 Audio Settings"
-2. Select measurement mode that works for your room
-3. Set "Auto-Reduce Threshold" based on your preferred volume:
-   ├─ Default (90 dB SPL)     = Recommended starting point
-   └─ Higher value (>90 dB SPL) = Less sensitive, allows louder levels
-
-4. Test with actual karaoke sessions and fine-tune as needed
-5. When threshold is reached, app automatically reduces volume by 5%
-
-NOTE: Auto-reduce prevents excessive audio spikes and hearing damage!
+Most settings are discovered automatically. Adjust only if your local setup differs.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  TROUBLESHOOTING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-❌ Application Won't Start
-   ✓ Ensure you have Windows 7 SP1 or later
-   ✓ Try running as Administrator: right-click KaraokeStudioProV3.exe → "Run as administrator"
-   ✓ Check that all files extracted correctly
-   ✓ Restart your computer and try again
-
-❌ No Audio Output
-   ✓ Check your system volume settings
-   ✓ Verify audio device is connected and enabled
-   ✓ Try a different video file to test
-   ✓ Check audio levels indicator on right side
-
-❌ YouTube Download Not Working
-   ✓ Check your internet connection
-   ✓ Verify YouTube URL is correct and video is available
-   ✓ Try a different video
-   ✓ Ensure download directory has enough disk space
-
-❌ Vocal Separator Not Available Offline
-   ✓ This team build keeps Vocal Separator visible, but separator backends/models are not bundled
-   ✓ First use may require internet access and additional backend/model downloads
-   ✓ Offline team machines will show a warning and refuse separator launch safely if requirements are missing
-   ✓ Playback, export, and other bundled features continue to work offline
-
-❌ Vocal Separator Fails on Files with Non-ASCII Names
-   ✓ This was fixed in v3 by forcing UTF-8 decoding for ffmpeg/Demucs subprocess output
-   ✓ Files and folders with Kannada or other Unicode characters now work correctly in the separator flow
-   ✓ If you still see a failure, move the media to a plain-ASCII folder temporarily and retry
-
-❌ Video Playback Issues
-   ✓ Check file format is supported (MP4, MKV, AVI, WebM)
-   ✓ Try a different video file
-   ✓ Ensure video file is not corrupted
-   ✓ Check that file isn't in use by another application
-
-❌ Application Hangs or Freezes
-   ✓ Wait 10-20 seconds (may be loading)
-   ✓ If still frozen, close with Task Manager (Ctrl+Shift+Esc)
-   ✓ Restart the application
+- If the app fails to launch from source, re-check the Python environment and installed requirements.
+- If the packaged build will not start, verify the entire `build_system\dist\KaraokeStudioPro\` folder is present and run the app from that folder.
+- If you are reporting an issue, include the files from the project `logs\` folder and note whether the issue occurs in source mode or packaged mode.
+- For packaging and bundling details, see `build_system\BUILD_GUIDE.md` and `documentation\LOGGING.md`.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  BUNDLED COMPONENTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-This package includes all necessary components:
+This package includes all required runtime components:
 
 ✓ FFmpeg               - Video encoding/transcoding engine
 ✓ FFprobe              - Media metadata/duration analysis engine
-✓ yt-dlp              - YouTube content downloader
-✓ VLC Libraries       - Media playback engine (libvlc.dll + plugins)
-✓ PySide6             - Qt6 GUI framework
-✓ Python Libraries    - numpy, sounddevice, and more
+✓ yt-dlp               - YouTube content downloader
+✓ VLC Libraries        - Media playback engine (libvlc.dll + plugins)
+✓ PySide6              - Qt6 GUI framework
+✓ Python libraries     - numpy, sounddevice, and related runtime support
 
-No additional installations needed for the bundled core app features.
-Vocal Separator is the exception: it is visible in the UI but is not guaranteed offline in the team build because separator backends/models are not bundled.
+No additional installations are normally required for the bundled app.
+The Demucs separator is fully supported in packaged builds when the offline model cache is present.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  SUPPORT & UPDATES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 For issues or questions:
-├─ Check README.md for project overview
-├─ Review documentation/ folder for technical details
+├─ Check `README.md` for the project overview
+├─ Review the `documentation/` folder for technical details
 └─ Report issues to the development team
 
-To get the latest version:
-└─ Contact your administrator for updated package
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- ENJOY YOUR KARAOKE! 🎤🎉
+ END OF GUIDE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

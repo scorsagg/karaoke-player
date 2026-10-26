@@ -210,7 +210,7 @@ exe = EXE(
 
 1. **Test .exe:**
    ```powershell
-   build_system\dist\KaraokeStudioPro\KaraokeStudioPro.exe
+   build_system\dist\KaraokeStudioPro\KaraokeStudioProV3.exe
    ```
    Try to load media, use all pages. Verify no `ModuleNotFoundError` or `ImportError`.
 

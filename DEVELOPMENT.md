@@ -60,7 +60,7 @@ cd d:\Srikanth\Academics\Python\karaoke-player
 # Use the runtime that already has the package toolchain installed
 C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe build_system\build.py
 # Or set KARAOKE_BUILD_PYTHON to the same interpreter before running the build script
-# Output: build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe
+# Output: build_system/dist/KaraokeStudioPro/KaraokeStudioProV3.exe
 ```
 
 ---
@@ -98,6 +98,7 @@ source_code/
 ├── utils/                     # Shared helpers (no duplicated blocks in callers)
 │   ├── subprocess_utils.py   # Hidden-console subprocess run/Popen wrappers
 │   ├── ffprobe_utils.py      # FFprobe duration/sample-rate/stream-type/resolution probes
+│   ├── audio_activity.py     # FFmpeg source-RMS scan and seek-bar ranges
 │   ├── media_paths.py        # FFmpeg path normalization + export output naming
 │   ├── splash_utils.py       # Loading/task/download splash creation & teardown
 │   └── range_rows.py         # Range-row traversal, clamping, merging, reset helpers
@@ -233,6 +234,13 @@ The staged ownership map, migration phases, all-feature Qt UI regression gates, 
 - Final half-second label clamping now shows full duration at track end (prevents visible `mm:ss` underflow such as `4:40` for a `4:41` track).
 - Inactive-state slider seeks are now deferred and applied immediately after Play starts; full-track playback-window rows are treated as inactive so they do not force rewind to `00:00` on Play.
 - Ended VLC state now triggers explicit media rebind before playback actions, so seek/play and +/-10 operations work immediately after natural completion without requiring manual Stop first.
+
+### Seek-Bar Audio Activity Highlights ✅ (updated 2026-10-23)
+- Media loading starts a background FFmpeg RMS scan of the first audio stream in **100 ms windows**; it does not block the UI or playback.
+- The displayed threshold is **≥−10 dBFS** for the decoded source file. Each 100 ms source-RMS window at or above that threshold is highlighted; this is separate from the live playback meter's dBFS/SPL reading.
+- The seek-bar track and handle have explicit high-contrast styles so the timeline remains visible on the dark playback bar.
+- This is a loudness estimate, not music recognition: continuous tracks may be highlighted almost end-to-end, and quiet passages may be treated as silence.
+- The scan is canceled when another track is loaded or the app closes. Failures are logged and leave the seek bar usable without highlights.
 
 ### Stop Lock-Release Behavior ✅ (updated 2026-07-09)
 - Stop now clears VLC media binding in `player_service.py` after detaching output, so files can be deleted/replaced after Stop.
@@ -688,7 +696,7 @@ Before committing or building:
 - [ ] **Audio Processing:** Results auto-load into player ✓
 - [ ] **Audio Processing:** Can cancel ongoing task ✓
 - [ ] `python build_system/build.py` completes successfully
-- [ ] `build_system/dist/KaraokeStudioProV3/KaraokeStudioProV3.exe` runs
+- [ ] `build_system/dist/KaraokeStudioPro/KaraokeStudioProV3.exe` runs
 - [ ] Documentation is consistent and up-to-date
 
 ---

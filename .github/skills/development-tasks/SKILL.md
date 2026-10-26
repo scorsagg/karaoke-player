@@ -39,7 +39,7 @@ pytest tests\test_filename.py -v
 ```powershell
 python build_system\build.py
 ```
-**Expected:** Output at `build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe`. Build takes 2-3 minutes.
+**Expected:** Output at `build_system/dist/KaraokeStudioPro/KaraokeStudioProV3.exe`. Build takes 2-3 minutes.
 
 ### Check Python Syntax (All Files)
 ```powershell
@@ -95,7 +95,7 @@ Build script handles FFmpeg/yt-dlp/libvlc bundling. **Do NOT skip this step — 
 
 **4. Test Executable**
 ```powershell
-build_system\dist\KaraokeStudioPro\KaraokeStudioPro.exe
+build_system\dist\KaraokeStudioPro\KaraokeStudioProV3.exe
 ```
 Verify .exe launches and loads media without errors.
 

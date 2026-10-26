@@ -1,15 +1,89 @@
 import json
 import os
+import shutil
 import time
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
+from source_code.utils.audio_activity import (
+    ACTIVITY_THRESHOLD_DBFS,
+    active_ranges_from_rms_metadata,
+    build_activity_scan_command,
+)
 from source_code.utils.splash_utils import create_loading_splash
+from source_code.workers.process_thread import ProcessThread
 
 
 class MediaController:
     """Media loading, history, and load-finalization orchestration."""
+
+    def stop_audio_activity_scan(self, app):
+        """Stop an in-flight timeline scan before replacing media or closing the app."""
+        app._audio_activity_scan_generation = getattr(app, "_audio_activity_scan_generation", 0) + 1
+        thread = getattr(app, "_audio_activity_scan_thread", None)
+        if thread is not None and thread.isRunning():
+            thread.stop()
+            thread.wait(2000)
+        app._audio_activity_scan_thread = None
+
+    def _start_audio_activity_scan(self, app, media_path):
+        """Analyze audio in the background and update seek-bar highlights on completion."""
+        self.stop_audio_activity_scan(app)
+        seek_slider = getattr(app, "seek_slider", None)
+        if "ffmpeg_path" not in app.settings or not hasattr(seek_slider, "set_activity_ranges"):
+            return
+
+        ffmpeg_path = str(app.settings["ffmpeg_path"]).strip()
+        if not ffmpeg_path or shutil.which(ffmpeg_path) is None:
+            app.log_warning(f"[audio_activity] FFmpeg executable is unavailable: {ffmpeg_path!r}")
+            return
+
+        generation = app._audio_activity_scan_generation
+        lines = []
+        thread = ProcessThread(build_activity_scan_command(ffmpeg_path, media_path))
+        app._audio_activity_scan_thread = thread
+        thread.line_output.connect(lines.append)
+        thread.finished.connect(
+            lambda success: self._finish_audio_activity_scan(
+                app, thread, media_path, generation, lines, success
+            )
+        )
+        thread.start()
+
+    def _finish_audio_activity_scan(self, app, thread, media_path, generation, lines, success):
+        if getattr(app, "_audio_activity_scan_thread", None) is thread:
+            app._audio_activity_scan_thread = None
+        thread.deleteLater()
+        if generation != getattr(app, "_audio_activity_scan_generation", 0):
+            return
+
+        current_path = getattr(app, "video_path", "")
+        if not current_path or os.path.normcase(os.path.abspath(current_path)) != os.path.normcase(
+            os.path.abspath(media_path)
+        ):
+            return
+        if not success:
+            app.log_warning(f"[audio_activity] FFmpeg scan failed for {media_path}")
+            return
+
+        duration = 0.0
+        try:
+            duration = max(0, int(app.player.get_length())) / 1000.0
+        except Exception as e:
+            app.log_debug(f"[audio_activity] player duration unavailable: {e}")
+        if duration <= 0:
+            duration = app.get_video_duration_via_ffprobe(media_path)
+        if duration <= 0:
+            app.log_warning(f"[audio_activity] Could not determine duration for {media_path}")
+            return
+
+        ranges = active_ranges_from_rms_metadata(lines, duration)
+        app.seek_slider.set_activity_ranges(ranges)
+        app.log_info(
+            f"[audio_activity] Detected {len(ranges)} active ranges above "
+            f"{ACTIVITY_THRESHOLD_DBFS} dBFS source RMS for {os.path.basename(media_path)}"
+        )
 
     def add_to_history(self, app, file_path):
         if not file_path or not os.path.exists(file_path):
@@ -122,6 +196,10 @@ class MediaController:
             loader.set_progress(40, "Mapping Core Encoders...")
             app.video_path = app.state._pending_video_path
             print(f"[main.load_video] 📝 Setting video_path: {app.video_path}")
+            seek_slider = getattr(app, "seek_slider", None)
+            if hasattr(seek_slider, "set_activity_ranges"):
+                seek_slider.set_activity_ranges([])
+            self._start_audio_activity_scan(app, app.video_path)
 
             print(f"[main.load_video] 🎬 Calling player.set_media({os.path.abspath(app.video_path)})...")
             app.player.set_media(os.path.abspath(app.video_path))
@@ -164,6 +242,10 @@ class MediaController:
             app.status_label.setText(f"Status: Playing {os.path.basename(app.video_path)}")
             app._refresh_realtime_pitch_status()
         except Exception as e:
+            self.stop_audio_activity_scan(app)
+            seek_slider = getattr(app, "seek_slider", None)
+            if hasattr(seek_slider, "set_activity_ranges"):
+                seek_slider.set_activity_ranges([])
             app.log_exception("main.load_video", e)
             loader.close()
             app.status_label.setText("Status: Load failed")

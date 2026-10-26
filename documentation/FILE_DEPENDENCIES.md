@@ -15,10 +15,11 @@
 - `documentation/ARCHITECTURE.md` → Title includes v3
 
 ### 2. EXE NAME CHANGES
-**Current:** `KaraokeStudioProV3.exe`
+**Current packaged executable:** `build_system/dist/KaraokeStudioPro/KaraokeStudioProV3.exe`
 **Files to update:**
 - `build_system/KaraokeStudioPro.spec` → `name='KaraokeStudioProV3'` in EXE section
-- `documentation/INSTALLATION.txt` → All executable references
+- `build_system/BUILD_GUIDE.md` → build output path and team distribution notes
+- `documentation/INSTALLATION.txt` → installation/startup instructions and packaged-path references
 
 ### 3. BUILD SPEC HIDDEN IMPORTS (Add new modules here when creating new Python files)
 **File:** `build_system/KaraokeStudioPro.spec` → `hiddenimports=[]` list
@@ -121,6 +122,26 @@
 - Finish focused tests and the full test suite before marking a migration phase complete.
 
 **Validation:** Follow the phase gates, baseline feature-to-test matrix, and per-feature procedure in `FEATURE_SERVICE_MIGRATION_PLAN.md`. Each phase requires all-feature service/controller tests, automated Qt UI navigation/workflow tests, applicable generated-media integration tests, and app-availability verification. Playwright is for browser UI; this PySide6 desktop app uses `PySide6.QtTest.QTest` (pytest-qt is not currently a dependency).
+
+### 3f. SEEK-BAR AUDIO ACTIVITY HIGHLIGHTS
+**Files to update together:**
+- `source_code/utils/audio_activity.py` → FFmpeg per-window RMS scan and source-level active-range parsing
+- `source_code/controllers/media_controller.py` → Start/stop background scans on media load and update the slider when complete
+- `source_code/ui/playback_bar.py` → Paint activity intervals and show the source dBFS threshold
+- `source_code/main.py` → Stop an active scan during application shutdown
+- `source_code/workers/process_thread.py` → Reuse the existing streaming subprocess worker
+- `build_system/KaraokeStudioPro.spec` → Include the utility module in hidden imports
+- `tests/test_audio_activity.py`, `tests/test_ui_components.py`, and `tests/test_media_controller.py` → Cover range parsing, display, and load lifecycle
+- All five synchronized documentation files → Keep this feature and its behavior documented
+
+**Behavior:** While media loads, FFmpeg scans the first audio stream using 100 ms RMS windows. A window is highlighted when source-file RMS meets or exceeds `-10 dBFS`. This is the decoded file's level, not the live playback meter's dBFS or approximate SPL reading. The scan runs asynchronously, and a failed scan is logged without interrupting playback.
+The seek slider must define its own visible groove and handle colors rather than depending on native platform defaults, so the timeline stays visible with the app's dark background.
+
+**Validation:**
+- [ ] Unit-test silence parsing, range clipping, threshold command, and seek-bar label/range handling
+- [ ] Syntax-check changed Python modules
+- [ ] Run the focused media-controller, audio-activity, and UI component tests
+- [ ] Verify the packaged spec includes `source_code.utils.audio_activity`
 
 ### 4. UI REFACTORING (Modularized Components)
 **Current structure:** `source_code/ui/` folder with:

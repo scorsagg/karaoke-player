@@ -37,7 +37,7 @@ cd d:\Srikanth\Academics\Python\karaoke-player
 C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe .\build_system\build.py
 ```
 
-The build output is created under `build_system/dist/KaraokeStudioPro/`.
+The build output is created under `build_system/dist/KaraokeStudioPro/` and includes the packaged app at `KaraokeStudioProV3.exe`.
 
 ## 📁 Project structure
 

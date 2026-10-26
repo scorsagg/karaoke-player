@@ -31,8 +31,6 @@ class AudioLevelMeter(QWidget):
 
     def get_approximate_spl(self):
         """Convert dBFS to approximate SPL (Sound Pressure Level in dB)"""
-        # Rough approximation: SPL ≈ 60 + (level_percent * 0.3)
-        # This gives: 0% → 60 SPL, 80% → 84 SPL, 100% → 90 SPL (max safe karaoke)
         return 60 + (self.level_percent * 0.3)
     
     def set_measurement_mode(self, mode):
