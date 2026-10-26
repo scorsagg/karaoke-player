@@ -31,6 +31,14 @@ class FakeLabel:
         return self._style
 
 
+class FakeActivitySlider:
+    def __init__(self):
+        self.ranges = []
+
+    def set_activity_ranges(self, ranges):
+        self.ranges = list(ranges)
+
+
 class FakeToggleButton(FakeLabel):
     pass
 
@@ -628,3 +636,59 @@ class TestLoadVideo:
         assert loader.closed is True
         assert app.status_label.text() == "Status: Load failed"
         assert app.file_loading_service.finished_with == [True]
+
+
+class TestAudioActivityScan:
+    def test_scan_completion_updates_current_media_slider(self, controller, app, tmp_path):
+        class FakeThread:
+            def __init__(self):
+                self.deleted = False
+
+            def deleteLater(self):
+                self.deleted = True
+
+        media_path = str(_make_media(tmp_path))
+        thread = FakeThread()
+        app.video_path = media_path
+        app.seek_slider = FakeActivitySlider()
+        app.player.get_length = lambda: 10_000
+        app.log_info = lambda message: None
+        app._audio_activity_scan_thread = thread
+        app._audio_activity_scan_generation = 3
+        lines = [
+            "frame:0 pts:0 pts_time:0",
+            "lavfi.astats.Overall.RMS_level=-5",
+            "frame:1 pts:4410 pts_time:0.1",
+            "lavfi.astats.Overall.RMS_level=-65",
+            "frame:2 pts:8820 pts_time:0.2",
+            "lavfi.astats.Overall.RMS_level=-5",
+        ]
+
+        controller._finish_audio_activity_scan(app, thread, media_path, 3, lines, True)
+
+        assert app.seek_slider.ranges[0] == (0.0, 0.01)
+        assert app.seek_slider.ranges[1] == pytest.approx((0.02, 0.03))
+        assert thread.deleted is True
+        assert app._audio_activity_scan_thread is None
+
+    def test_stale_scan_completion_does_not_replace_new_media_ranges(self, controller, app, tmp_path):
+        class FakeThread:
+            def deleteLater(self):
+                pass
+
+        media_path = str(_make_media(tmp_path))
+        app.video_path = media_path
+        app.seek_slider = FakeActivitySlider()
+        app._audio_activity_scan_generation = 4
+        app._audio_activity_scan_thread = None
+
+        controller._finish_audio_activity_scan(
+            app,
+            FakeThread(),
+            media_path,
+            3,
+            [],
+            True,
+        )
+
+        assert app.seek_slider.ranges == []

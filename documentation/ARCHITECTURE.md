@@ -111,6 +111,7 @@ source_code/
 │   ├── __init__.py
 │   ├── subprocess_utils.py        # Hidden-console subprocess run/Popen wrappers
 │   ├── ffprobe_utils.py           # FFprobe duration/sample-rate/stream-type/resolution probes
+│   ├── audio_activity.py          # FFmpeg RMS scan and source-level active timeline ranges
 │   ├── media_paths.py             # FFmpeg path normalization + export output naming
 │   ├── splash_utils.py            # Loading/task/download splash creation & teardown
 │   └── range_rows.py              # Range-row traversal, clamping, merging, reset helpers
@@ -310,6 +311,15 @@ Convert & Export includes a dual-backend vocal separation workflow:
 - `main.py::apply_playback_window()` now treats a single full-track range (`00:00 -> duration`) as no active window, preventing unintended rewind-on-play.
 - `PlaybackController.apply_playback_window()` compares collected millisecond ranges against media duration converted to milliseconds, preserving partial ranges that start at zero.
 - `main.py::_ensure_media_loaded_for_playback()` now forces a media rebind when VLC reports `Ended` state, because this state can appear loaded but may ignore seek/play until rebound.
+
+### Seek-Bar Audio Activity Highlights (updated 2026-10-23)
+
+- `MediaController` starts an asynchronous FFmpeg scan when a track loads and stops the previous scan when replacing media or closing the app.
+- `utils/audio_activity.py` measures first-stream RMS in 100 ms windows and highlights source windows at or above `-10 dBFS`.
+- The threshold uses an inclusive comparison (`>=`). Source-file RMS is not comparable to live playback meter values, and no SPL conversion is applied to the scan.
+- `AudioActivitySlider` paints those ranges on the seek-bar groove without changing its 0–1000 seek values; the UI displays the source dBFS threshold beside the timeline.
+- Activity segments are painted around the native handle so playback-position repaints do not erase the highlight. The track has explicit high-contrast groove, played sub-page, and handle styles.
+- The highlights indicate loudness above the threshold, not music classification. Scan failures are logged and do not block media loading or playback.
 
 ### Stop/Detach File Handle Release (updated 2026-07-09)
 
@@ -853,7 +863,7 @@ Audio pitch remains constant (VLC handles this)
   - VLC plugins directory
 - Demucs model metadata, NumPy pickle-compatibility shims, and the offline checkpoint cache are bundled for offline vocal separation
 - Standalone executable requires zero external dependencies
-- Output: `build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe`
+- Output: `build_system/dist/KaraokeStudioPro/KaraokeStudioProV3.exe`
 
 **Build Command:**
 ```bash

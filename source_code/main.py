@@ -3394,6 +3394,11 @@ class KaraokeApp(QWidget):
     def closeEvent(self, event):
         """Handle window close event - proper cleanup is now in PlayerService.stop()"""
         try:
+            self.media_controller.stop_audio_activity_scan(self)
+        except Exception as e:
+            print(f"Error stopping audio activity scan on close: {e}")
+
+        try:
             if hasattr(self, 'realtime_pitch') and self.realtime_pitch:
                 self.realtime_pitch.stop()
         except Exception:

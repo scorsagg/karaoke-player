@@ -1,7 +1,46 @@
 # Implementation Log - Karaoke Studio Pro v3
+# Change: Documentation Sync Cleanup for Installation and Build Paths (2026-10-26) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `documentation/INSTALLATION.txt`, `documentation/FILE_DEPENDENCIES.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `documentation/ARCHITECTURE.md`, `build_system/BUILD_GUIDE.md`, and `documentation/IMPLEMENTATION_LOG.md`
+
+### Change
+- Corrected the packaged deployment path to match the actual Windows output: `build_system/dist/KaraokeStudioPro/KaraokeStudioProV3.exe`.
+- Updated the installation flow to document both source execution and packaged-build usage, rather than describing the older "extract and run the exe" flow as the only setup path.
+- Reconciled the documentation wording around bundled runtime tools, ZIP archive naming, and developer build steps with the current PyInstaller spec and build script.
+
+### Validation
+- Reviewed the current repository layout and build outputs to confirm the executable name and folder layout match `build_system/KaraokeStudioPro.spec` and the generated distribution folder.
+- Documentation-only change; no runtime logic modified.
+
+# Change: Seek-Bar Audio Activity Highlights (2026-10-23) - COMPLETE
+
+**Status:** Implemented
+
+**Files Changed:** `source_code/utils/audio_activity.py`, `source_code/controllers/media_controller.py`, `source_code/ui/playback_bar.py`, `source_code/main.py`, `build_system/KaraokeStudioPro.spec`, focused tests, and the five synchronized project documentation files
+
+### Change
+- Added an asynchronous FFmpeg RMS scan using 100 ms windows. The initial silence-based scan was replaced after playback showed the full timeline highlighted.
+- Replaced the misleading SPL-derived cutoff with a source-file RMS cutoff of `-10 dBFS`, using an inclusive comparison. Decoded source levels are not directly comparable to the live meter's input/output reading.
+- Converted per-window RMS measurements into normalized active ranges and painted them on the seek-bar groove without changing seeking behavior.
+- Displayed the source dBFS threshold beside the timeline and logged scan failures without interrupting media playback.
+- Cancelled an in-progress scan when media is replaced or the app closes.
+- Applied explicit high-contrast seek-track and handle styling after runtime screenshots showed the native groove was not visible on the dark playback bar.
+- Fixed activity painting to leave a gap around the native slider handle; re-drawing the full slider control after the highlight had been erasing the active-range segments on every repaint.
+
+### Validation
+- Focused audio-activity, UI, and media-controller tests passed, including a real FFmpeg scan over generated audio.
+- Full pytest suite passed with one skipped test.
+- Changed Python modules passed `py_compile`; `git diff --check` passed.
+
+### Notes
+- Highlights indicate source audio above the dBFS threshold, not semantic music detection. Continuous loud audio can therefore highlight nearly the full track.
+- See [FILE_DEPENDENCIES.md](FILE_DEPENDENCIES.md) section 3f for the coupled files and validation checklist.
+
 # Change: Fix Packaged Vocal Separator Startup and Model Lookup (2026-10-21) - COMPLETE
 
-**Status:** Packaging fixes in progress; final packaged model-load smoke test pending.
+**Status:** Implemented; packaged `htdemucs_ft` model load verified. Full audio inference remains unverified.
 
 **Files Changed:** `source_code/main.py`, `source_code/workers/audio_separator_thread.py`, `tests/test_audio_separator_thread.py`, `build_system/KaraokeStudioPro.spec`, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `build_system/BUILD_GUIDE.md`, `documentation/IMPLEMENTATION_LOG.md`
 
@@ -16,7 +55,9 @@ The packaged Vocal Separator could relaunch the GUI when starting its isolated D
 
 ### Validation
 - Focused `tests/test_audio_separator_thread.py` passed; changed Python files passed `py_compile`.
-- Pending spec/build validation and an actual frozen model-load smoke test.
+- PyInstaller spec compiles; rebuilt distribution includes both Demucs metadata files and both NumPy multiarray shims.
+- The frozen executable loaded the complete four-model `htdemucs_ft` bag from the bundled offline checkpoints and exited cleanly in helper mode.
+- Focused `tests/test_audio_separator_thread.py` passed under the build interpreter; a full audio-separation output was not generated.
 
 # Change: Preserve Video Streams During MP4 Pitch/Speed Exports (2026-10-14) - COMPLETE
 # Change: Preserve Video Streams During MP4 Pitch/Speed Exports (2026-10-14) - COMPLETE

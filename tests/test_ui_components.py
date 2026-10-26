@@ -2,6 +2,7 @@
 
 import pytest
 from PySide6.QtWidgets import QScrollArea, QStackedWidget
+from PySide6.QtGui import QPixmap
 
 from source_code.main import KaraokeApp
 from source_code.ui.audio_studio_page import create_audio_studio_page
@@ -47,6 +48,42 @@ class TestPlaybackBar:
 
     def test_seek_slider_uses_permille_range(self, bar):
         assert (bar["seek_slider"].minimum(), bar["seek_slider"].maximum()) == (0, 1000)
+
+    def test_seek_slider_has_visible_track_style(self, bar):
+        slider = bar["seek_slider"]
+
+        assert slider.minimumHeight() >= 24
+        assert "QSlider::groove:horizontal" in slider.styleSheet()
+        assert "background: #555555" in slider.styleSheet()
+        assert "QSlider::handle:horizontal" in slider.styleSheet()
+
+    def test_seek_slider_exposes_audio_activity_ranges_and_threshold(self, bar):
+        slider = bar["seek_slider"]
+        slider.set_activity_ranges([(0.2, 0.5), (0.7, 1.0)])
+
+        assert slider.activity_ranges() == [(0.2, 0.5), (0.7, 1.0)]
+        assert bar["activity_threshold_label"].text() == "Activity: >= -10 dBFS"
+
+    def test_seek_slider_renders_activity_ranges(self, bar, qapp):
+        slider = bar["seek_slider"]
+        slider.set_activity_ranges([(0.2, 0.8)])
+        slider.resize(400, 30)
+        slider.show()
+        for value in (0, 100, 500):
+            slider.setValue(value)
+            qapp.processEvents()
+
+            pixmap = QPixmap(slider.size())
+            slider.render(pixmap)
+            image = pixmap.toImage()
+            green_pixels = sum(
+                1
+                for y in range(image.height())
+                for x in range(image.width())
+                if image.pixelColor(x, y).green()
+                > image.pixelColor(x, y).red() * 1.5
+            )
+            assert green_pixels > 300
 
     def test_volume_defaults_to_eighty_percent(self, bar):
         assert bar["vol_slider"].value() == 80

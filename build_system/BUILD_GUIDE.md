@@ -6,7 +6,7 @@ This guide explains how to build a **complete standalone executable** of Karaoke
 ## Prerequisites
 
 ### For Building:
-1. **Python 3.8+** installed on your system
+1. **Python 3.10+ recommended** (the project is verified on Python 3.13)
 2. **All runtime dependencies** installed:
    ```powershell
    pip install -r requirements-build.txt
@@ -65,6 +65,9 @@ C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe -m pip inst
 C:/Users/Srikanth/AppData/Local/Programs/Python/Python313/python.exe build_system\build.py
 ```
 
+The packaged executable is created at:
+`build_system\dist\KaraokeStudioPro\KaraokeStudioProV3.exe`
+
 ### Method 2: From Build System Folder
 ```powershell
 cd D:\Srikanth\Academics\Python\karaoke-player\build_system
@@ -88,7 +91,7 @@ python build_system\build.py
 build_system/
 ├── dist/
 │   └── KaraokeStudioPro/          # ← Final executable folder
-│       ├── KaraokeStudioPro.exe   # ← Main executable (RUN THIS)
+│       ├── KaraokeStudioProV3.exe # ← Main executable (RUN THIS)
 │       ├── ffmpeg.exe             # Bundled
 │       ├── yt-dlp.exe             # Bundled
 │       ├── libvlc.dll             # Bundled
@@ -99,7 +102,7 @@ build_system/
 │       └── ... (other support files)
 │
 ├── build/                          # (Temporary - can be deleted)
-├── KaraokeStudioPro_v2.0_*.zip    # Distribution package
+├── KaraokeStudioPro_v3_*.zip      # Distribution package
 └── build_manifest.json             # Build information
 ```
 
@@ -109,16 +112,16 @@ build_system/
 
 **Option 1: Direct Folder (Fastest)**
 1. Copy the `dist/KaraokeStudioPro/` folder to your team member
-2. They simply run: `KaraokeStudioPro.exe`
+2. They run: `KaraokeStudioProV3.exe`
 3. No installation, no dependencies, just works!
 
 **Option 2: ZIP File (Professional)**
-1. The build automatically creates `KaraokeStudioPro_v2.0_*.zip`
+1. The build automatically creates `KaraokeStudioPro_v3_*.zip`
 2. Share this ZIP file with your team
-3. Team extracts and runs `KaraokeStudioPro/KaraokeStudioPro.exe`
+3. Team extracts and runs `KaraokeStudioPro/KaraokeStudioProV3.exe`
 
 ### System Requirements for End Users:
-- **Windows 7 or later** (64-bit recommended)
+- **Windows 10/11 recommended** (Windows 7 SP1+ may still work)
 - **No additional software needed** - Everything is bundled!
 - That's it! 🎉
 
@@ -162,7 +165,7 @@ Required files:
 **Normal behavior!** First build compiles and bundles everything (~5-15 minutes depending on system).
 
 ### Executable Won't Run
-1. Run from `build_system/dist/KaraokeStudioPro/KaraokeStudioPro.exe`
+1. Run from `build_system/dist/KaraokeStudioPro/KaraokeStudioProV3.exe`
 2. Try running with administrator privileges
 3. Check Windows Defender/Antivirus - may be blocking (add exception)
 
@@ -190,7 +193,7 @@ datas=[
 ### Change Version
 Edit `build.py`, line ~50:
 ```python
-VERSION = "2.1"  # Update version number
+VERSION = "3"  # Update version number
 ```
 
 ## Advanced: Updating Bundled Tools

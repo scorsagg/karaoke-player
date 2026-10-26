@@ -40,7 +40,7 @@
 │  │  ├─ main_layout.py           (UI assembly + stack navigation)
 │  │  ├─ media_loader_page.py     (media load / URL download page)
 │  │  ├─ pitch_page.py            (playback controls)
-│  │  ├─ playback_bar.py          (play/pause/stop/seek/volume)
+│  │  ├─ playback_bar.py          (play/pause/stop/seek/volume; visible activity timeline)
 │  │  ├─ range_row_section.py     (shared time-range row builders)
 │  │  ├─ sidebar.py              (navigation & settings sidebar)
 │  │  ├─ video_tools_page.py     (video trim + extraction + widen)
@@ -49,6 +49,7 @@
 │  ├─ utils/
 │  │  ├─ __init__.py
 │  │  ├─ ffprobe_utils.py        (duration/sample-rate/resolution probes)
+│  │  ├─ audio_activity.py       (FFmpeg RMS scanning and SPL-threshold timeline ranges)
 │  │  ├─ media_paths.py          (FFmpeg path handling + output naming)
 │  │  ├─ range_rows.py           (time-range collection + validation)
 │  │  ├─ splash_utils.py         (loading/task/download splash helpers)
@@ -168,11 +169,11 @@ Development:
    python .\source_code\main.py          ← Direct execution
 
 Production (Built):
-   build_system\dist\KaraokeStudioPro\KaraokeStudioPro.exe
-   
+   build_system\dist\KaraokeStudioPro\KaraokeStudioProV3.exe
+
 Distribution to Team:
    • Copy: build_system\dist\KaraokeStudioPro\ folder
-   • Team runs: KaraokeStudioPro.exe
+   • Team runs: KaraokeStudioProV3.exe
    • No setup needed! Everything bundled!
 
 ═══════════════════════════════════════════════════════════════════════════════

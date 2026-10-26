@@ -396,7 +396,7 @@ def print_summary():
     
     print("="*70)
     log("Next steps:", "INFO")
-    print("  1. TEST: dist/KaraokeStudioPro/KaraokeStudioPro.exe")
+    print("  1. TEST: dist/KaraokeStudioPro/KaraokeStudioProV3.exe")
     print("  2. DISTRIBUTE: dist/ folder contains standalone executable")
     print("  3. NO INSTALLATION NEEDED: Team members just run the .exe")
     print("     - All tools (FFmpeg, FFprobe, yt-dlp, VLC) are bundled")

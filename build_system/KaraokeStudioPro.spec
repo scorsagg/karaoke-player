@@ -63,6 +63,7 @@ a = Analysis(
         'source_code.ui.range_row_section',
         'source_code.utils.subprocess_utils',
         'source_code.utils.ffprobe_utils',
+        'source_code.utils.audio_activity',
         'source_code.utils.media_paths',
         'source_code.utils.splash_utils',
         'source_code.utils.range_rows',
