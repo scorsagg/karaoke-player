@@ -88,6 +88,20 @@ class TestDownloadVideo:
         assert str(tmp_path / "%(title)s.%(ext)s") in thread.cmd
         assert service.download_url == "https://youtu.be/abc"
 
+    def test_passes_configured_ffmpeg_to_ytdlp(self, tmp_path, qapp):
+        ffmpeg_path = str(tmp_path / "ffmpeg.exe")
+        svc = DownloadService(
+            FakeSettingsManager({"ytdlp_path": "/opt/yt-dlp", "ffmpeg_path": ffmpeg_path}),
+            FakeProcessThread,
+        )
+
+        svc.download_video("https://youtu.be/abc", str(tmp_path))
+
+        command = svc.download_thread.cmd
+        ffmpeg_option = command.index("--ffmpeg-location")
+        assert command[ffmpeg_option + 1] == ffmpeg_path
+        assert ffmpeg_option < command.index("--")
+
     def test_uses_custom_format_selector(self, service, tmp_path):
         service.download_video("https://youtu.be/abc", str(tmp_path), preferred_format="bestaudio")
 

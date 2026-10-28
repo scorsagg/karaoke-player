@@ -4,7 +4,7 @@
 
 The application includes a comprehensive logging system that tracks runtime events, errors, and diagnostics. This is essential for troubleshooting issues when users report problems.
 
-**Log Location:** `logs/` folder in the application directory, parallel to `config/`
+**Log Location:** Both source and packaged runs use a `logs/` folder under the process current working directory.
 
 ---
 
@@ -77,13 +77,12 @@ All log entries follow this format:
 ### For Standalone Executable (.exe)
 ```powershell
 # Log location:
-# Windows: C:\Users\[YourUsername]\AppData\Local\KaraokeStudioPro\logs\
-# (Exact path depends on installation location)
+# Windows: <current working directory>\logs\
 
 # To find it:
 # 1. Open File Explorer
 # 2. Paste this in address bar:
-#    %APPDATA%\..\..\AppData\Local\KaraokeStudioPro\logs\
+#    <current working directory>\logs\
 # 3. Look for app_debug.log and app_errors.log
 ```
 
@@ -94,7 +93,7 @@ All log entries follow this format:
 When a user reports an issue, ask them to:
 
 1. **Locate logs folder:**
-   - For .exe: Check `AppData/Local/KaraokeStudioPro/logs/` (or installation directory)
+   - For .exe: Check `<current working directory>\logs\`
    - For source: Check `logs/` in project root
 
 2. **Collect both files:**
@@ -116,7 +115,7 @@ These logs contain diagnostic information that will help me diagnose your issue.
 
 Location: Look for a "logs" folder where you installed or ran the app.
 If using the executable (.exe), check:
-  C:\Users\[YourName]\AppData\Local\KaraokeStudioPro\logs\
+  <current working directory>\logs\
 ```
 
 ---
@@ -263,10 +262,10 @@ Get-Content logs\app_debug.log -Tail 20 -Wait
 
 | Environment | Location | Notes |
 |---|---|---|
-| **Source Run (Windows)** | `project_root\logs\` | Relative to main.py location |
-| **Source Run (macOS/Linux)** | `project_root/logs/` | Relative to main.py location |
-| **Standalone .exe** | `InstallDir\logs\` or `%APPDATA%\KaraokeStudioPro\logs\` | Depends on installation |
-| **Portable .exe** | `exe_directory\logs\` | Same folder as .exe |
+| **Source Run (Windows)** | `<current working directory>\logs\` | Relative to process current working directory |
+| **Source Run (macOS/Linux)** | `<current working directory>/logs/` | Relative to process current working directory |
+| **Standalone .exe** | `<current working directory>\logs\` | Relative to process current working directory |
+| **Portable .exe** | `<current working directory>\logs\` | Relative to process current working directory |
 
 ---
 

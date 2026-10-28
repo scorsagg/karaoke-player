@@ -152,6 +152,22 @@ class TestRun:
 
         assert events["finished"] == [False]
 
+    def test_subprocess_start_failure_emits_error_and_failure(self, qapp, monkeypatch):
+        def fail_to_start(_cmd, **_kwargs):
+            raise FileNotFoundError("yt-dlp.exe not found")
+
+        monkeypatch.setattr(process_thread_module, "popen_hidden", fail_to_start)
+        thread = ProcessThread(["yt-dlp.exe", "https://example.com"])
+        lines = []
+        results = []
+        thread.line_output.connect(lines.append)
+        thread.finished.connect(results.append)
+
+        thread.run()
+
+        assert lines == ["ERROR: Failed to start subprocess: yt-dlp.exe not found"]
+        assert results == [False]
+
     def test_killed_thread_reports_failure(self, qapp, monkeypatch):
         process = FakeProcess(output="line\n")
         monkeypatch.setattr(process_thread_module, "popen_hidden", lambda cmd, **kwargs: process)

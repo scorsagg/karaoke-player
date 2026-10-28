@@ -27,7 +27,7 @@
 │  ├─ services/
 │  │  ├─ __init__.py
 │  │  ├─ audio_service.py         (audio monitoring + analyzer coordination)
-│  │  ├─ download_service.py      (YouTube/download workflows)
+│  │  ├─ download_service.py      (yt-dlp downloads + configured FFmpeg path for merging)
 │  │  ├─ file_loading_service.py  (thread-safe load lifecycle)
 │  │  ├─ logging_service.py       (rotating debug/error logger)
 │  │  ├─ player_service.py        (VLC playback abstraction)
@@ -75,11 +75,11 @@
 │  ├─ build/
 │  └─ dist/
 │
-├─ config/
+├─ config/                       (source-run settings/history; ignored user data)
 │  ├─ history.json
 │  ├─ settings.json
 │
-├─ logs/                         (runtime logs; ignored by git)
+├─ logs/                         (source-run logs; ignored by git)
 │  ├─ app_debug.log
 │  └─ app_errors.log
 │
@@ -135,6 +135,10 @@
    └─ test_video_frame.py
 
 ═══════════════════════════════════════════════════════════════════════════════
+
+For both source and packaged runs, runtime-writable data (settings, logs, downloads, history,
+model cache, and generated files) is rooted in the process current working directory. Bundled
+tools and read-only resources remain in the distribution's `_internal\` folder.
 
 🚀 Quick run:
    cd D:\Srikanth\Academics\Python\karaoke-player

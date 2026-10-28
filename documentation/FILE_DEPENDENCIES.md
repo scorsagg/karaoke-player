@@ -45,7 +45,7 @@
 **Required bundled tools:**
 - `ffmpeg.exe` → encoding/transcoding/filter execution
 - `ffprobe.exe` → media duration, stream type, and sample-rate probing
-- `yt-dlp.exe` → URL downloads
+- `yt-dlp.exe` → URL downloads; pass the configured `ffmpeg_path` using `--ffmpeg-location` so packaged format merging can find bundled FFmpeg
 
 **Demucs runtime package data:**
 - `build_system/KaraokeStudioPro.spec` → collect `demucs/remote/files.txt` and `demucs/remote/htdemucs_ft.yaml`; Demucs needs both the model index and the `htdemucs_ft` bag definition to resolve cached checkpoints.
@@ -56,7 +56,7 @@
 **Files to update:**
 - `source_code/services/logging_service.py` → Main logging service (RotatingFileHandler, multiple log levels)
 - `build_system/KaraokeStudioPro.spec` → Add to hiddenimports: `'source_code.services.logging_service'`
-- `source_code/main.py` → Initialize LoggingService and route uncaught exceptions to the logs directory
+- `source_code/main.py` → Initialize LoggingService and route uncaught exceptions to `logs/` under the process current working directory
 - `documentation/LOGGING.md` → User guide for finding logs and reporting issues
 - `documentation/IMPLEMENTATION_LOG.md` → Record the change and validation notes
 - `.gitignore` → Exclude the root `logs/` directory
@@ -68,7 +68,8 @@
 - Two log files: `app_debug.log` (all events) and `app_errors.log` (errors only)
 - Automatic rotation: 5 MB max per file, keeps 5 backups (~50 MB total)
 - Log levels: DEBUG, INFO, WARNING, ERROR, EXCEPTION
-- Logs stored in the root `logs/` folder, parallel to `config/`
+- Source-run logs are stored in the project-root `logs/` folder, parallel to `config/`.
+- Packaged settings, logs, downloads, history, model cache, and generated files are rooted in the process current working directory; bundled binaries and read-only resources continue to resolve from PyInstaller's `_MEIPASS`.
 - Easy for users to locate and send logs when reporting issues
 
 **Log methods in app:**

@@ -84,7 +84,7 @@ source_code/
 ├── services/
 │   ├── __init__.py
 │   ├── player_service.py          # VLC playback abstraction
-│   ├── download_service.py        # YouTube/stream download service
+│   ├── download_service.py        # yt-dlp URL download service; supplies configured FFmpeg location for merging
 │   ├── file_loading_service.py    # Safe load lifecycle + cleanup coordination
 │   ├── audio_service.py           # Audio analysis integration + helper commands
 │   ├── logging_service.py         # Rotating debug/error logger and troubleshooting capture
@@ -158,12 +158,12 @@ layouts, getters) so Audio Studio and Video Studio can share them without cross-
 
 `source_code/services/logging_service.py` provides the app-wide diagnostic boundary. This service owns:
 
-- rotating `app_debug.log` and `app_errors.log` files under the root `logs/` directory, parallel to `config/`
+- rotating `app_debug.log` and `app_errors.log` files under `logs/` in the current working directory for source and packaged runs
 - event classification by DEBUG, INFO, WARNING, ERROR, and EXCEPTION levels
 - a single access point for app startup, process lifecycle, download, and media-load troubleshooting
 - user-facing guidance via `documentation/LOGGING.md` for collecting the right logs when reporting issues
 
-`main.py` initializes the logger at startup and uses it across playback, processing, and file-load flows so errors are captured consistently without ad hoc print statements.
+`main.py` initializes the logger at startup and uses it across playback, processing, and file-load flows so errors are captured consistently without ad hoc print statements. Runtime-writable data—including settings, logs, downloads, history, model cache, and generated files—is rooted in the process current working directory. Bundled tools and read-only resources continue to resolve from PyInstaller's `_MEIPASS`. Legacy packaged settings are migrated into the current working directory on first startup.
 
 ### Page Layout & Scroll Architecture (updated 2026-06-29)
 

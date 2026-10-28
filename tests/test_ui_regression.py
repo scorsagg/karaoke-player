@@ -118,6 +118,17 @@ def _record_calls(calls, name):
     return record
 
 
+def test_frozen_app_data_uses_current_working_directory(monkeypatch, tmp_path):
+    working_dir = tmp_path / "working"
+    working_dir.mkdir()
+    monkeypatch.chdir(working_dir)
+    internal_dir = tmp_path / "distribution" / "_internal"
+    monkeypatch.setattr(main_module.sys, "_MEIPASS", str(internal_dir), raising=False)
+
+    assert main_module.get_app_data_dir() == working_dir
+    assert main_module.get_log_dir() == working_dir / "logs"
+
+
 @pytest.fixture
 def application(qapp, monkeypatch, tmp_path):
     """Construct the real shell with fake external services and observable action sinks."""

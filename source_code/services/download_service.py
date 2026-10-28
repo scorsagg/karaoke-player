@@ -83,9 +83,14 @@ class DownloadService(QObject):
             "--merge-output-format", "mp4",
             "--force-overwrites",
             "--no-warnings",
+        ]
+        ffmpeg_path = self.settings_manager.get("ffmpeg_path")
+        if ffmpeg_path:
+            command.extend(["--ffmpeg-location", str(ffmpeg_path)])
+        command.extend([
             "--",
             url,
-        ]
+        ])
 
         self.download_thread = self.process_thread_factory(cmd=command, duration=0)
         self.download_thread.line_output.connect(self._parse_download_status)

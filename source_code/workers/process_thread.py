@@ -19,15 +19,20 @@ class ProcessThread(QThread):
         self.is_killed = False
 
     def run(self):
-        self.process = popen_hidden(
-            self.cmd,
-            merge_stderr=True,
-            universal_newlines=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-        )
-        
+        try:
+            self.process = popen_hidden(
+                self.cmd,
+                merge_stderr=True,
+                universal_newlines=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+        except (OSError, ValueError) as e:
+            self.line_output.emit(f"ERROR: Failed to start subprocess: {e}")
+            self.finished.emit(False)
+            return
+
         buffer = ""
         try:
             while True:
