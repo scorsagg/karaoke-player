@@ -61,6 +61,17 @@ PAGE_AUDIO_STUDIO = 2
 PAGE_VIDEO_STUDIO = 3
 PAGE_CONVERT_EXPORT = 4
 
+
+def get_app_data_dir():
+    """Return the current working directory for writable application data."""
+    return Path.cwd()
+
+
+def get_log_dir():
+    """Return the log directory under the current working directory."""
+    return get_app_data_dir() / "logs"
+
+
 class KaraokeApp(QWidget):
     realtime_pitch_error = Signal(str)
 
@@ -173,12 +184,22 @@ class KaraokeApp(QWidget):
         self.state._pending_seek_ratio = None
 
     def init_settings_manager(self):
-        app_dir = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(__file__).parent.parent
+        app_dir = get_app_data_dir()
         config_dir = app_dir / "config"
-        config_dir.mkdir(exist_ok=True)
+        config_dir.mkdir(parents=True, exist_ok=True)
         self.settings_file = config_dir / "settings.json"
+
         # Initialize new centralized logging service with rotation and multi-level logging
-        self.logger = LoggingService(app_dir / "logs")
+        self.logger = LoggingService(get_log_dir())
+
+        # Older packaged builds stored mutable settings beside bundled resources.
+        if hasattr(sys, "_MEIPASS") and not self.settings_file.exists():
+            previous_settings = Path(sys._MEIPASS) / "config" / "settings.json"
+            if previous_settings.is_file():
+                try:
+                    shutil.copy2(previous_settings, self.settings_file)
+                except OSError as e:
+                    self.log_exception("migrate_settings", e)
 
         bundled_ffmpeg = get_resource_path("ffmpeg.exe")
         bundled_ffprobe = get_resource_path("ffprobe.exe")
@@ -199,19 +220,32 @@ class KaraokeApp(QWidget):
             except Exception as e:
                 print(f"[settings] Failed to load {self.settings_file}: {e} (using defaults)")
 
+        if hasattr(sys, "_MEIPASS"):
+            previous_app_dir = Path(sys._MEIPASS)
+            for setting_key in ("base_directory", "download_directory"):
+                configured_dir = Path(
+                    str(self.settings.get(setting_key, app_dir)).strip() or app_dir
+                )
+                if configured_dir.resolve() == previous_app_dir.resolve():
+                    self.settings[setting_key] = str(app_dir)
+
         # Migrate legacy command-only paths to bundled tools when available.
         try:
-            ffmpeg_path = str(self.settings.get("ffmpeg_path", "")).strip().lower()
-            if ffmpeg_path in {"ffmpeg", "ffmpeg.exe"} and os.path.exists(bundled_ffmpeg):
-                self.settings["ffmpeg_path"] = bundled_ffmpeg
-
-            ffprobe_path = str(self.settings.get("ffprobe_path", "")).strip().lower()
-            if ffprobe_path in {"ffprobe", "ffprobe.exe"} and os.path.exists(bundled_ffprobe):
-                self.settings["ffprobe_path"] = bundled_ffprobe
-
-            ytdlp_path = str(self.settings.get("ytdlp_path", "")).strip().lower()
-            if ytdlp_path in {"yt-dlp", "yt-dlp.exe"} and os.path.exists(bundled_ytdlp):
-                self.settings["ytdlp_path"] = bundled_ytdlp
+            for setting_key, command_names, bundled_path in (
+                ("ffmpeg_path", {"ffmpeg", "ffmpeg.exe"}, bundled_ffmpeg),
+                ("ffprobe_path", {"ffprobe", "ffprobe.exe"}, bundled_ffprobe),
+                ("ytdlp_path", {"yt-dlp", "yt-dlp.exe"}, bundled_ytdlp),
+            ):
+                configured_path = str(self.settings.get(setting_key, "")).strip()
+                if (
+                    configured_path.lower() in command_names
+                    or not os.path.isfile(configured_path)
+                ) and os.path.isfile(bundled_path):
+                    if configured_path and configured_path.lower() not in command_names:
+                        self.log_warning(
+                            f"[settings] Configured {setting_key} is unavailable; using the bundled tool."
+                        )
+                    self.settings[setting_key] = bundled_path
 
             self.save_settings()
         except Exception as e:
@@ -1582,6 +1616,7 @@ class KaraokeApp(QWidget):
         close_splash(self, "download_splash")
         self.status_label.setText("Status: Ready")
         self._set_download_ui_busy(self.download_service.is_downloading())
+        self.log_error(f"[download] {message}")
         if "cancelled" in message.lower():
             return
 
@@ -3504,9 +3539,8 @@ class ModernSplashScreen(QSplashScreen):
 def log_uncaught_exception(exc_type, exc_value, exc_traceback):
     """Global uncaught exception handler for startup/runtime fatal errors."""
     try:
-        app_dir = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(__file__).parent.parent
-        logs_dir = app_dir / "logs"
-        logs_dir.mkdir(exist_ok=True)
+        logs_dir = get_log_dir()
+        logs_dir.mkdir(parents=True, exist_ok=True)
         log_file = logs_dir / "app_debug.log"
 
         logger = logging.getLogger("karaoke_app_boot")

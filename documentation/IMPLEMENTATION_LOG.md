@@ -1,4 +1,54 @@
 # Implementation Log - Karaoke Studio Pro v3
+# Follow-up: Keep All Runtime Data in Current Working Directory (2026-10-28) - COMPLETE
+
+**Status:** Implemented and rebuilt.
+
+### Change
+- Root packaged settings, logs, downloads, history, model cache, and generated files in `Path.cwd()`.
+- Keep bundled executables and read-only resources resolved from `_MEIPASS`.
+- Migrate legacy settings whose base or download directory pointed at `_MEIPASS` to the current working directory.
+- Update runtime-location documentation and regression coverage.
+
+### Validation
+- Focused UI regression test and full pytest suite passed with one skipped test; syntax checks and `git diff --check` passed.
+- Packaged executable and distribution ZIP rebuilt successfully with the project Python 3.12 environment.
+
+# Follow-up: Pass Bundled FFmpeg to Packaged Downloads (2026-10-28) - COMPLETE
+
+**Status:** Implemented and rebuilt at the time; superseded by the current-working-directory runtime-data follow-up above.
+
+### Problem
+The packaged app bundles FFmpeg next to yt-dlp, but yt-dlp was not explicitly told where to find it when merging separately downloaded video and audio streams.
+
+### Fix
+- Add yt-dlp's `--ffmpeg-location` argument using the configured FFmpeg path.
+- Add command-construction regression coverage and document the runtime dependency.
+
+### Validation
+- Focused download-service, process-thread, and UI regression tests passed; the full pytest suite passed with one skipped test.
+- Bundled yt-dlp `2026.08.19` supports `--ffmpeg-location`; the distribution was rebuilt successfully using the project Python 3.12 environment.
+- The packaged executable has not been tested with a live URL.
+
+# Change: Fix Packaged Downloads and Writable Diagnostics (2026-10-28) - SUPERSEDED
+
+**Status:** Download diagnostics retained; app-data location superseded by the current-working-directory follow-up above.
+
+**Files Changed:** `source_code/main.py`, `source_code/workers/process_thread.py`, focused tests, `documentation/FILE_DEPENDENCIES.md`, `documentation/ARCHITECTURE.md`, `documentation/FOLDER_ORGANIZATION_SUMMARY.txt`, `DEVELOPMENT.md`, `documentation/LOGGING.md`, and `documentation/IMPLEMENTATION_LOG.md`
+
+### Problem
+Packaged runtime state was placed under PyInstaller's `_MEIPASS` resource directory, which could make writable files unavailable or unwritable. In addition, a failed subprocess launch (for example, an invalid saved yt-dlp path) raised before the worker's error handling, leaving the download UI without a completion or error signal.
+
+### Fix
+- The initial fix separated logs from other runtime data; the later current-working-directory follow-up now roots all writable runtime data in the process working directory.
+- Migrate legacy packaged settings on first launch, retarget a legacy default download directory, and replace missing configured tool paths with bundled tools when available.
+- Emit a failure line and completion signal when a subprocess cannot start, allowing downloads to close the splash and show the actual error.
+- Log download errors through the application logger.
+
+### Validation
+- Focused process-thread and UI regression tests passed (27 tests), covering subprocess launch failure and packaged app-data path selection.
+- Full `python -m pytest -q` suite passed with one skipped test.
+- Changed Python files passed `py_compile`; `git diff --check` passed. A new distribution executable was not built in this session.
+
 # Change: Documentation Sync Cleanup for Installation and Build Paths (2026-10-26) - COMPLETE
 
 **Status:** Implemented

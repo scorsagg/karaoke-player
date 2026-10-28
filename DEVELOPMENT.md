@@ -90,7 +90,7 @@ source_code/
 │   └── extra_page.py         # Secondary / legacy page placeholder
 ├── services/
 │   ├── audio_service.py      # Audio analyzer coordination
-│   ├── download_service.py   # YouTube downloads
+│   ├── download_service.py   # yt-dlp downloads, with configured FFmpeg path for merging
 │   ├── file_loading_service.py # Safe file load lifecycle and cleanup
 │   ├── logging_service.py    # Rotating app/debug/error logger
 │   ├── player_service.py     # VLC player abstraction
@@ -133,6 +133,10 @@ logs/
 └── app_errors.log             # Error-only log (NOT tracked in git)
 ```
 
+For both source and packaged runs, settings, logs, downloads, history, model cache, and generated
+files are rooted in the process current working directory. Bundled tools and read-only resources
+remain in the distribution's `_internal` directory.
+
 ---
 
 ## File Dependencies Reference
@@ -164,7 +168,7 @@ The staged ownership map, migration phases, all-feature Qt UI regression gates, 
 
 ### Logging & Diagnostics ✅
 - Centralized runtime logger is managed by `source_code/services/logging_service.py`
-- Logs are stored in `logs/app_debug.log` and `logs/app_errors.log`, in a root-level `logs/` folder parallel to `config/`
+- Source-run and packaged logs are stored in `logs/` under the process current working directory
 - The logger uses rotating files with error-only capture and developer-friendly debug output
 - See [`documentation/LOGGING.md`](documentation/LOGGING.md) for user troubleshooting steps
 
